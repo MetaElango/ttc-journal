@@ -70,26 +70,12 @@ export default async function NewJournalPage({ searchParams }) {
 
     const supabase = await createClient();
 
-    const parseJsonArray = (key) => {
-      const raw = formData.get(key);
-      if (!raw) return [];
-      try {
-        const v = JSON.parse(raw);
-        return Array.isArray(v) ? v : [];
-      } catch {
-        return [];
-      }
-    };
-
     const trading_account_id = formData.get("trading_account_id") || null;
     const symbol_id = formData.get("symbol_id") || null;
     const status = formData.get("status") || "FORWARD TESTING";
 
     const entry_price = Number(formData.get("entry_price"));
     const stop_loss = Number(formData.get("stop_loss"));
-    const take_profit = parseJsonArray("take_profit")
-      .map((x) => Number(x))
-      .filter((n) => !Number.isNaN(n));
 
     const entry_reason = String(formData.get("entry_reason") || "").trim();
     const exit_reason_raw = String(formData.get("exit_reason") || "").trim();
@@ -100,17 +86,39 @@ export default async function NewJournalPage({ searchParams }) {
 
     const risk_mode = formData.get("risk_mode") || null;
     const risk_per_trade = Number(formData.get("risk_per_trade"));
+    const quantity = Number(formData.get("quantity"));
 
-    // Validate
+    // ---- Parse TP JSON (editable price + qty) ----
+    const tpRaw = String(formData.get("take_profit_json") || "[]");
+    let tpItems = [];
+    try {
+      const parsed = JSON.parse(tpRaw);
+      tpItems = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      tpItems = [];
+    }
+
+    const take_profit = tpItems
+      .map((x) => Number(x?.price))
+      .filter((n) => !Number.isNaN(n));
+
+    const take_profit_qty = tpItems
+      .map((x) => Number(x?.qty))
+      .filter((n) => !Number.isNaN(n));
+
+    // ---- Validate ----
     if (!trading_account_id)
       return { ok: false, message: "Select a trading account." };
     if (!symbol_id) return { ok: false, message: "Select a symbol." };
+
     if (Number.isNaN(entry_price))
       return { ok: false, message: "Entry price must be a number." };
     if (Number.isNaN(stop_loss))
       return { ok: false, message: "Stop loss must be a number." };
+
     if (!entry_reason)
       return { ok: false, message: "Entry reason is required." };
+
     if (!risk_mode) return { ok: false, message: "Select risk mode." };
     if (Number.isNaN(risk_per_trade) || risk_per_trade <= 0)
       return {
@@ -118,6 +126,10 @@ export default async function NewJournalPage({ searchParams }) {
         message: "Risk per trade must be a positive number.",
       };
 
+    if (Number.isNaN(quantity) || quantity <= 0)
+      return { ok: false, message: "Quantity must be a positive number." };
+
+    // Exit validation
     if (exit_reason && (exit_price === null || Number.isNaN(exit_price)))
       return {
         ok: false,
@@ -129,6 +141,32 @@ export default async function NewJournalPage({ searchParams }) {
         ok: false,
         message: "Exit reason is required if exit price is provided.",
       };
+
+    // TP validation
+    if (!tpItems || tpItems.length === 0)
+      return { ok: false, message: "Add at least one Take Profit." };
+
+    if (
+      take_profit.length !== tpItems.length ||
+      take_profit_qty.length !== tpItems.length
+    )
+      return {
+        ok: false,
+        message: "Every TP must have a valid price and quantity.",
+      };
+
+    for (const q of take_profit_qty) {
+      if (!(q > 0))
+        return { ok: false, message: "Each TP quantity must be > 0." };
+    }
+
+    const sumQty = take_profit_qty.reduce((a, b) => a + b, 0);
+    if (Math.abs(quantity - sumQty) > 0.0001) {
+      return {
+        ok: false,
+        message: "Sum of TP quantities must equal total quantity (lots).",
+      };
+    }
 
     // Snapshot the strategy at time of journaling
     const strategy_snapshot = {
@@ -159,12 +197,19 @@ export default async function NewJournalPage({ searchParams }) {
       symbol_id,
       status,
       strategy_snapshot,
+
+      quantity,
+
       entry_price,
       stop_loss,
+
       take_profit,
+      take_profit_qty,
+
       entry_reason,
       exit_reason,
       exit_price,
+
       risk_mode,
       risk_per_trade,
     });
