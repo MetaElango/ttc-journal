@@ -13,6 +13,11 @@ export default function SettingsForm({ initialProfile, action }) {
   return (
     <div className="max-w-md space-y-6">
       <h1 className="text-xl font-semibold">Complete your profile</h1>
+      {p.username ? (
+        <p className="text-sm text-muted-foreground">
+          Username: <span className="font-medium">{p.username}</span>
+        </p>
+      ) : null}
 
       <form action={formAction} className="space-y-4">
         <div className="space-y-2">

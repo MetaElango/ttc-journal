@@ -1,3 +1,4 @@
+// app/app/strategies/new-journal/page.js  (or wherever your page lives)
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import NewJournalForm from "./journal-form";
@@ -14,7 +15,6 @@ export default async function NewJournalPage({ searchParams }) {
   const user = authData?.user;
   if (!user) redirect("/login");
 
-  // Load strategy (blueprint)
   const { data: strategy, error: sErr } = await supabase
     .from("strategies")
     .select(
@@ -52,13 +52,11 @@ export default async function NewJournalPage({ searchParams }) {
     );
   }
 
-  // Load user trading accounts
   const { data: accounts } = await supabase
     .from("trading_accounts")
     .select("id, account_name, account_size, framework")
     .order("created_at", { ascending: false });
 
-  // Load symbols list
   const { data: symbols } = await supabase
     .from("symbols")
     .select("id, category, symbol_name")
@@ -70,23 +68,115 @@ export default async function NewJournalPage({ searchParams }) {
 
     const supabase = await createClient();
 
-    const trading_account_id = formData.get("trading_account_id") || null;
-    const symbol_id = formData.get("symbol_id") || null;
-    const status = formData.get("status") || "FORWARD TESTING";
+    const PURPOSES = new Set([
+      "FOR OBSERVATION",
+      "ENTRY PLANNED",
+      "FORWARD TESTING",
+    ]);
+
+    const STATUS_OPTIONS_BY_PURPOSE = {
+      "FOR OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
+      "ENTRY PLANNED": [
+        "ENTRY PLACED",
+        "ENTRY TRIGGERED",
+        "ENTRY CANCELLED",
+        "ENTRY MISSED",
+        "RUNNING TRADE",
+        "TRADE SL HIT",
+        "TRADE CLOSE WITH PROFIT",
+        "TRADE EXIT IN MID",
+      ],
+      "FORWARD TESTING": [
+        "ENTRY PLACED",
+        "ENTRY TRIGGERED",
+        "ENTRY CANCELLED",
+        "ENTRY MISSED",
+        "RUNNING TRADE",
+        "TRADE SL HIT",
+        "TRADE CLOSE WITH PROFIT",
+        "TRADE EXIT IN MID",
+      ],
+    };
+
+    const purpose = String(formData.get("purpose") || "")
+      .trim()
+      .toUpperCase();
+    if (!PURPOSES.has(purpose)) {
+      return { ok: false, message: "Invalid purpose selected." };
+    }
+
+    // ✅ status optional for FOR OBSERVATION
+    const statusRaw = String(formData.get("status") || "")
+      .trim()
+      .toUpperCase();
+
+    const allowedStatuses =
+      STATUS_OPTIONS_BY_PURPOSE[purpose] ||
+      STATUS_OPTIONS_BY_PURPOSE["FOR OBSERVATION"];
+
+    let status = null;
+
+    if (statusRaw) {
+      if (!allowedStatuses.has(statusRaw)) {
+        return { ok: false, message: "Select a valid status." };
+      }
+      status = statusRaw;
+    }
+
+    // status is required only for non-observation purposes
+    if (purpose !== "FOR OBSERVATION" && !status) {
+      return { ok: false, message: "Select a status." };
+    }
+
+    // ✅ FOR OBSERVATION doesn't capture trading_account_id
+    let trading_account_id = String(formData.get("trading_account_id") || "");
+    if (purpose === "FOR OBSERVATION") trading_account_id = "";
+    trading_account_id = trading_account_id ? trading_account_id : null;
+
+    if (purpose !== "FOR OBSERVATION" && !trading_account_id) {
+      return { ok: false, message: "Select a trading account." };
+    }
+
+    const symbol_id = String(formData.get("symbol_id") || "") || null;
+
+    // ✅ Direction (BUY / SELL)
+    const directionRaw = String(formData.get("direction") || "")
+      .trim()
+      .toUpperCase();
+    const direction =
+      directionRaw === "BUY" ? "BUY" : directionRaw === "SELL" ? "SELL" : "";
+    if (!direction) {
+      return { ok: false, message: "Select direction (BUY or SELL)." };
+    }
 
     const entry_price = Number(formData.get("entry_price"));
     const stop_loss = Number(formData.get("stop_loss"));
+    const quantity = Number(formData.get("quantity"));
 
     const entry_reason = String(formData.get("entry_reason") || "").trim();
+
+    // ✅ Exit fields OPTIONAL & independent
     const exit_reason_raw = String(formData.get("exit_reason") || "").trim();
     const exit_reason = exit_reason_raw ? exit_reason_raw : null;
 
     const exit_price_raw = String(formData.get("exit_price") || "").trim();
     const exit_price = exit_price_raw ? Number(exit_price_raw) : null;
 
-    const risk_mode = formData.get("risk_mode") || null;
-    const risk_per_trade = Number(formData.get("risk_per_trade"));
-    const quantity = Number(formData.get("quantity"));
+    // Risk fields: for OBSERVATION they are disabled in UI, so fallback
+    const risk_mode =
+      String(formData.get("risk_mode") || "")
+        .trim()
+        .toUpperCase() || (purpose === "FOR OBSERVATION" ? "PERCENT" : "");
+
+    let risk_per_trade_raw = String(
+      formData.get("risk_per_trade") || "",
+    ).trim();
+    let risk_per_trade = risk_per_trade_raw ? Number(risk_per_trade_raw) : NaN;
+
+    if (purpose === "FOR OBSERVATION") {
+      // You said risk is disabled for observation; we store strategy value
+      risk_per_trade = Number(strategy.risk_per_trade);
+    }
 
     // ---- Parse TP JSON (editable price + qty) ----
     const tpRaw = String(formData.get("take_profit_json") || "[]");
@@ -107,40 +197,46 @@ export default async function NewJournalPage({ searchParams }) {
       .filter((n) => !Number.isNaN(n));
 
     // ---- Validate ----
-    if (!trading_account_id)
-      return { ok: false, message: "Select a trading account." };
     if (!symbol_id) return { ok: false, message: "Select a symbol." };
+
+    if (Number.isNaN(quantity) || quantity <= 0)
+      return { ok: false, message: "Quantity must be a positive number." };
 
     if (Number.isNaN(entry_price))
       return { ok: false, message: "Entry price must be a number." };
+
     if (Number.isNaN(stop_loss))
       return { ok: false, message: "Stop loss must be a number." };
 
     if (!entry_reason)
       return { ok: false, message: "Entry reason is required." };
 
+    // Exit price if provided => must be number
+    if (exit_price_raw && (exit_price === null || Number.isNaN(exit_price))) {
+      return { ok: false, message: "Exit price must be a valid number." };
+    }
+
     if (!risk_mode) return { ok: false, message: "Select risk mode." };
-    if (Number.isNaN(risk_per_trade) || risk_per_trade <= 0)
+    if (Number.isNaN(risk_per_trade) || risk_per_trade <= 0) {
       return {
         ok: false,
         message: "Risk per trade must be a positive number.",
       };
+    }
 
-    if (Number.isNaN(quantity) || quantity <= 0)
-      return { ok: false, message: "Quantity must be a positive number." };
-
-    // Exit validation
-    if (exit_reason && (exit_price === null || Number.isNaN(exit_price)))
+    // ✅ Direction based SL validation
+    if (direction === "BUY" && !(stop_loss < entry_price)) {
       return {
         ok: false,
-        message: "Exit price is required when exit reason is provided.",
+        message: "For BUY, stop loss must be less than entry price.",
       };
-
-    if (!exit_reason && exit_price !== null)
+    }
+    if (direction === "SELL" && !(stop_loss > entry_price)) {
       return {
         ok: false,
-        message: "Exit reason is required if exit price is provided.",
+        message: "For SELL, stop loss must be greater than entry price.",
       };
+    }
 
     // TP validation
     if (!tpItems || tpItems.length === 0)
@@ -149,11 +245,12 @@ export default async function NewJournalPage({ searchParams }) {
     if (
       take_profit.length !== tpItems.length ||
       take_profit_qty.length !== tpItems.length
-    )
+    ) {
       return {
         ok: false,
         message: "Every TP must have a valid price and quantity.",
       };
+    }
 
     for (const q of take_profit_qty) {
       if (!(q > 0))
@@ -168,7 +265,6 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
-    // Snapshot the strategy at time of journaling
     const strategy_snapshot = {
       id: strategy.id,
       strategy_name: strategy.strategy_name,
@@ -193,13 +289,17 @@ export default async function NewJournalPage({ searchParams }) {
     const { error } = await supabase.from("journals").insert({
       user_id: user.id,
       strategy_id: strategy.id,
-      trading_account_id,
+
+      trading_account_id, // null for FOR OBSERVATION
       symbol_id,
+
+      purpose,
       status,
+      direction,
+
       strategy_snapshot,
 
       quantity,
-
       entry_price,
       stop_loss,
 
