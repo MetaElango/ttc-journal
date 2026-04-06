@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import EditJournalForm from "./edit-form";
 
 const STATUS_OPTIONS_BY_PURPOSE = {
   "FOR OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
@@ -32,6 +33,8 @@ const EDITABLE_ACTIVE_STATUSES = [
   "ENTRY PLACED",
 ];
 
+const EXIT_REQUIRED_STATUSES = ["TRADE CLOSE WITH PROFIT", "TRADE EXIT IN MID"];
+
 function canEditJournal(journal) {
   if (!journal) return false;
 
@@ -49,14 +52,6 @@ function canEditJournal(journal) {
   return false;
 }
 
-function Pill({ children }) {
-  return (
-    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
-      {children}
-    </span>
-  );
-}
-
 function sanitize2dp(raw) {
   const s = String(raw ?? "");
   let out = s.replace(/[^\d.]/g, "");
@@ -72,8 +67,10 @@ function sanitize2dp(raw) {
   return out;
 }
 
-export default async function EditJournalPage({ params }) {
+export default async function EditJournalPage({ params, searchParams }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const errorType = sp?.error || "";
 
   const supabase = await createClient();
 
@@ -89,6 +86,7 @@ export default async function EditJournalPage({ params }) {
       purpose,
       status,
       exit_price,
+      exit_reason,
       direction,
       entry_price,
       stop_loss,
@@ -160,6 +158,9 @@ export default async function EditJournalPage({ params }) {
       .trim()
       .toUpperCase();
 
+    const exitReasonRaw = String(formData.get("exit_reason") || "").trim();
+    const exit_reason = exitReasonRaw || null;
+
     const exitPriceRaw = sanitize2dp(formData.get("exit_price") || "");
     const exit_price = exitPriceRaw ? Number(exitPriceRaw) : null;
 
@@ -175,17 +176,31 @@ export default async function EditJournalPage({ params }) {
       redirect(`/app/journals/${id}/edit?error=exit_price`);
     }
 
+    const exitRequired = EXIT_REQUIRED_STATUSES.includes(statusRaw);
+
+    if (exitRequired && !exit_reason) {
+      redirect(`/app/journals/${id}/edit?error=exit_reason_required`);
+    }
+
+    if (exitRequired && (exit_price === null || Number.isNaN(exit_price))) {
+      redirect(`/app/journals/${id}/edit?error=exit_price_required`);
+    }
+
     const { error: updateError } = await supabase
       .from("journals")
       .update({
         status: statusRaw,
+        exit_reason,
         exit_price,
       })
       .eq("id", id)
       .eq("user_id", user.id);
 
     if (updateError) {
-      redirect(`/app/journals/${id}/edit?error=save`);
+      console.log("UPDATE ERROR:", updateError);
+      redirect(
+        `/app/journals/${id}/edit?error=${encodeURIComponent(updateError.message)}`,
+      );
     }
 
     redirect("/app/journals");
@@ -203,85 +218,14 @@ export default async function EditJournalPage({ params }) {
         </Link>
       </div>
 
-      <div className="rounded-xl border">
-        <div className="border-b p-4">
-          <div className="text-lg font-semibold">{strategyName}</div>
-
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Pill>Symbol: {symbolLabel}</Pill>
-            <Pill>Direction: {journal.direction || "—"}</Pill>
-            <Pill>Purpose: {journal.purpose || "—"}</Pill>
-            <Pill>Status: {journal.status || "—"}</Pill>
-            <Pill>Entry: {journal.entry_price ?? "—"}</Pill>
-            <Pill>SL: {journal.stop_loss ?? "—"}</Pill>
-          </div>
-        </div>
-
-        <div className="p-4">
-          <form action={updateJournal} className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Status <span className="text-destructive">*</span>
-                </label>
-                <select
-                  name="status"
-                  defaultValue={journal.status || ""}
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                  required
-                >
-                  <option value="" disabled>
-                    Select status
-                  </option>
-                  {statusOptions.map((x) => (
-                    <option key={x} value={x}>
-                      {x}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Exit Price{" "}
-                  <span className="text-muted-foreground">(optional)</span>
-                </label>
-                <input
-                  name="exit_price"
-                  type="text"
-                  inputMode="decimal"
-                  defaultValue={journal.exit_price ?? ""}
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                  placeholder="e.g. 245.50"
-                />
-              </div>
-            </div>
-
-            <div className="rounded-md border p-3 text-sm whitespace-pre-wrap">
-              <div className="mb-2 text-xs font-medium text-muted-foreground">
-                Entry Reason
-              </div>
-              {journal.entry_reason || "—"}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-              >
-                Update Journal
-              </button>
-
-              <Link
-                href="/app/journals"
-                className="inline-flex h-10 items-center rounded-md border px-4 text-sm hover:bg-accent"
-              >
-                Cancel
-              </Link>
-            </div>
-          </form>
-        </div>
-      </div>
+      <EditJournalForm
+        action={updateJournal}
+        journal={journal}
+        strategyName={strategyName}
+        symbolLabel={symbolLabel}
+        statusOptions={statusOptions}
+        errorType={errorType}
+      />
     </div>
   );
 }

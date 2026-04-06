@@ -117,7 +117,7 @@ export default async function NewJournalPage({ searchParams }) {
     let status = null;
 
     if (statusRaw) {
-      if (!allowedStatuses.has(statusRaw)) {
+      if (!allowedStatuses.includes(statusRaw)) {
         return { ok: false, message: "Select a valid status." };
       }
       status = statusRaw;
