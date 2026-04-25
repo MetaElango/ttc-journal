@@ -1,50 +1,183 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import JournalsClient, { JournalsTableBody } from "./journals-client";
 
-function Pill({ children }) {
-  return (
-    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
-      {children}
-    </span>
-  );
+const TABS = [
+  { key: "open", label: "Open" },
+  { key: "closed", label: "Closed" },
+  { key: "cancelled", label: "Cancelled" },
+];
+
+const PURPOSES = ["FOR OBSERVATION", "ENTRY PLANNED", "FORWARD TESTING"];
+
+const OPEN_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+
+const CLOSED_STATUSES = [
+  "TRADE SL HIT",
+  "TRADE CLOSE WITH PROFIT",
+  "TRADE EXIT IN MID",
+  "ENTRY CLOSED",
+];
+
+const CANCELLED_STATUSES = ["ENTRY CANCELLED", "ENTRY MISSED"];
+
+function norm(v) {
+  return String(v || "")
+    .trim()
+    .toUpperCase();
 }
 
-function Section({ title, children }) {
+function getJournalTab(journal) {
+  const status = norm(journal.status);
+
+  if (OPEN_STATUSES.includes(status)) return "open";
+  if (CLOSED_STATUSES.includes(status)) return "closed";
+  if (CANCELLED_STATUSES.includes(status)) return "cancelled";
+
+  return null;
+}
+
+function getWeightedTakeProfit(journal) {
+  const prices = Array.isArray(journal.take_profit) ? journal.take_profit : [];
+  const qtys = Array.isArray(journal.take_profit_qty)
+    ? journal.take_profit_qty
+    : [];
+
+  if (!prices.length) return 0;
+
+  if (qtys.length === prices.length) {
+    let total = 0;
+    let totalQty = 0;
+
+    for (let i = 0; i < prices.length; i++) {
+      const price = Number(prices[i]);
+      const qty = Number(qtys[i]);
+
+      if (Number.isNaN(price) || Number.isNaN(qty) || qty <= 0) continue;
+
+      total += price * qty;
+      totalQty += qty;
+    }
+
+    if (totalQty > 0) return total / totalQty;
+  }
+
+  const validPrices = prices.map(Number).filter((n) => !Number.isNaN(n));
+  if (!validPrices.length) return 0;
+
+  return validPrices.reduce((a, b) => a + b, 0) / validPrices.length;
+}
+
+function calculatePlannedRR(journal) {
+  const direction = norm(journal.direction);
+  const entry = Number(journal.entry_price);
+  const stop = Number(journal.stop_loss);
+  const tp = Number(getWeightedTakeProfit(journal));
+
+  if (!(entry > 0) || !(stop > 0) || !(tp > 0)) return 0;
+
+  if (direction === "BUY") {
+    const risk = entry - stop;
+    if (risk <= 0) return 0;
+    return (tp - entry) / risk;
+  }
+
+  if (direction === "SELL") {
+    const risk = stop - entry;
+    if (risk <= 0) return 0;
+    return (entry - tp) / risk;
+  }
+
+  return 0;
+}
+
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function formatRisk(journal) {
+  const mode = norm(journal.risk_mode);
+  const risk = journal.risk_per_trade;
+
+  if (risk == null) return "—";
+  if (mode === "PERCENT") return `${risk}%`;
+  if (mode === "AMOUNT") return `$${risk}`;
+
+  return risk;
+}
+
+function shortText(value, max = 24) {
+  const text = String(value || "—");
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}...`;
+}
+
+function JournalsTable({ journals, setSelectedJournal }) {
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-medium text-muted-foreground">{title}</div>
-      <div className="rounded-md border p-3 text-sm whitespace-pre-wrap">
-        {children || <span className="opacity-60">—</span>}
-      </div>
+    <div className="overflow-x-auto rounded-xl border">
+      <table className="relative w-full min-w-[1030px] table-fixed text-sm">
+        <thead className="bg-background">
+          <tr className="border-b">
+            <th className="sticky left-0 z-30 w-[240px] bg-background px-4 py-3 text-left font-medium shadow-[2px_0_5px_rgba(0,0,0,0.08)]">
+              Strategy
+            </th>
+            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
+              Symbol
+            </th>
+            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
+              Direction
+            </th>
+            <th className="w-[160px] bg-background px-4 py-3 text-left font-medium">
+              Trading Style
+            </th>
+            <th className="w-[140px] bg-background px-4 py-3 text-left font-medium">
+              Setup
+            </th>
+            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
+              Entry
+            </th>
+            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
+              SL
+            </th>
+            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
+              Risk
+            </th>
+            <th className="w-[100px] bg-background px-4 py-3 text-left font-medium">
+              RR
+            </th>
+            <th className="sticky right-[104px] z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
+              Edit
+            </th>
+            <th className="sticky right-0 z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
+              Details
+            </th>
+          </tr>
+        </thead>
+
+        <JournalsTableBody
+          journals={journals}
+          setSelectedJournal={setSelectedJournal}
+          calculatePlannedRR={calculatePlannedRR}
+          round2={round2}
+          formatRisk={formatRisk}
+          shortText={shortText}
+        />
+      </table>
     </div>
   );
 }
 
-function formatTP(tp = [], qty = []) {
-  if (!Array.isArray(tp) || tp.length === 0) return "—";
+export default async function JournalsPage({ searchParams }) {
+  const params = await searchParams;
+  const activeTab = TABS.some((t) => t.key === params?.tab)
+    ? params.tab
+    : "open";
 
-  // If qty is present and matches length, show: 250.5 (0.5), 260 (0.25)
-  if (Array.isArray(qty) && qty.length === tp.length) {
-    return tp
-      .map((p, i) => {
-        const q = qty[i];
-        const qStr = typeof q === "number" && !Number.isNaN(q) ? ` (${q})` : "";
-        return `${p}${qStr}`;
-      })
-      .join(", ");
-  }
-
-  // else just prices
-  return tp.join(", ");
-}
-
-export default async function JournalsPage() {
   const supabase = await createClient();
 
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user;
 
-  // RLS should handle ownership; still ok to require login
   if (!user) {
     return (
       <div className="p-6">
@@ -64,18 +197,31 @@ export default async function JournalsPage() {
       purpose,
       status,
       direction,
+      quantity,
       entry_price,
       stop_loss,
       take_profit,
       take_profit_qty,
+      risk_mode,
+      risk_per_trade,
       entry_reason,
       exit_reason,
+      exit_price,
+      setup_images,
+      reference_images,
       created_at,
       strategy_snapshot,
       symbols:symbol_id (
         id,
         symbol_name,
         category
+      ),
+      trading_accounts:trading_account_id (
+        id,
+        account_name,
+        account_size,
+        framework,
+        tag
       )
     `,
     )
@@ -90,17 +236,57 @@ export default async function JournalsPage() {
     );
   }
 
+  const allJournals = journals || [];
+
+  async function getSignedImageUrls(paths = []) {
+    if (!Array.isArray(paths) || paths.length === 0) return [];
+
+    const { data, error } = await supabase.storage
+      .from("journal-images")
+      .createSignedUrls(paths, 60 * 60); // 1 hour
+
+    if (error) {
+      console.log("Signed URL error:", error.message);
+      return [];
+    }
+
+    return data?.map((x) => x.signedUrl).filter(Boolean) || [];
+  }
+
+  const journalsWithImageUrls = await Promise.all(
+    allJournals.map(async (journal) => ({
+      ...journal,
+      setupImageUrls: await getSignedImageUrls(journal.setup_images),
+      referenceImageUrls: await getSignedImageUrls(journal.reference_images),
+    })),
+  );
+
+  const counts = TABS.reduce((acc, tab) => {
+    acc[tab.key] = journalsWithImageUrls.filter(
+      (j) => getJournalTab(j) === tab.key,
+    ).length;
+    return acc;
+  }, {});
+
+  const filteredJournals = journalsWithImageUrls.filter(
+    (j) => getJournalTab(j) === activeTab,
+  );
+
+  const journalsByPurpose = PURPOSES.map((purpose) => ({
+    purpose,
+    data: filteredJournals.filter((j) => norm(j.purpose) === purpose),
+  })).filter((group) => group.data.length > 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Journals</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {journals?.length || 0} journals
+            {journalsWithImageUrls.length} journals
           </p>
         </div>
 
-        {/* optional: link to strategies since journals are created from strategy */}
         <Link
           href="/app/strategies"
           className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
@@ -109,85 +295,33 @@ export default async function JournalsPage() {
         </Link>
       </div>
 
-      {(!journals || journals.length === 0) && (
-        <div className="rounded-md border p-6 text-sm">
-          <div className="font-medium">No journals yet</div>
-          <p className="mt-1 text-muted-foreground">
-            Create a journal from a strategy to see it here.
-          </p>
-          <Link
-            href="/app/strategies"
-            className="mt-4 inline-block rounded-md border px-4 py-2 text-sm hover:bg-accent"
-          >
-            Go to Strategies
-          </Link>
-        </div>
-      )}
-
-      <div className="grid gap-6">
-        {journals?.map((j) => {
-          const strategyName = j?.strategy_snapshot?.strategy_name || "—";
-
-          const symbolLabel = j?.symbols
-            ? `${j.symbols.symbol_name} — ${j.symbols.category}`
-            : "—";
-
-          const tpText = formatTP(j.take_profit, j.take_profit_qty);
-
-          const canEdit =
-            (j.purpose === "FOR OBSERVATION" && !j.status) ||
-            ((j.purpose === "ENTRY PLANNED" ||
-              j.purpose === "FORWARD TESTING") &&
-              ["RUNNING TRADE", "ENTRY TRIGGERED", "ENTRY PLACED"].includes(
-                j.status || "",
-              ));
+      <div className="flex flex-wrap gap-2 border-b">
+        {TABS.map((tab) => {
+          const active = activeTab === tab.key;
 
           return (
-            <div key={j.id} className="rounded-xl border">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b p-4">
-                <div className="space-y-2">
-                  <div className="text-lg font-semibold">{strategyName}</div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Pill>Symbol: {symbolLabel}</Pill>
-                    <Pill>Direction: {j.direction || "—"}</Pill>
-                    <Pill>Purpose: {j.purpose || "—"}</Pill>
-                    <Pill>Status: {j.status || "—"}</Pill>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Pill>Entry: {j.entry_price ?? "—"}</Pill>
-                    <Pill>SL: {j.stop_loss ?? "—"}</Pill>
-                    <Pill>TP: {tpText}</Pill>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2">
-                  <div className="text-xs text-muted-foreground">
-                    {j.created_at
-                      ? new Date(j.created_at).toLocaleDateString()
-                      : "—"}
-                  </div>
-
-                  {canEdit ? (
-                    <Link
-                      href={`/app/journals/${j.id}/edit`}
-                      className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
-                    >
-                      Edit
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="grid gap-4 p-4 md:grid-cols-2">
-                <Section title="Entry Reason">{j.entry_reason}</Section>
-                <Section title="Exit Reason">{j.exit_reason}</Section>
-              </div>
-            </div>
+            <Link
+              key={tab.key}
+              href={`/app/journals?tab=${tab.key}`}
+              className={`border-b-2 px-4 py-3 text-sm font-medium ${
+                active
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label} ({counts[tab.key] || 0})
+            </Link>
           );
         })}
       </div>
+
+      {filteredJournals.length === 0 ? (
+        <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">
+          No journals in this tab.
+        </div>
+      ) : (
+        <JournalsClient journalsByPurpose={journalsByPurpose} />
+      )}
     </div>
   );
 }
