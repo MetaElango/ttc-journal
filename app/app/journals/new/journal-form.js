@@ -1,9 +1,11 @@
 // app/app/strategies/new-journal/journal-form.js  (or wherever your form lives)
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
 
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -581,6 +583,11 @@ function JournalDetailsCommon({
   setEntryPrice,
   stopLoss,
   setStopLoss,
+
+  setupImages,
+  setSetupImages,
+  referenceImages,
+  setReferenceImages,
 }) {
   const disableTradingAccount = !!cfg.disable?.tradingAccount;
   const disableRisk = !!cfg.disable?.risk;
@@ -870,6 +877,51 @@ function JournalDetailsCommon({
           />
         </div>
       </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Setup Images</Label>
+          <Input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+
+              if (files.length > 3) {
+                alert("Setup images can be maximum 3.");
+                e.target.value = "";
+                setSetupImages([]);
+                return;
+              }
+
+              setSetupImages(files);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">Max 3 images.</p>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Reference Images</Label>
+          <Input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+
+              if (files.length > 3) {
+                alert("Reference images can be maximum 3.");
+                e.target.value = "";
+                setReferenceImages([]);
+                return;
+              }
+
+              setReferenceImages(files);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">Max 3 images.</p>
+        </div>
+      </div>
 
       {/* Risk */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -951,6 +1003,12 @@ export default function NewJournalForm({
   accounts,
   symbols,
 }) {
+  const router = useRouter();
+
+  const [setupImages, setSetupImages] = useState([]);
+  const [referenceImages, setReferenceImages] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [state, formAction, pending] = useActionState(action, {
     ok: true,
     message: "",
@@ -996,6 +1054,75 @@ export default function NewJournalForm({
     if (direction === "BUY") slOk = slNum < entryNum;
     if (direction === "SELL") slOk = slNum > entryNum;
   }
+  useEffect(() => {
+    async function uploadImagesAndRedirect() {
+      if (!state?.ok || !state?.journalId) return;
+
+      setUploadingImages(true);
+      setUploadError("");
+
+      try {
+        const supabase = createClient();
+
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          throw new Error("User not found.");
+        }
+
+        async function uploadFiles(files, type) {
+          const uploadedPaths = [];
+
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+
+            const ext = file.name.split(".").pop() || "jpg";
+            const filePath = `${user.id}/${state.journalId}/${type}/${Date.now()}-${i}.${ext}`;
+
+            const { error } = await supabase.storage
+              .from("journal-images")
+              .upload(filePath, file, {
+                contentType: file.type,
+                upsert: false,
+              });
+
+            if (error) throw new Error(error.message);
+
+            uploadedPaths.push(filePath);
+          }
+
+          return uploadedPaths;
+        }
+
+        const setupImagePaths = await uploadFiles(setupImages, "setup");
+        const referenceImagePaths = await uploadFiles(
+          referenceImages,
+          "reference",
+        );
+
+        const { error: updateError } = await supabase
+          .from("journals")
+          .update({
+            setup_images: setupImagePaths,
+            reference_images: referenceImagePaths,
+          })
+          .eq("id", state.journalId);
+
+        if (updateError) throw new Error(updateError.message);
+
+        router.push("/app/journals");
+      } catch (err) {
+        setUploadError(err.message || "Image upload failed.");
+      } finally {
+        setUploadingImages(false);
+      }
+    }
+
+    uploadImagesAndRedirect();
+  }, [state?.ok, state?.journalId]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -1039,6 +1166,10 @@ export default function NewJournalForm({
                   setEntryPrice={setEntryPrice}
                   stopLoss={stopLoss}
                   setStopLoss={setStopLoss}
+                  setupImages={setupImages}
+                  setSetupImages={setSetupImages}
+                  referenceImages={referenceImages}
+                  setReferenceImages={setReferenceImages}
                 />
               )}
             </PurposeRenderer>
@@ -1046,19 +1177,26 @@ export default function NewJournalForm({
             {state?.message ? (
               <p className="text-sm text-destructive">{state.message}</p>
             ) : null}
-
+            {uploadError ? (
+              <p className="text-sm text-destructive">{uploadError}</p>
+            ) : null}
             <div className="flex items-center gap-3">
               <Button
                 type="submit"
                 disabled={
                   pending ||
+                  uploadingImages ||
                   tpItems.length === 0 ||
                   !sumOk ||
                   !slOk ||
                   (cfg.required?.status && !status)
                 }
               >
-                {pending ? "Saving..." : "Create Journal"}
+                {pending
+                  ? "Saving..."
+                  : uploadingImages
+                    ? "Uploading Images..."
+                    : "Create Journal"}
               </Button>
 
               {cfg.required?.status && !status ? (

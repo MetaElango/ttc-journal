@@ -285,36 +285,115 @@ export default async function NewJournalPage({ searchParams }) {
       planned_r_year: strategy.planned_r_year,
       snapshotted_at: new Date().toISOString(),
     };
+    const setupImages = formData
+      .getAll("setup_images")
+      .filter((file) => file && file.size > 0);
 
-    const { error } = await supabase.from("journals").insert({
-      user_id: user.id,
-      strategy_id: strategy.id,
+    const referenceImages = formData
+      .getAll("reference_images")
+      .filter((file) => file && file.size > 0);
 
-      trading_account_id, // null for FOR OBSERVATION
-      symbol_id,
+    if (setupImages.length > 3) {
+      return { ok: false, message: "Setup images can be maximum 3." };
+    }
 
-      purpose,
-      status,
-      direction,
+    if (referenceImages.length > 3) {
+      return { ok: false, message: "Reference images can be maximum 3." };
+    }
+    const { data: insertedJournal, error } = await supabase
+      .from("journals")
+      .insert({
+        user_id: user.id,
+        strategy_id: strategy.id,
 
-      strategy_snapshot,
+        trading_account_id,
+        symbol_id,
 
-      quantity,
-      entry_price,
-      stop_loss,
+        purpose,
+        status,
+        direction,
 
-      take_profit,
-      take_profit_qty,
+        strategy_snapshot,
 
-      entry_reason,
-      exit_reason,
-      exit_price,
+        quantity,
+        entry_price,
+        stop_loss,
 
-      risk_mode,
-      risk_per_trade,
-    });
+        take_profit,
+        take_profit_qty,
+
+        entry_reason,
+        exit_reason,
+        exit_price,
+
+        risk_mode,
+        risk_per_trade,
+
+        setup_images: [],
+        reference_images: [],
+      })
+      .select("id")
+      .single();
 
     if (error) return { ok: false, message: error.message };
+
+    return {
+      ok: true,
+      message: "Journal created.",
+      journalId: insertedJournal.id,
+    };
+
+    async function uploadJournalImages(files, type) {
+      const uploadedPaths = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+
+        const ext = file.name.split(".").pop() || "jpg";
+        const filePath = `${user.id}/${insertedJournal.id}/${type}/${Date.now()}-${i}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("journal-images")
+          .upload(filePath, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw new Error(uploadError.message);
+        }
+
+        uploadedPaths.push(filePath);
+      }
+
+      return uploadedPaths;
+    }
+
+    try {
+      const setupImagePaths = await uploadJournalImages(setupImages, "setup");
+      const referenceImagePaths = await uploadJournalImages(
+        referenceImages,
+        "reference",
+      );
+
+      const { error: imageUpdateError } = await supabase
+        .from("journals")
+        .update({
+          setup_images: setupImagePaths,
+          reference_images: referenceImagePaths,
+        })
+        .eq("id", insertedJournal.id)
+        .eq("user_id", user.id);
+
+      if (imageUpdateError) {
+        return { ok: false, message: imageUpdateError.message };
+      }
+    } catch (uploadErr) {
+      return {
+        ok: false,
+        message: uploadErr.message || "Image upload failed.",
+      };
+    }
 
     redirect("/app/journals");
   }
