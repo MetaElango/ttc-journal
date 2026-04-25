@@ -107,7 +107,7 @@ function formatRisk(journal) {
 function JournalsTable({ journals, setSelectedJournal }) {
   return (
     <div className="overflow-x-auto rounded-xl border">
-      <table className="relative w-full min-w-[1030px] table-fixed text-sm">
+      <table className="relative w-full min-w-[1134px] table-fixed text-sm">
         <thead className="bg-background">
           <tr className="border-b">
             <th className="sticky left-0 z-30 w-[240px] bg-background px-4 py-3 text-left font-medium shadow-[2px_0_5px_rgba(0,0,0,0.08)]">
@@ -136,6 +136,9 @@ function JournalsTable({ journals, setSelectedJournal }) {
             </th>
             <th className="w-[100px] bg-background px-4 py-3 text-left font-medium">
               RR
+            </th>
+            <th className="sticky right-[208px] z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
+              Share
             </th>
             <th className="sticky right-[104px] z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
               Edit
@@ -169,6 +172,33 @@ function JournalsTable({ journals, setSelectedJournal }) {
                 <td className="w-[120px] px-4 py-3">{formatRisk(j)}</td>
                 <td className="w-[100px] px-4 py-3">
                   {rr > 0 ? `1:${round2(rr)}` : "—"}
+                </td>
+                <td className="sticky right-[208px] z-20 w-[104px] bg-background px-4 py-3 shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
+                  <button
+                    type="button"
+                    disabled={j.is_shared}
+                    onClick={async () => {
+                      const res = await fetch("/api/journals/share", {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ journalId: j.id }),
+                      });
+
+                      const json = await res.json();
+
+                      if (!json.ok) {
+                        alert(json.message || "Failed to share journal.");
+                        return;
+                      }
+
+                      window.location.reload();
+                    }}
+                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
+                  >
+                    {j.is_shared ? "Shared" : "Share"}
+                  </button>
                 </td>
 
                 <td className="sticky right-[104px] z-20 w-[104px] bg-background px-4 py-3 shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">

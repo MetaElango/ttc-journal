@@ -223,6 +223,9 @@ export default async function JournalsPage({ searchParams }) {
         framework,
         tag
       )
+        is_shared,
+        shared_at,
+        user_id,
     `,
     )
     .order("created_at", { ascending: false });

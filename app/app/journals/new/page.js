@@ -16,27 +16,49 @@ export default async function NewJournalPage({ searchParams }) {
   if (!user) redirect("/login");
 
   const { data: strategy, error: sErr } = await supabase
+
     .from("strategies")
+
     .select(
       `
-      id,
-      strategy_name,
-      preparation_status,
-      strategy_status,
-      trading_style,
-      setup_type,
-      bias_confluence,
-      htf,
-      intermediate_tf,
-      entry_tf,
-      checklist,
-      entry_rules,
-      exit_rules,
-      sl_management_rules,
-      risk_per_trade,
-      avg_planned_rr,
-      planned_r_year
-    `,
+
+    id,
+
+    strategy_name,
+
+    strategy_type,
+
+    preparation_status,
+
+    strategy_status,
+
+    trading_style,
+
+    setup_type,
+
+    bias_confluence,
+
+    htf,
+
+    intermediate_tf,
+
+    entry_tf,
+
+    checklist,
+
+    entry_rules,
+
+    exit_rules,
+
+    sl_management_rules,
+
+    risk_per_trade,
+
+    avg_planned_rr,
+
+    planned_r_year
+
+  `,
     )
     .eq("id", strategyId)
     .single();
@@ -268,6 +290,7 @@ export default async function NewJournalPage({ searchParams }) {
     const strategy_snapshot = {
       id: strategy.id,
       strategy_name: strategy.strategy_name,
+      strategy_type: strategy.strategy_type,
       preparation_status: strategy.preparation_status,
       strategy_status: strategy.strategy_status,
       trading_style: strategy.trading_style,
