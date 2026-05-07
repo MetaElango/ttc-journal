@@ -83,6 +83,35 @@ function shortText(value, max = 60) {
   return `${text.slice(0, max)}...`;
 }
 
+function ImagePreviewRow({ setupImages = [], referenceImages = [] }) {
+  const images = [...setupImages, ...referenceImages].slice(0, 4);
+
+  if (images.length === 0) {
+    return (
+      <div className="rounded-lg border p-3 text-xs text-muted-foreground">
+        No images
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2">
+      {images.map((url, index) => (
+        <div
+          key={`${url}-${index}`}
+          className="h-16 w-20 overflow-hidden rounded-md border bg-muted"
+        >
+          <img
+            src={url}
+            alt={`Preview ${index + 1}`}
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function SocialClient({ journals }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [copyingId, setCopyingId] = useState(null);
@@ -134,8 +163,6 @@ export default function SocialClient({ journals }) {
                 ? `${journal.symbols.symbol_name} — ${journal.symbols.category}`
                 : "—";
 
-              const author = "Trader";
-
               const rr = calculatePlannedRR(journal);
 
               return (
@@ -147,7 +174,7 @@ export default function SocialClient({ journals }) {
                           {strategy.strategy_name || "Shared Journal"}
                         </h2>
                         <p className="text-sm text-muted-foreground">
-                          Shared by {author}
+                          Shared by Trader
                         </p>
                       </div>
 
@@ -183,7 +210,7 @@ export default function SocialClient({ journals }) {
                         type="button"
                         disabled={copyingId === journal.id}
                         onClick={() => incorporateJournal(journal.id)}
-                        className="rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+                        className="rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {copyingId === journal.id
                           ? "Copying..."
@@ -192,7 +219,7 @@ export default function SocialClient({ journals }) {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <div className="mt-4 grid gap-3 md:grid-cols-5">
                     <div className="rounded-lg border p-3">
                       <div className="text-xs text-muted-foreground">Entry</div>
                       <div className="mt-1 text-sm font-medium">
@@ -222,6 +249,11 @@ export default function SocialClient({ journals }) {
                         {shortText(journal.entry_reason, 80)}
                       </div>
                     </div>
+
+                    <ImagePreviewRow
+                      setupImages={journal.setupImageUrls || []}
+                      referenceImages={journal.referenceImageUrls || []}
+                    />
                   </div>
                 </div>
               );

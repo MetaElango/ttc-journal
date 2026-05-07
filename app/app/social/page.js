@@ -9,7 +9,13 @@ async function getSignedImageUrls(supabase, paths = []) {
     .from("journal-images")
     .createSignedUrls(paths, 60 * 60);
 
-  if (error) return [];
+  if (error) {
+    console.log("SIGNED URL ERROR:", {
+      paths,
+      message: error.message,
+    });
+    return [];
+  }
 
   return data?.map((x) => x.signedUrl).filter(Boolean) || [];
 }
@@ -67,14 +73,23 @@ export default async function SocialPage() {
   }
 
   const sharedJournals = await Promise.all(
-    (journals || []).map(async (journal) => ({
-      ...journal,
-      setupImageUrls: await getSignedImageUrls(supabase, journal.setup_images),
-      referenceImageUrls: await getSignedImageUrls(
+    (journals || []).map(async (journal) => {
+      const setupImageUrls = await getSignedImageUrls(
+        supabase,
+        journal.setup_images,
+      );
+
+      const referenceImageUrls = await getSignedImageUrls(
         supabase,
         journal.reference_images,
-      ),
-    })),
+      );
+
+      return {
+        ...journal,
+        setupImageUrls,
+        referenceImageUrls,
+      };
+    }),
   );
 
   return <SocialClient journals={sharedJournals} />;

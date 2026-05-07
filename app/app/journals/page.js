@@ -1,6 +1,8 @@
+// app/app/journals/page.js
+
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import JournalsClient, { JournalsTableBody } from "./journals-client";
+import JournalsClient from "./journals-client";
 
 const TABS = [
   { key: "open", label: "Open" },
@@ -37,138 +39,9 @@ function getJournalTab(journal) {
   return null;
 }
 
-function getWeightedTakeProfit(journal) {
-  const prices = Array.isArray(journal.take_profit) ? journal.take_profit : [];
-  const qtys = Array.isArray(journal.take_profit_qty)
-    ? journal.take_profit_qty
-    : [];
-
-  if (!prices.length) return 0;
-
-  if (qtys.length === prices.length) {
-    let total = 0;
-    let totalQty = 0;
-
-    for (let i = 0; i < prices.length; i++) {
-      const price = Number(prices[i]);
-      const qty = Number(qtys[i]);
-
-      if (Number.isNaN(price) || Number.isNaN(qty) || qty <= 0) continue;
-
-      total += price * qty;
-      totalQty += qty;
-    }
-
-    if (totalQty > 0) return total / totalQty;
-  }
-
-  const validPrices = prices.map(Number).filter((n) => !Number.isNaN(n));
-  if (!validPrices.length) return 0;
-
-  return validPrices.reduce((a, b) => a + b, 0) / validPrices.length;
-}
-
-function calculatePlannedRR(journal) {
-  const direction = norm(journal.direction);
-  const entry = Number(journal.entry_price);
-  const stop = Number(journal.stop_loss);
-  const tp = Number(getWeightedTakeProfit(journal));
-
-  if (!(entry > 0) || !(stop > 0) || !(tp > 0)) return 0;
-
-  if (direction === "BUY") {
-    const risk = entry - stop;
-    if (risk <= 0) return 0;
-    return (tp - entry) / risk;
-  }
-
-  if (direction === "SELL") {
-    const risk = stop - entry;
-    if (risk <= 0) return 0;
-    return (entry - tp) / risk;
-  }
-
-  return 0;
-}
-
-function round2(n) {
-  return Math.round((Number(n) || 0) * 100) / 100;
-}
-
-function formatRisk(journal) {
-  const mode = norm(journal.risk_mode);
-  const risk = journal.risk_per_trade;
-
-  if (risk == null) return "—";
-  if (mode === "PERCENT") return `${risk}%`;
-  if (mode === "AMOUNT") return `$${risk}`;
-
-  return risk;
-}
-
-function shortText(value, max = 24) {
-  const text = String(value || "—");
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}...`;
-}
-
-function JournalsTable({ journals, setSelectedJournal }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="relative w-full min-w-[1030px] table-fixed text-sm">
-        <thead className="bg-background">
-          <tr className="border-b">
-            <th className="sticky left-0 z-30 w-[240px] bg-background px-4 py-3 text-left font-medium shadow-[2px_0_5px_rgba(0,0,0,0.08)]">
-              Strategy
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Symbol
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Direction
-            </th>
-            <th className="w-[160px] bg-background px-4 py-3 text-left font-medium">
-              Trading Style
-            </th>
-            <th className="w-[140px] bg-background px-4 py-3 text-left font-medium">
-              Setup
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Entry
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              SL
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Risk
-            </th>
-            <th className="w-[100px] bg-background px-4 py-3 text-left font-medium">
-              RR
-            </th>
-            <th className="sticky right-[104px] z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
-              Edit
-            </th>
-            <th className="sticky right-0 z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
-              Details
-            </th>
-          </tr>
-        </thead>
-
-        <JournalsTableBody
-          journals={journals}
-          setSelectedJournal={setSelectedJournal}
-          calculatePlannedRR={calculatePlannedRR}
-          round2={round2}
-          formatRisk={formatRisk}
-          shortText={shortText}
-        />
-      </table>
-    </div>
-  );
-}
-
 export default async function JournalsPage({ searchParams }) {
   const params = await searchParams;
+
   const activeTab = TABS.some((t) => t.key === params?.tab)
     ? params.tab
     : "open";
@@ -194,8 +67,12 @@ export default async function JournalsPage({ searchParams }) {
     .select(
       `
       id,
+      user_id,
+      copied_from_journal_id,
       purpose,
       status,
+      is_shared,
+      shared_at,
       direction,
       quantity,
       entry_price,
@@ -223,11 +100,9 @@ export default async function JournalsPage({ searchParams }) {
         framework,
         tag
       )
-        is_shared,
-        shared_at,
-        user_id,
-    `,
+      `,
     )
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -239,14 +114,12 @@ export default async function JournalsPage({ searchParams }) {
     );
   }
 
-  const allJournals = journals || [];
-
   async function getSignedImageUrls(paths = []) {
     if (!Array.isArray(paths) || paths.length === 0) return [];
 
     const { data, error } = await supabase.storage
       .from("journal-images")
-      .createSignedUrls(paths, 60 * 60); // 1 hour
+      .createSignedUrls(paths, 60 * 60);
 
     if (error) {
       console.log("Signed URL error:", error.message);
@@ -257,28 +130,45 @@ export default async function JournalsPage({ searchParams }) {
   }
 
   const journalsWithImageUrls = await Promise.all(
-    allJournals.map(async (journal) => ({
+    (journals || []).map(async (journal) => ({
       ...journal,
       setupImageUrls: await getSignedImageUrls(journal.setup_images),
       referenceImageUrls: await getSignedImageUrls(journal.reference_images),
     })),
   );
 
-  const counts = TABS.reduce((acc, tab) => {
-    acc[tab.key] = journalsWithImageUrls.filter(
-      (j) => getJournalTab(j) === tab.key,
-    ).length;
-    return acc;
-  }, {});
+  const ownJournalsAll = journalsWithImageUrls.filter(
+    (j) => !j.copied_from_journal_id,
+  );
 
-  const filteredJournals = journalsWithImageUrls.filter(
+  const incorporatedJournals = journalsWithImageUrls.filter(
+    (j) => j.copied_from_journal_id,
+  );
+
+  const filteredOwnJournals = ownJournalsAll.filter(
     (j) => getJournalTab(j) === activeTab,
   );
 
-  const journalsByPurpose = PURPOSES.map((purpose) => ({
+  const counts = TABS.reduce((acc, tab) => {
+    acc[tab.key] = ownJournalsAll.filter(
+      (j) => getJournalTab(j) === tab.key,
+    ).length;
+
+    return acc;
+  }, {});
+
+  const ownJournalsByPurpose = PURPOSES.map((purpose) => ({
     purpose,
-    data: filteredJournals.filter((j) => norm(j.purpose) === purpose),
+    data: filteredOwnJournals.filter((j) => norm(j.purpose) === purpose),
   })).filter((group) => group.data.length > 0);
+
+  const incorporatedJournalsByPurpose = PURPOSES.map((purpose) => ({
+    purpose,
+    data: incorporatedJournals.filter((j) => norm(j.purpose) === purpose),
+  })).filter((group) => group.data.length > 0);
+
+  const totalVisibleCount =
+    filteredOwnJournals.length + incorporatedJournals.length;
 
   return (
     <div className="space-y-6">
@@ -318,12 +208,48 @@ export default async function JournalsPage({ searchParams }) {
         })}
       </div>
 
-      {filteredJournals.length === 0 ? (
+      {totalVisibleCount === 0 ? (
         <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">
           No journals in this tab.
         </div>
       ) : (
-        <JournalsClient journalsByPurpose={journalsByPurpose} />
+        <div className="space-y-10">
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">My Journals</h2>
+              <p className="text-sm text-muted-foreground">
+                Journals created from your own strategies
+              </p>
+            </div>
+
+            {ownJournalsByPurpose.length === 0 ? (
+              <div className="rounded-xl border p-6 text-sm text-muted-foreground">
+                No own journals in this tab.
+              </div>
+            ) : (
+              <JournalsClient journalsByPurpose={ownJournalsByPurpose} />
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Incorporated Journals</h2>
+              <p className="text-sm text-muted-foreground">
+                Journals copied from Social
+              </p>
+            </div>
+
+            {incorporatedJournalsByPurpose.length === 0 ? (
+              <div className="rounded-xl border p-6 text-sm text-muted-foreground">
+                No incorporated journals.
+              </div>
+            ) : (
+              <JournalsClient
+                journalsByPurpose={incorporatedJournalsByPurpose}
+              />
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
