@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useActionState } from "react";
 
-// shadcn (if installed)
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,12 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 function MultiSelect({ label, required, options, value, onChange }) {
-  const selected = useMemo(() => new Set(value), [value]);
+  const selected = useMemo(() => new Set(value || []), [value]);
 
   function toggle(opt) {
     const next = new Set(selected);
+
     if (next.has(opt)) next.delete(opt);
     else next.add(opt);
+
     onChange(Array.from(next));
   }
 
@@ -28,8 +29,9 @@ function MultiSelect({ label, required, options, value, onChange }) {
           {label}{" "}
           {required ? <span className="text-destructive">*</span> : null}
         </Label>
+
         <div className="flex flex-wrap gap-1">
-          {value.map((v) => (
+          {(value || []).map((v) => (
             <Badge
               key={v}
               variant="secondary"
@@ -46,6 +48,7 @@ function MultiSelect({ label, required, options, value, onChange }) {
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => {
           const active = selected.has(opt);
+
           return (
             <button
               key={opt}
@@ -65,7 +68,11 @@ function MultiSelect({ label, required, options, value, onChange }) {
   );
 }
 
-export default function NewStrategyForm({ action }) {
+export default function StrategyForm({
+  action,
+  strategy = null,
+  mode = "create",
+}) {
   const [state, formAction, pending] = useActionState(action, {
     ok: true,
     message: "",
@@ -82,6 +89,7 @@ export default function NewStrategyForm({ action }) {
     "SUPPLY / DEMAND",
     "Support & Resistance",
   ];
+
   const BIAS = [
     "Fundamentals",
     "Price Action",
@@ -89,6 +97,7 @@ export default function NewStrategyForm({ action }) {
     "Sentiment",
     "NEWS",
   ];
+
   const TF = [
     "MN",
     "Week",
@@ -111,25 +120,30 @@ export default function NewStrategyForm({ action }) {
     "5M",
     "1M",
   ];
+
   const PREP_STATUS = ["Preparing", "Draft", "Active"];
   const STRAT_STATUS = ["LIVE", "ALTERNATING", "NOT USING"];
 
-  const [bias, setBias] = useState([]);
-  const [htf, setHtf] = useState([]);
-  const [itf, setItf] = useState([]);
-  const [etf, setEtf] = useState([]);
+  const [bias, setBias] = useState(strategy?.bias_confluence || []);
+  const [htf, setHtf] = useState(strategy?.htf || []);
+  const [itf, setItf] = useState(strategy?.intermediate_tf || []);
+  const [etf, setEtf] = useState(strategy?.entry_tf || []);
 
-  const [prepStatus, setPrepStatus] = useState("Preparing");
+  const [prepStatus, setPrepStatus] = useState(
+    strategy?.preparation_status || "Preparing",
+  );
+
+  const isEdit = mode === "edit";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Strategy</CardTitle>
+          <CardTitle>{isEdit ? "Edit Strategy" : "Create Strategy"}</CardTitle>
         </CardHeader>
+
         <CardContent>
           <form action={formAction} className="space-y-8">
-            {/* Hidden inputs to submit arrays */}
             <input
               type="hidden"
               name="bias_confluence"
@@ -151,6 +165,7 @@ export default function NewStrategyForm({ action }) {
                 <Input
                   name="strategy_name"
                   placeholder="Eg: ORB + Trend"
+                  defaultValue={strategy?.strategy_name || ""}
                   required
                 />
               </div>
@@ -163,7 +178,7 @@ export default function NewStrategyForm({ action }) {
                   name="strategy_type"
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   required
-                  defaultValue=""
+                  defaultValue={strategy?.strategy_type || ""}
                 >
                   <option value="" disabled>
                     Select
@@ -184,7 +199,7 @@ export default function NewStrategyForm({ action }) {
                   name="trading_style"
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   required
-                  defaultValue=""
+                  defaultValue={strategy?.trading_style || ""}
                 >
                   <option value="" disabled>
                     Select
@@ -205,7 +220,7 @@ export default function NewStrategyForm({ action }) {
                   name="setup_type"
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                   required
-                  defaultValue=""
+                  defaultValue={strategy?.setup_type || ""}
                 >
                   <option value="" disabled>
                     Select
@@ -262,18 +277,21 @@ export default function NewStrategyForm({ action }) {
                   step="0.01"
                   min="0"
                   placeholder="2"
+                  defaultValue={strategy?.risk_per_trade || ""}
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Use percent (1 = 1%).
-                </p>
               </div>
 
               <div className="space-y-2">
                 <Label>
                   AVG Planned R:R <span className="text-destructive">*</span>
                 </Label>
-                <Input name="avg_planned_rr" placeholder="1:2" required />
+                <Input
+                  name="avg_planned_rr"
+                  placeholder="1:2"
+                  defaultValue={strategy?.avg_planned_rr || ""}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -284,6 +302,7 @@ export default function NewStrategyForm({ action }) {
                   name="planned_r_year"
                   placeholder="20"
                   inputMode="numeric"
+                  defaultValue={strategy?.planned_r_year || ""}
                   required
                 />
               </div>
@@ -323,6 +342,7 @@ export default function NewStrategyForm({ action }) {
                           name="strategy_status"
                           value={x}
                           required
+                          defaultChecked={strategy?.strategy_status === x}
                         />
                         {x}
                       </label>
@@ -330,7 +350,6 @@ export default function NewStrategyForm({ action }) {
                   </div>
                 </div>
               ) : (
-                // Ensure it doesn't submit old value
                 <input type="hidden" name="strategy_status" value="" />
               )}
             </div>
@@ -340,21 +359,36 @@ export default function NewStrategyForm({ action }) {
                 <Label>
                   CheckList <span className="text-destructive">*</span>
                 </Label>
-                <Textarea name="checklist" rows={3} required />
+                <Textarea
+                  name="checklist"
+                  rows={3}
+                  defaultValue={strategy?.checklist || ""}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>
                   Entry Rules <span className="text-destructive">*</span>
                 </Label>
-                <Textarea name="entry_rules" rows={3} required />
+                <Textarea
+                  name="entry_rules"
+                  rows={3}
+                  defaultValue={strategy?.entry_rules || ""}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>
                   Exit Rules <span className="text-destructive">*</span>
                 </Label>
-                <Textarea name="exit_rules" rows={3} required />
+                <Textarea
+                  name="exit_rules"
+                  rows={3}
+                  defaultValue={strategy?.exit_rules || ""}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -362,7 +396,12 @@ export default function NewStrategyForm({ action }) {
                   SL Management Rules{" "}
                   <span className="text-destructive">*</span>
                 </Label>
-                <Textarea name="sl_management_rules" rows={3} required />
+                <Textarea
+                  name="sl_management_rules"
+                  rows={3}
+                  defaultValue={strategy?.sl_management_rules || ""}
+                  required
+                />
               </div>
             </div>
 
@@ -372,11 +411,12 @@ export default function NewStrategyForm({ action }) {
 
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={pending}>
-                {pending ? "Saving..." : "Create Strategy"}
+                {pending
+                  ? "Saving..."
+                  : isEdit
+                    ? "Update Strategy"
+                    : "Create Strategy"}
               </Button>
-              <p className="text-xs text-muted-foreground">
-                Your strategy is private (RLS enforced).
-              </p>
             </div>
           </form>
         </CardContent>

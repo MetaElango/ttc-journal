@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import NewStrategyForm from "./strategy-form";
+import NewStrategyForm from "../strategy-form";
 
 export default async function NewStrategyPage() {
   const supabase = await createClient();
