@@ -277,26 +277,13 @@ export default async function EditJournalPage({ params, searchParams }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Edit Journal</h1>
-
-        <Link
-          href="/app/journals"
-          className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
-        >
-          Back
-        </Link>
-      </div>
-
-      <EditJournalForm
-        action={updateJournal}
-        journal={journal}
-        strategyName={strategyName}
-        symbolLabel={symbolLabel}
-        statusOptions={statusOptions}
-        errorType={errorType}
-      />
-    </div>
+    <EditJournalForm
+      action={updateJournal}
+      journal={journal}
+      strategyName={strategyName}
+      symbolLabel={symbolLabel}
+      statusOptions={statusOptions}
+      errorType={errorType}
+    />
   );
 }

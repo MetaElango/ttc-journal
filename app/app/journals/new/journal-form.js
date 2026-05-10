@@ -12,6 +12,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  BadgeCheck,
+  CalendarClock,
+  Camera,
+  ChevronRight,
+  FileText,
+  ImagePlus,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Upload,
+  X,
+  BarChart3,
+  GripVertical,
+  Lightbulb,
+  Plus,
+  Scale,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 
 function normPurpose(v) {
   return String(v || "")
@@ -65,7 +86,6 @@ const PURPOSE_CONFIG = {
     },
     exitRule: "reason_required_price_optional",
   },
-
   "ENTRY PLANNED": {
     showStatusDropdown: true,
     disable: { tradingAccount: false, risk: false },
@@ -86,7 +106,6 @@ const PURPOSE_CONFIG = {
     },
     exitRule: "pair_or_empty",
   },
-
   "FORWARD TESTING": {
     showStatusDropdown: true,
     disable: { tradingAccount: false, risk: false },
@@ -143,9 +162,55 @@ function getStatusOptions(purpose) {
   );
 }
 
+function FieldShell({ label, required, hint, children }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-end justify-between gap-3">
+        <Label className="text-sm font-medium">
+          {label}{" "}
+          {required ? <span className="text-destructive">*</span> : null}
+        </Label>
+        {hint ? (
+          <span className="text-xs text-muted-foreground">{hint}</span>
+        ) : null}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function NativeSelect({ children, ...props }) {
+  return (
+    <select
+      {...props}
+      className="h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {children}
+    </select>
+  );
+}
+
+function StepHeader({ icon: Icon, eyebrow, title, description }) {
+  return (
+    <div className="flex gap-3">
+      <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border bg-background shadow-sm">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      <div>
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {eyebrow}
+        </div>
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 function Pill({ children }) {
   return (
-    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
+    <span className="inline-flex items-center rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground">
       {children}
     </span>
   );
@@ -153,58 +218,51 @@ function Pill({ children }) {
 
 function StrategyBlueprint({ s }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Strategy Blueprint</CardTitle>
-      </CardHeader>
+    <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+      <StepHeader
+        icon={BadgeCheck}
+        eyebrow="Strategy"
+        title={s.strategy_name || "Strategy Blueprint"}
+        description="This blueprint will be snapshotted into the journal."
+      />
 
-      <CardContent className="space-y-3">
-        <div className="text-lg font-semibold">{s.strategy_name}</div>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Pill>Prep: {s.preparation_status || "—"}</Pill>
+        <Pill>Status: {s.strategy_status || "—"}</Pill>
+        <Pill>Style: {s.trading_style || "—"}</Pill>
+        <Pill>Setup: {s.setup_type || "—"}</Pill>
+      </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Pill>Prep: {s.preparation_status}</Pill>
-          <Pill>Status: {s.strategy_status || "—"}</Pill>
-          <Pill>Style: {s.trading_style}</Pill>
-          <Pill>Setup: {s.setup_type}</Pill>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {(s.bias_confluence || []).map((b) => (
-            <Badge key={b} variant="secondary">
+      {s.bias_confluence?.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {s.bias_confluence.map((b) => (
+            <Badge key={b} variant="secondary" className="rounded-full">
               {b}
             </Badge>
           ))}
         </div>
+      ) : null}
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-md border p-3 text-sm whitespace-pre-wrap">
-            <div className="mb-2 text-xs font-medium opacity-70">Checklist</div>
-            {s.checklist}
-          </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <PreviewBox title="Checklist">{s.checklist}</PreviewBox>
+        <PreviewBox title="Entry Rules">{s.entry_rules}</PreviewBox>
+        <PreviewBox title="Exit Rules">{s.exit_rules}</PreviewBox>
+        <PreviewBox title="SL Management">{s.sl_management_rules}</PreviewBox>
+      </div>
+    </section>
+  );
+}
 
-          <div className="rounded-md border p-3 text-sm whitespace-pre-wrap">
-            <div className="mb-2 text-xs font-medium opacity-70">
-              Entry Rules
-            </div>
-            {s.entry_rules}
-          </div>
-
-          <div className="rounded-md border p-3 text-sm whitespace-pre-wrap">
-            <div className="mb-2 text-xs font-medium opacity-70">
-              Exit Rules
-            </div>
-            {s.exit_rules}
-          </div>
-
-          <div className="rounded-md border p-3 text-sm whitespace-pre-wrap">
-            <div className="mb-2 text-xs font-medium opacity-70">
-              SL Management Rules
-            </div>
-            {s.sl_management_rules}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+function PreviewBox({ title, children }) {
+  return (
+    <div className="rounded-2xl border bg-background/60 p-4">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
+      <div className="line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+        {children || "—"}
+      </div>
+    </div>
   );
 }
 
@@ -366,87 +424,150 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <Label>
-          Take Profit (multiple) <span className="text-destructive">*</span>
-        </Label>
+    <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-5">
+        <div className="flex gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border bg-primary/10 text-primary">
+            <Target className="h-5 w-5" />
+          </div>
+
+          <div>
+            <Label className="text-lg font-semibold tracking-tight">
+              Take Profit <span className="text-destructive">*</span>
+            </Label>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add one or more targets. Qty sum must equal total lots.
+            </p>
+          </div>
+        </div>
 
         <div className="flex items-center gap-2">
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             onClick={autoSplitAll}
-            disabled={disabled}
+            disabled={disabled || items.length === 0 || !totalOk}
+            className="h-11 rounded-2xl"
           >
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
             Auto Split
           </Button>
 
-          <Button type="button" onClick={addRow} disabled={disabled}>
+          <Button
+            type="button"
+            onClick={addRow}
+            disabled={disabled}
+            className="h-11 rounded-2xl"
+          >
+            <Plus className="mr-2 h-4 w-4" />
             Add TP
           </Button>
         </div>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">
-          Add one or more targets.
-        </p>
+        <div className="mt-5 rounded-2xl border border-dashed bg-muted/30 p-8 text-center">
+          <p className="text-sm font-medium">No take-profit targets yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Click Add TP to create your first target.
+          </p>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="mt-5 space-y-4">
           {items.map((it, idx) => {
             const tpLots = Number(it.qty) || 0;
-            const pct = totalOk ? (tpLots / totalOk) * 100 : 0;
+            const pct = totalOk ? Math.min((tpLots / totalOk) * 100, 100) : 0;
 
             return (
               <div
                 key={idx}
-                className="grid grid-cols-12 items-center gap-2 rounded-md border p-3"
+                className="rounded-3xl border bg-background/70 p-4 shadow-sm"
               >
-                <div className="col-span-12 text-sm font-medium md:col-span-1">
-                  TP {idx + 1}
-                </div>
-
-                <div className="col-span-12 space-y-1 md:col-span-5">
-                  <div className="text-xs text-muted-foreground">Price</div>
-                  <Input
-                    value={it.price}
-                    onChange={(e) => updatePrice(idx, e.target.value)}
-                    inputMode="decimal"
-                    placeholder="e.g. 250.50"
-                    disabled={disabled}
-                    required
-                  />
-                </div>
-
-                <div className="col-span-12 space-y-1 md:col-span-4">
-                  <div className="text-xs text-muted-foreground">
-                    Qty (LOTS) — sum must equal total lots
+                <div className="grid gap-4 md:grid-cols-[44px_100px_1fr_1fr_170px_90px] md:items-center">
+                  <div className="hidden text-muted-foreground md:block">
+                    <GripVertical className="h-5 w-5" />
                   </div>
-                  <Input
-                    value={it.qty}
-                    onChange={(e) => updateQty(idx, e.target.value)}
-                    inputMode="decimal"
-                    placeholder={
-                      totalOk ? "e.g. 0.50" : "Enter total lots first"
-                    }
-                    disabled={disabled}
-                    required
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    {totalOk ? `${round2(pct)}%` : "—"}
-                  </div>
-                </div>
 
-                <div className="col-span-12 flex justify-end md:col-span-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                      {idx + 1}
+                    </div>
+                    <div className="font-semibold">TP {idx + 1}</div>
+                  </div>
+
+                  <FieldShell label="Price" required>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute left-0 top-0 flex h-11 w-12 items-center justify-center rounded-l-xl border-r bg-primary/10 text-primary">
+                        <BarChart3 className="h-4 w-4" />
+                      </div>
+                      <Input
+                        value={it.price}
+                        onChange={(e) => updatePrice(idx, e.target.value)}
+                        inputMode="decimal"
+                        placeholder="e.g. 250.50"
+                        disabled={disabled}
+                        required
+                        className="h-11 rounded-xl pl-14"
+                      />
+                    </div>
+                  </FieldShell>
+
+                  <FieldShell label="Qty / Lots" required>
+                    <Input
+                      value={it.qty}
+                      onChange={(e) => updateQty(idx, e.target.value)}
+                      inputMode="decimal"
+                      placeholder={totalOk ? "e.g. 0.50" : "Enter lots first"}
+                      disabled={disabled}
+                      required
+                      className="h-11 rounded-xl"
+                    />
+                  </FieldShell>
+
+                  <div className="rounded-2xl border bg-card p-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-12 w-12 rounded-full"
+                        style={{
+                          background: `conic-gradient(hsl(var(--primary)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
+                        }}
+                      >
+                        <div className="m-1.5 h-9 w-9 rounded-full bg-background" />
+                      </div>
+
+                      <div>
+                        <div className="text-lg font-semibold">
+                          {round2(pct)}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          of position
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => removeRow(idx)}
                     disabled={disabled}
+                    className="h-11 rounded-xl text-destructive hover:text-destructive"
                   >
+                    <Trash2 className="mr-2 h-4 w-4" />
                     Remove
                   </Button>
+                </div>
+
+                <div className="mt-4">
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 text-center text-xs text-muted-foreground">
+                    {round2(pct)}% of position
+                  </div>
                 </div>
               </div>
             );
@@ -454,102 +575,28 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
         </div>
       )}
 
-      <div className="flex items-center justify-between text-xs">
-        <div className={sumOk ? "text-muted-foreground" : "text-destructive"}>
-          TP Qty sum: {round2(sumTpLots)} / Total lots:{" "}
-          {totalOk ? round2(totalOk) : "—"} {sumOk ? "" : "(must match)"}
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div
+          className={[
+            "inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm",
+            sumOk
+              ? "bg-primary/5 text-foreground"
+              : "border-destructive/30 bg-destructive/10 text-destructive",
+          ].join(" ")}
+        >
+          <Scale className="h-4 w-4" />
+          <span>
+            TP Qty sum: <strong>{round2(sumTpLots)}</strong> / Total lots:{" "}
+            <strong>{totalOk ? round2(totalOk) : "—"}</strong>
+          </span>
         </div>
 
-        <div className="text-muted-foreground">
-          Tip: edit any TP qty except last to auto-split the remainder below.
+        <div className="inline-flex items-center gap-2 rounded-2xl bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          <Lightbulb className="h-4 w-4 text-primary" />
+          Tip: edit any TP qty except last to auto-split the remainder.
         </div>
       </div>
-    </div>
-  );
-}
-
-function PurposeRenderer({
-  purpose,
-  status,
-  setStatus,
-  journalStartAt,
-  setJournalStartAt,
-  journalEndAt,
-  setJournalEndAt,
-  children,
-}) {
-  const purposeKey = normPurpose(purpose);
-  const cfg = PURPOSE_CONFIG[purposeKey] || PURPOSE_CONFIG["FOR OBSERVATION"];
-  const statusOptions = getStatusOptions(purposeKey);
-  const statusRequired = !!cfg.required?.status;
-
-  return (
-    <div className="space-y-4">
-      {children({ cfg, purposeKey })}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label>
-            Status{" "}
-            {statusRequired ? (
-              <span className="text-destructive">*</span>
-            ) : (
-              <span className="text-muted-foreground">(optional)</span>
-            )}
-          </Label>
-
-          <select
-            name="status"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            required={statusRequired}
-          >
-            <option value="">
-              {statusRequired ? "Select status" : "No status"}
-            </option>
-
-            {statusOptions.map((x) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>
-            Create Date & Time <span className="text-destructive">*</span>
-          </Label>
-
-          <Input
-            name="journal_start_at"
-            type="datetime-local"
-            value={journalStartAt}
-            onChange={(e) => setJournalStartAt(e.target.value)}
-            required
-          />
-        </div>
-
-        {needsEndDate(status) ? (
-          <div className="space-y-2">
-            <Label>
-              End Date & Time <span className="text-destructive">*</span>
-            </Label>
-
-            <Input
-              name="journal_end_at"
-              type="datetime-local"
-              value={journalEndAt}
-              onChange={(e) => setJournalEndAt(e.target.value)}
-              required
-            />
-          </div>
-        ) : (
-          <input type="hidden" name="journal_end_at" value="" />
-        )}
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -557,20 +604,20 @@ function ExistingImageGrid({ title, images, onRemove }) {
   if (!images?.length) return null;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Label>{title}</Label>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {images.map((img) => (
           <div
             key={img.path}
-            className="relative overflow-hidden rounded-lg border bg-muted"
+            className="group relative overflow-hidden rounded-2xl border bg-muted"
           >
             {img.url ? (
               <img
                 src={img.url}
                 alt={title}
-                className="h-40 w-full object-cover"
+                className="h-40 w-full object-cover transition group-hover:scale-105"
               />
             ) : (
               <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
@@ -581,9 +628,10 @@ function ExistingImageGrid({ title, images, onRemove }) {
             <button
               type="button"
               onClick={() => onRemove(img.path)}
-              className="absolute right-2 top-2 rounded bg-black/80 px-2 py-1 text-xs text-white"
+              className="absolute right-2 top-2 rounded-full bg-black/75 p-1.5 text-white hover:bg-black"
+              aria-label="Remove image"
             >
-              Remove
+              <X className="h-4 w-4" />
             </button>
           </div>
         ))}
@@ -591,6 +639,108 @@ function ExistingImageGrid({ title, images, onRemove }) {
     </div>
   );
 }
+
+function NewImageUploader({
+  title,
+  files,
+  setFiles,
+  existingCount,
+  max,
+  error,
+  setError,
+}) {
+  const previews = useMemo(() => {
+    return files.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+    }));
+  }, [files]);
+
+  useEffect(() => {
+    return () => {
+      previews.forEach((img) => URL.revokeObjectURL(img.url));
+    };
+  }, [previews]);
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <Label>{title}</Label>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {existingCount} existing, {files.length} selected. Max {max} total.
+        </p>
+      </div>
+
+      <label className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed bg-muted/30 p-6 text-center transition hover:bg-muted/50">
+        <Upload className="h-7 w-7 text-muted-foreground" />
+        <div className="mt-3 text-sm font-medium">Upload images</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          PNG, JPG or WebP
+        </div>
+
+        <input
+          className="hidden"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={(e) => {
+            const selected = Array.from(e.target.files || []);
+            const totalCount = selected.length + existingCount;
+
+            if (totalCount > max) {
+              setError(`${title} can be maximum ${max} images total.`);
+              e.target.value = "";
+              setFiles([]);
+              return;
+            }
+
+            setError("");
+            setFiles(selected);
+          }}
+        />
+      </label>
+
+      {error ? (
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
+      {previews.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {previews.map((img, index) => (
+            <div
+              key={`${img.file.name}-${index}`}
+              className="group relative overflow-hidden rounded-2xl border bg-muted"
+            >
+              <img
+                src={img.url}
+                alt={`${title} ${index + 1}`}
+                className="h-40 w-full object-cover transition group-hover:scale-105"
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  setFiles((prev) => prev.filter((_, i) => i !== index));
+                }}
+                className="absolute right-2 top-2 rounded-full bg-black/75 p-1.5 text-white hover:bg-black"
+                aria-label="Remove selected image"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              <div className="absolute bottom-2 left-2 max-w-[85%] rounded-full bg-black/70 px-2 py-1 text-xs text-white">
+                {img.file.name}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function JournalDetailsCommon({
   cfg,
   purpose,
@@ -612,13 +762,23 @@ function JournalDetailsCommon({
   setEntryPrice,
   stopLoss,
   setStopLoss,
+  setupImages,
   setSetupImages,
+  referenceImages,
   setReferenceImages,
+  setupImageError,
+  setSetupImageError,
+  referenceImageError,
+  setReferenceImageError,
   prefillJournal,
   existingSetupImages,
   setExistingSetupImages,
   existingReferenceImages,
   setExistingReferenceImages,
+  journalStartAt,
+  setJournalStartAt,
+  journalEndAt,
+  setJournalEndAt,
 }) {
   const disableTradingAccount = !!cfg.disable?.tradingAccount;
   const disableRisk = !!cfg.disable?.risk;
@@ -667,6 +827,8 @@ function JournalDetailsCommon({
 
   const exitReasonRequired = !!required.exit_reason;
   const exitPriceRequired = !!required.exit_price;
+  const statusOptions = getStatusOptions(purpose);
+  const statusRequired = !!required.status;
 
   function onPurposeChange(next) {
     const nextKey = normPurpose(next);
@@ -699,374 +861,372 @@ function JournalDetailsCommon({
         )}
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>
-            Trading Account{" "}
-            {required.tradingAccount ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
-
-          <select
-            name="trading_account_id"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            required={!!required.tradingAccount}
-            defaultValue={prefillJournal?.trading_account_id || ""}
-            disabled={disableTradingAccount}
-          >
-            <option value="" disabled>
-              Select account
-            </option>
-
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.account_name} — {a.framework} — {a.account_size}
-              </option>
-            ))}
-          </select>
-
-          {disableTradingAccount ? (
-            <p className="text-xs text-muted-foreground">
-              Disabled for {purpose}.
-            </p>
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label>
-            Purpose <span className="text-destructive">*</span>
-          </Label>
-
-          <select
-            name="purpose"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            value={normPurpose(purpose)}
-            onChange={(e) => onPurposeChange(e.target.value)}
-            required
-          >
-            {PURPOSES.map((x) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>
-          Symbol{" "}
-          {required.symbol ? <span className="text-destructive">*</span> : null}
-        </Label>
-
-        <Input
-          value={symbolQuery}
-          onChange={(e) => setSymbolQuery(e.target.value)}
-          placeholder="Search symbol e.g. GOLD, EURUSD, Indices"
+      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+        <StepHeader
+          icon={Target}
+          eyebrow="Step 1"
+          title="Journal Setup"
+          description="Choose purpose, account, symbol, status and timing."
         />
 
-        <select
-          name="symbol_id"
-          className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-          required={!!required.symbol}
-          defaultValue={prefillJournal?.symbol_id || ""}
-        >
-          <option value="" disabled>
-            Select symbol
-          </option>
-
-          {filteredSymbols.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.symbol_name} — {s.category}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="space-y-2">
-          <Label>
-            Direction{" "}
-            {required.direction ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
-
-          <select
-            name="direction"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            value={direction}
-            onChange={(e) => setDirection(e.target.value)}
-            required={!!required.direction}
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <FieldShell
+            label="Trading Account"
+            required={required.tradingAccount}
           >
-            <option value="BUY">Buy</option>
-            <option value="SELL">Sell</option>
-          </select>
-        </div>
+            <NativeSelect
+              name="trading_account_id"
+              required={!!required.tradingAccount}
+              defaultValue={prefillJournal?.trading_account_id || ""}
+              disabled={disableTradingAccount}
+            >
+              <option value="" disabled>
+                Select account
+              </option>
 
-        <div className="space-y-2">
-          <Label>
-            Quantity (Lots){" "}
-            {required.quantity ? (
-              <span className="text-destructive">*</span>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.account_name} — {a.framework} — {a.account_size}
+                </option>
+              ))}
+            </NativeSelect>
+
+            {disableTradingAccount ? (
+              <p className="text-xs text-muted-foreground">
+                Disabled for {purpose}.
+              </p>
             ) : null}
-          </Label>
+          </FieldShell>
 
-          <Input
-            name="quantity"
-            inputMode="decimal"
-            value={quantity}
-            onChange={(e) => setQuantity(sanitize2dp(e.target.value))}
-            required={!!required.quantity}
-            placeholder="1"
-          />
-        </div>
+          <FieldShell label="Purpose" required>
+            <NativeSelect
+              name="purpose"
+              value={normPurpose(purpose)}
+              onChange={(e) => onPurposeChange(e.target.value)}
+              required
+            >
+              {PURPOSES.map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </NativeSelect>
+          </FieldShell>
 
-        <div className="space-y-2">
-          <Label>
-            Entry Price{" "}
-            {required.entry_price ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
+          <div className="md:col-span-2">
+            <FieldShell label="Symbol" required={required.symbol}>
+              <Input
+                value={symbolQuery}
+                onChange={(e) => setSymbolQuery(e.target.value)}
+                placeholder="Search symbol e.g. GOLD, EURUSD, Indices"
+                className="mb-2 h-11 rounded-xl"
+              />
 
-          <Input
-            name="entry_price"
-            inputMode="decimal"
-            value={entryPrice}
-            required={!!required.entry_price}
-            onChange={(e) => setEntryPrice(sanitize2dp(e.target.value))}
-          />
-        </div>
+              <NativeSelect
+                name="symbol_id"
+                required={!!required.symbol}
+                defaultValue={prefillJournal?.symbol_id || ""}
+              >
+                <option value="" disabled>
+                  Select symbol
+                </option>
 
-        <div className="space-y-2">
-          <Label>
-            Stop Loss{" "}
-            {required.stop_loss ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
+                {filteredSymbols.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.symbol_name} — {s.category}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FieldShell>
+          </div>
 
-          <Input
-            name="stop_loss"
-            inputMode="decimal"
-            value={stopLoss}
-            required={!!required.stop_loss}
-            onChange={(e) => setStopLoss(sanitize2dp(e.target.value))}
-          />
+          <FieldShell label="Status" required={statusRequired}>
+            <NativeSelect
+              name="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              required={statusRequired}
+            >
+              <option value="">
+                {statusRequired ? "Select status" : "No status"}
+              </option>
 
-          {slDirectionError ? (
-            <p className="text-xs text-destructive">{slDirectionError}</p>
-          ) : null}
-        </div>
-      </div>
+              {statusOptions.map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </NativeSelect>
+          </FieldShell>
 
-      <TakeProfitEditor
-        items={tpItems}
-        setItems={setTpItems}
-        totalLots={quantity}
-        disabled={false}
-      />
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>
-            Entry Reason{" "}
-            {required.entry_reason ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
-
-          <Textarea
-            name="entry_reason"
-            rows={3}
-            defaultValue={prefillJournal?.entry_reason || ""}
-            required={!!required.entry_reason}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>
-            Exit Reason{" "}
-            {exitReasonRequired ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
-
-          <Textarea
-            name="exit_reason"
-            rows={3}
-            defaultValue={prefillJournal?.exit_reason || ""}
-            required={exitReasonRequired}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label>
-            Exit Price{" "}
-            {exitPriceRequired ? (
-              <span className="text-destructive">*</span>
-            ) : (
-              <span className="text-muted-foreground">(optional)</span>
-            )}
-          </Label>
-
-          <Input
-            name="exit_price"
-            inputMode="decimal"
-            defaultValue={prefillJournal?.exit_price ?? ""}
-            required={exitPriceRequired}
-            onChange={(e) => {
-              e.target.value = sanitize2dp(e.target.value);
-            }}
-          />
-        </div>
-      </div>
-
-      <ExistingImageGrid
-        title="Existing Setup Images"
-        images={existingSetupImages}
-        onRemove={(path) =>
-          setExistingSetupImages((prev) => prev.filter((x) => x.path !== path))
-        }
-      />
-
-      <ExistingImageGrid
-        title="Existing Reference Images"
-        images={existingReferenceImages}
-        onRemove={(path) =>
-          setExistingReferenceImages((prev) =>
-            prev.filter((x) => x.path !== path),
-          )
-        }
-      />
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label>Add Setup Images</Label>
-
-          <Input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const totalCount =
-                files.length + (existingSetupImages?.length || 0);
-
-              if (totalCount > 3) {
-                alert("Setup images can be maximum 3 total.");
-                e.target.value = "";
-                setSetupImages([]);
-                return;
-              }
-
-              setSetupImages(files);
-            }}
-          />
-
-          <p className="text-xs text-muted-foreground">Max 3 images total.</p>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Add Reference Images</Label>
-
-          <Input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              const totalCount =
-                files.length + (existingReferenceImages?.length || 0);
-
-              if (totalCount > 3) {
-                alert("Reference images can be maximum 3 total.");
-                e.target.value = "";
-                setReferenceImages([]);
-                return;
-              }
-
-              setReferenceImages(files);
-            }}
-          />
-
-          <p className="text-xs text-muted-foreground">Max 3 images total.</p>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label>
-            Risk Mode{" "}
-            {required.risk_mode ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
-
-          <select
-            name="risk_mode"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            value={riskMode}
-            onChange={(e) => setRiskMode(e.target.value)}
-            required={!!required.risk_mode && !disableRisk}
-            disabled={disableRisk}
-          >
-            <option value="PERCENT">Percentage</option>
-            <option value="AMOUNT">$ Amount</option>
-          </select>
-
-          {disableRisk ? (
-            <input type="hidden" name="risk_mode" value={riskMode} />
-          ) : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label>
-            Risk Per Trade{" "}
-            {required.risk_per_trade ? (
-              <span className="text-destructive">*</span>
-            ) : null}
-          </Label>
-
-          <Input
-            name="risk_per_trade"
-            inputMode="decimal"
-            defaultValue={prefillJournal?.risk_per_trade ?? ""}
-            required={!!required.risk_per_trade && !disableRisk}
-            placeholder={riskMode === "PERCENT" ? "e.g. 1.5" : "e.g. 25"}
-            disabled={disableRisk}
-            onChange={(e) => {
-              e.target.value = sanitize2dp(e.target.value);
-            }}
-          />
-
-          {disableRisk ? (
-            <input
-              type="hidden"
-              name="risk_per_trade"
-              value={strategy.risk_per_trade || 1}
+          <FieldShell label="Create Date & Time" required>
+            <Input
+              name="journal_start_at"
+              type="datetime-local"
+              value={journalStartAt}
+              onChange={(e) => setJournalStartAt(e.target.value)}
+              required
+              className="h-11 rounded-xl"
             />
-          ) : null}
+          </FieldShell>
+
+          {needsEndDate(status) ? (
+            <FieldShell label="End Date & Time" required>
+              <Input
+                name="journal_end_at"
+                type="datetime-local"
+                value={journalEndAt}
+                onChange={(e) => setJournalEndAt(e.target.value)}
+                required
+                className="h-11 rounded-xl"
+              />
+            </FieldShell>
+          ) : (
+            <input type="hidden" name="journal_end_at" value="" />
+          )}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+        <StepHeader
+          icon={ChevronRight}
+          eyebrow="Step 2"
+          title="Trade Levels"
+          description="Enter direction, quantity, entry, stop loss and targets."
+        />
+
+        <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <FieldShell label="Direction" required={required.direction}>
+            <NativeSelect
+              name="direction"
+              value={direction}
+              onChange={(e) => setDirection(e.target.value)}
+              required={!!required.direction}
+            >
+              <option value="BUY">Buy</option>
+              <option value="SELL">Sell</option>
+            </NativeSelect>
+          </FieldShell>
+
+          <FieldShell label="Quantity" required={required.quantity} hint="Lots">
+            <Input
+              name="quantity"
+              inputMode="decimal"
+              value={quantity}
+              onChange={(e) => setQuantity(sanitize2dp(e.target.value))}
+              required={!!required.quantity}
+              placeholder="1"
+              className="h-11 rounded-xl"
+            />
+          </FieldShell>
+
+          <FieldShell label="Entry Price" required={required.entry_price}>
+            <Input
+              name="entry_price"
+              inputMode="decimal"
+              value={entryPrice}
+              required={!!required.entry_price}
+              onChange={(e) => setEntryPrice(sanitize2dp(e.target.value))}
+              className="h-11 rounded-xl"
+            />
+          </FieldShell>
+
+          <FieldShell label="Stop Loss" required={required.stop_loss}>
+            <Input
+              name="stop_loss"
+              inputMode="decimal"
+              value={stopLoss}
+              required={!!required.stop_loss}
+              onChange={(e) => setStopLoss(sanitize2dp(e.target.value))}
+              className="h-11 rounded-xl"
+            />
+
+            {slDirectionError ? (
+              <p className="text-xs text-destructive">{slDirectionError}</p>
+            ) : null}
+          </FieldShell>
         </div>
 
-        <div className="rounded-md border p-3 text-xs text-muted-foreground">
-          <div className="mb-1 font-medium text-foreground">Strategy risk</div>
-          <div>Risk/Trade: {strategy.risk_per_trade}</div>
-          <div>AVG R:R: {strategy.avg_planned_rr}</div>
-          <div>Planned R/Year: {strategy.planned_r_year}</div>
+        <div className="mt-6">
+          <TakeProfitEditor
+            items={tpItems}
+            setItems={setTpItems}
+            totalLots={quantity}
+            disabled={false}
+          />
         </div>
-      </div>
 
-      {!sumOk && tpItems.length > 0 && totalLotsOk ? (
-        <p className="text-xs text-destructive">
-          Fix TP quantities to match total lots.
-        </p>
-      ) : null}
+        {!sumOk && tpItems.length > 0 && totalLotsOk ? (
+          <p className="mt-3 text-xs text-destructive">
+            Fix TP quantities to match total lots.
+          </p>
+        ) : null}
+      </section>
+
+      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+        <StepHeader
+          icon={FileText}
+          eyebrow="Step 3"
+          title="Reasoning"
+          description="Capture why you entered and how/why the trade ended."
+        />
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <FieldShell label="Entry Reason" required={required.entry_reason}>
+            <Textarea
+              name="entry_reason"
+              rows={4}
+              defaultValue={prefillJournal?.entry_reason || ""}
+              required={!!required.entry_reason}
+              className="rounded-xl"
+            />
+          </FieldShell>
+
+          <FieldShell label="Exit Reason" required={exitReasonRequired}>
+            <Textarea
+              name="exit_reason"
+              rows={4}
+              defaultValue={prefillJournal?.exit_reason || ""}
+              required={exitReasonRequired}
+              className="rounded-xl"
+            />
+          </FieldShell>
+
+          <FieldShell
+            label="Exit Price"
+            required={exitPriceRequired}
+            hint={exitPriceRequired ? "" : "Optional"}
+          >
+            <Input
+              name="exit_price"
+              inputMode="decimal"
+              defaultValue={prefillJournal?.exit_price ?? ""}
+              required={exitPriceRequired}
+              onChange={(e) => {
+                e.target.value = sanitize2dp(e.target.value);
+              }}
+              className="h-11 rounded-xl"
+            />
+          </FieldShell>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+        <StepHeader
+          icon={Camera}
+          eyebrow="Step 4"
+          title="Images"
+          description="Add setup screenshots and reference charts. You can remove copied images before saving."
+        />
+
+        <div className="mt-6 grid gap-6">
+          <ExistingImageGrid
+            title="Existing Setup Images"
+            images={existingSetupImages}
+            onRemove={(path) =>
+              setExistingSetupImages((prev) =>
+                prev.filter((x) => x.path !== path),
+              )
+            }
+          />
+
+          <ExistingImageGrid
+            title="Existing Reference Images"
+            images={existingReferenceImages}
+            onRemove={(path) =>
+              setExistingReferenceImages((prev) =>
+                prev.filter((x) => x.path !== path),
+              )
+            }
+          />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <NewImageUploader
+              title="Add Setup Images"
+              files={setupImages}
+              setFiles={setSetupImages}
+              existingCount={existingSetupImages?.length || 0}
+              max={3}
+              error={setupImageError}
+              setError={setSetupImageError}
+            />
+
+            <NewImageUploader
+              title="Add Reference Images"
+              files={referenceImages}
+              setFiles={setReferenceImages}
+              existingCount={existingReferenceImages?.length || 0}
+              max={3}
+              error={referenceImageError}
+              setError={setReferenceImageError}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+        <StepHeader
+          icon={ShieldCheck}
+          eyebrow="Step 5"
+          title="Risk"
+          description="Set risk mode and risk per trade."
+        />
+
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <FieldShell label="Risk Mode" required={required.risk_mode}>
+            <NativeSelect
+              name="risk_mode"
+              value={riskMode}
+              onChange={(e) => setRiskMode(e.target.value)}
+              required={!!required.risk_mode && !disableRisk}
+              disabled={disableRisk}
+            >
+              <option value="PERCENT">Percentage</option>
+              <option value="AMOUNT">$ Amount</option>
+            </NativeSelect>
+
+            {disableRisk ? (
+              <input type="hidden" name="risk_mode" value={riskMode} />
+            ) : null}
+          </FieldShell>
+
+          <FieldShell label="Risk Per Trade" required={required.risk_per_trade}>
+            <Input
+              name="risk_per_trade"
+              inputMode="decimal"
+              defaultValue={prefillJournal?.risk_per_trade ?? ""}
+              required={!!required.risk_per_trade && !disableRisk}
+              placeholder={riskMode === "PERCENT" ? "e.g. 1.5" : "e.g. 25"}
+              disabled={disableRisk}
+              onChange={(e) => {
+                e.target.value = sanitize2dp(e.target.value);
+              }}
+              className="h-11 rounded-xl"
+            />
+
+            {disableRisk ? (
+              <input
+                type="hidden"
+                name="risk_per_trade"
+                value={strategy.risk_per_trade || 1}
+              />
+            ) : null}
+          </FieldShell>
+
+          <div className="rounded-2xl border bg-background/60 p-4 text-sm">
+            <div className="mb-2 font-medium">Strategy Risk</div>
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <div>Risk/Trade: {strategy.risk_per_trade}</div>
+              <div>AVG R:R: {strategy.avg_planned_rr}</div>
+              <div>Planned R/Year: {strategy.planned_r_year}</div>
+            </div>
+          </div>
+        </div>
+      </section>
     </>
   );
 }
+
 export default function NewJournalForm({
   action,
   strategy,
@@ -1080,6 +1240,8 @@ export default function NewJournalForm({
   const [referenceImages, setReferenceImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [setupImageError, setSetupImageError] = useState("");
+  const [referenceImageError, setReferenceImageError] = useState("");
 
   const [existingSetupImages, setExistingSetupImages] = useState([]);
   const [existingReferenceImages, setExistingReferenceImages] = useState([]);
@@ -1314,102 +1476,147 @@ export default function NewJournalForm({
   }, [state?.ok, state?.journalId]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">
-          {prefillJournal ? "Incorporate Journal" : "Create Journal"}
-        </h1>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className="overflow-hidden rounded-3xl border bg-gradient-to-br from-card via-card to-muted/40 shadow-sm">
+        <div className="p-6 md:p-8">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
+                <Sparkles className="h-3.5 w-3.5" />
+                {prefillJournal ? "Incorporate Journal" : "Journal Builder"}
+              </div>
+
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+                {prefillJournal ? "Incorporate Journal" : "Create Journal"}
+              </h1>
+
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                Record your setup, trade levels, reasoning, images, and risk in
+                a structured journal entry.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border bg-background p-4 text-sm shadow-sm">
+              <div className="text-xs text-muted-foreground">Mode</div>
+              <div className="mt-1 font-medium">
+                {prefillJournal ? "Review copied journal" : "New journal"}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {!prefillJournal ? <StrategyBlueprint s={strategy} /> : null}
-      <Card>
-        <CardHeader>
-          <CardTitle>Journal Details</CardTitle>
-        </CardHeader>
 
-        <CardContent>
-          <form action={formAction} className="space-y-8">
-            <PurposeRenderer
-              purpose={purposeKey}
-              status={status}
-              setStatus={setStatus}
-              journalStartAt={journalStartAt}
-              setJournalStartAt={setJournalStartAt}
-              journalEndAt={journalEndAt}
-              setJournalEndAt={setJournalEndAt}
+      <form action={formAction} className="space-y-6">
+        <JournalDetailsCommon
+          cfg={cfg}
+          purpose={purposeKey}
+          setPurpose={setPurpose}
+          status={status}
+          setStatus={setStatus}
+          accounts={accounts}
+          symbols={symbols}
+          tpItems={tpItems}
+          setTpItems={setTpItems}
+          direction={direction}
+          setDirection={setDirection}
+          quantity={quantity}
+          setQuantity={setQuantity}
+          riskMode={riskMode}
+          setRiskMode={setRiskMode}
+          strategy={strategy}
+          entryPrice={entryPrice}
+          setEntryPrice={setEntryPrice}
+          stopLoss={stopLoss}
+          setStopLoss={setStopLoss}
+          setupImages={setupImages}
+          setSetupImages={setSetupImages}
+          referenceImages={referenceImages}
+          setReferenceImages={setReferenceImages}
+          setupImageError={setupImageError}
+          setSetupImageError={setSetupImageError}
+          referenceImageError={referenceImageError}
+          setReferenceImageError={setReferenceImageError}
+          prefillJournal={prefillJournal}
+          existingSetupImages={existingSetupImages}
+          setExistingSetupImages={setExistingSetupImages}
+          existingReferenceImages={existingReferenceImages}
+          setExistingReferenceImages={setExistingReferenceImages}
+          journalStartAt={journalStartAt}
+          setJournalStartAt={setJournalStartAt}
+          journalEndAt={journalEndAt}
+          setJournalEndAt={setJournalEndAt}
+        />
+
+        {state?.message ? (
+          <div
+            className={`rounded-2xl border p-4 text-sm ${
+              state.ok
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "border-destructive/30 bg-destructive/10 text-destructive"
+            }`}
+          >
+            {state.message}
+          </div>
+        ) : null}
+
+        {uploadError ? (
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+            {uploadError}
+          </div>
+        ) : null}
+
+        <div className="sticky bottom-4 z-10 rounded-3xl border bg-background/85 p-3 shadow-lg backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="hidden text-sm text-muted-foreground md:block">
+              Save this journal entry and review it from your dashboard.
+            </p>
+
+            <Button
+              type="submit"
+              disabled={
+                pending ||
+                uploadingImages ||
+                tpItems.length === 0 ||
+                !sumOk ||
+                !slOk ||
+                (cfg.required?.status && !status)
+              }
+              className="h-11 rounded-2xl px-5"
             >
-              {({ cfg: derivedCfg }) => (
-                <JournalDetailsCommon
-                  cfg={derivedCfg}
-                  purpose={purposeKey}
-                  setPurpose={setPurpose}
-                  status={status}
-                  setStatus={setStatus}
-                  accounts={accounts}
-                  symbols={symbols}
-                  tpItems={tpItems}
-                  setTpItems={setTpItems}
-                  direction={direction}
-                  setDirection={setDirection}
-                  quantity={quantity}
-                  setQuantity={setQuantity}
-                  riskMode={riskMode}
-                  setRiskMode={setRiskMode}
-                  strategy={strategy}
-                  entryPrice={entryPrice}
-                  setEntryPrice={setEntryPrice}
-                  stopLoss={stopLoss}
-                  setStopLoss={setStopLoss}
-                  setSetupImages={setSetupImages}
-                  setReferenceImages={setReferenceImages}
-                  prefillJournal={prefillJournal}
-                  existingSetupImages={existingSetupImages}
-                  setExistingSetupImages={setExistingSetupImages}
-                  existingReferenceImages={existingReferenceImages}
-                  setExistingReferenceImages={setExistingReferenceImages}
-                />
+              {pending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : uploadingImages ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Uploading Images...
+                </>
+              ) : prefillJournal ? (
+                "Incorporate Journal"
+              ) : (
+                "Create Journal"
               )}
-            </PurposeRenderer>
+            </Button>
+          </div>
 
-            {state?.message ? (
-              <p className="text-sm text-destructive">{state.message}</p>
-            ) : null}
+          {!slOk ? (
+            <p className="mt-2 text-xs text-destructive">
+              Fix Stop Loss based on direction. BUY: SL &lt; Entry, SELL: SL
+              &gt; Entry.
+            </p>
+          ) : null}
 
-            {uploadError ? (
-              <p className="text-sm text-destructive">{uploadError}</p>
-            ) : null}
-
-            <div className="flex items-center gap-3">
-              <Button
-                type="submit"
-                disabled={
-                  pending ||
-                  uploadingImages ||
-                  tpItems.length === 0 ||
-                  !sumOk ||
-                  !slOk ||
-                  (cfg.required?.status && !status)
-                }
-              >
-                {pending
-                  ? "Saving..."
-                  : uploadingImages
-                    ? "Uploading Images..."
-                    : prefillJournal
-                      ? "Incorporate Journal"
-                      : "Create Journal"}
-              </Button>
-
-              {!slOk ? (
-                <p className="text-xs text-destructive">
-                  Fix Stop Loss based on direction. BUY: SL &lt; Entry, SELL: SL
-                  &gt; Entry.
-                </p>
-              ) : null}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          {cfg.required?.status && !status ? (
+            <p className="mt-2 text-xs text-destructive">
+              Please select a status.
+            </p>
+          ) : null}
+        </div>
+      </form>
     </div>
   );
 }
