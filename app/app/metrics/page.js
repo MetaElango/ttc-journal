@@ -1,5 +1,21 @@
+// app/app/metrics/page.js
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  CircleDollarSign,
+  Flame,
+  Gauge,
+  LineChart,
+  ShieldCheck,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  BadgeCheck,
+} from "lucide-react";
 
 const CLOSED_STATUSES = [
   "TRADE CLOSE WITH PROFIT",
@@ -15,10 +31,10 @@ function getWeightedTakeProfit(journal) {
     ? journal.take_profit_qty
     : [];
 
-  if (prices.length === 0) return 0;
+  if (!prices.length) return 0;
 
   if (qtys.length === prices.length) {
-    let weightedSum = 0;
+    let total = 0;
     let totalQty = 0;
 
     for (let i = 0; i < prices.length; i++) {
@@ -27,15 +43,15 @@ function getWeightedTakeProfit(journal) {
 
       if (Number.isNaN(price) || Number.isNaN(qty) || qty <= 0) continue;
 
-      weightedSum += price * qty;
+      total += price * qty;
       totalQty += qty;
     }
 
-    if (totalQty > 0) return weightedSum / totalQty;
+    if (totalQty > 0) return total / totalQty;
   }
 
   const validPrices = prices.map(Number).filter((n) => !Number.isNaN(n));
-  if (validPrices.length === 0) return 0;
+  if (!validPrices.length) return 0;
 
   return validPrices.reduce((a, b) => a + b, 0) / validPrices.length;
 }
@@ -94,10 +110,6 @@ function calculateRMultiple(journal) {
 }
 
 function calculateExecutionScore(journal) {
-  const status = String(journal.status || "").toUpperCase();
-
-  if (!CLOSED_STATUSES.includes(status)) return 0;
-
   const actualR = calculateRMultiple(journal);
   const plannedRR = calculatePlannedRR(journal);
 
@@ -107,19 +119,13 @@ function calculateExecutionScore(journal) {
 
   if (ratio <= 0) return 1;
 
-  let score = 1 + ratio * 6;
-  score = Math.max(1, Math.min(10, score));
-
-  return Math.round(score);
+  return Math.round(Math.max(1, Math.min(10, 1 + ratio * 6)));
 }
 
 function mapDeviationToScore(percent) {
   if (percent <= 0) return 20;
 
-  let score = 20 - percent / 5;
-  score = Math.max(1, Math.min(20, score));
-
-  return Math.round(score);
+  return Math.round(Math.max(1, Math.min(20, 20 - percent / 5)));
 }
 
 function calculateRDeviationScore(journal) {
@@ -132,35 +138,6 @@ function calculateRDeviationScore(journal) {
   return mapDeviationToScore(percent);
 }
 
-function getDeviationQualityTagFromScore(score) {
-  if (score >= 17) return "🟢 High Discipline";
-  if (score >= 12) return "🟡 Moderate Discipline";
-  if (score >= 6) return "🟠 Poor Discipline";
-  return "🔴 Severe Discipline Breakdown";
-}
-
-function calculatePositiveDeviationScore(journal) {
-  const actualR = calculateRMultiple(journal);
-  const plannedRR = calculatePlannedRR(journal);
-
-  if (!(plannedRR > 0)) return 0;
-  if (actualR <= plannedRR) return 0;
-
-  const percent = ((actualR - plannedRR) / plannedRR) * 100;
-  return mapDeviationToScore(percent);
-}
-
-function calculateNegativeDeviationScore(journal) {
-  const actualR = calculateRMultiple(journal);
-  const plannedRR = calculatePlannedRR(journal);
-
-  if (!(plannedRR > 0)) return 0;
-  if (actualR >= plannedRR) return 0;
-
-  const percent = ((plannedRR - actualR) / plannedRR) * 100;
-  return mapDeviationToScore(percent);
-}
-
 function getRiskAmountUSD(journal) {
   const riskMode = String(journal.risk_mode || "").toUpperCase();
   const riskPerTrade = Number(journal.risk_per_trade);
@@ -168,9 +145,7 @@ function getRiskAmountUSD(journal) {
 
   if (!(riskPerTrade > 0)) return 0;
 
-  if (riskMode === "AMOUNT") {
-    return riskPerTrade;
-  }
+  if (riskMode === "AMOUNT") return riskPerTrade;
 
   if (riskMode === "PERCENT") {
     if (!(accountSize > 0)) return 0;
@@ -181,9 +156,7 @@ function getRiskAmountUSD(journal) {
 }
 
 function calculateProfitLossUSD(journal) {
-  const rMultiple = calculateRMultiple(journal);
-  const riskAmount = getRiskAmountUSD(journal);
-  return rMultiple * riskAmount;
+  return calculateRMultiple(journal) * getRiskAmountUSD(journal);
 }
 
 function round2(n) {
@@ -197,25 +170,12 @@ function formatUSD(n) {
 }
 
 function isClosedTrade(journal) {
-  const status = String(journal.status || "").toUpperCase();
-  return CLOSED_STATUSES.includes(status);
+  return CLOSED_STATUSES.includes(String(journal.status || "").toUpperCase());
 }
 
 function isWinningTrade(journal) {
   const status = String(journal.status || "").toUpperCase();
-  const r = calculateRMultiple(journal);
-
-  if (!WIN_STATUSES.includes(status)) return false;
-  return r > 0;
-}
-
-function MetricRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between rounded-md border p-4">
-      <div className="text-sm font-medium">{label}</div>
-      <div className="text-sm text-muted-foreground">{value}</div>
-    </div>
-  );
+  return WIN_STATUSES.includes(status) && calculateRMultiple(journal) > 0;
 }
 
 function getTradeDiscipline(journal) {
@@ -223,13 +183,9 @@ function getTradeDiscipline(journal) {
   const plannedRR = calculatePlannedRR(journal);
 
   if (!(plannedRR > 0)) return "Needs review";
-
   if (actualR >= plannedRR) return "Optimal Exit";
-
   if (actualR > 0 && actualR < plannedRR) return "Early exit / fear";
-
   if (actualR === -1) return "SL respected";
-
   if (plannedRR >= 2 && actualR < 0) return "Psychology issue";
 
   return "Needs review";
@@ -241,17 +197,165 @@ function getTradeWarning(journal) {
 
   if (!(plannedRR > 0)) return null;
 
-  // ⚠️ Early exit on high RR trades
   if (plannedRR >= 2 && actualR > 0 && actualR < plannedRR * 0.5) {
-    return "⚠️ Early exit on high RR trade";
+    return "Early exit on high RR trade";
   }
 
-  // 🚨 Psychology breakdown
   if (plannedRR >= 2 && actualR < 0) {
-    return "🚨 Psychology breakdown";
+    return "Psychology breakdown";
   }
 
   return null;
+}
+
+function getScoreTone(score, max) {
+  const pct = max ? (Number(score) / max) * 100 : 0;
+
+  if (pct >= 75) return "text-emerald-600 dark:text-emerald-400";
+  if (pct >= 50) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function StatCard({ icon: Icon, label, value, sub, tone = "" }) {
+  return (
+    <div className="rounded-3xl border bg-card p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </div>
+
+          <div className={`mt-3 text-3xl font-semibold tracking-tight ${tone}`}>
+            {value}
+          </div>
+
+          {sub ? (
+            <div className="mt-1 text-xs text-muted-foreground">{sub}</div>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl border bg-background p-2.5">
+          <Icon className="h-5 w-5 text-muted-foreground" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressCard({ title, value, max, description, icon: Icon }) {
+  const pct = max ? Math.max(0, Math.min(100, (Number(value) / max) * 100)) : 0;
+
+  return (
+    <div className="rounded-3xl border bg-card p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold">{title}</div>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        </div>
+
+        <div className="rounded-2xl border bg-background p-2.5">
+          <Icon className="h-5 w-5 text-muted-foreground" />
+        </div>
+      </div>
+
+      <div className="mt-5 flex items-end justify-between">
+        <div className={`text-3xl font-semibold ${getScoreTone(value, max)}`}>
+          {value || 0}
+        </div>
+        <div className="text-xs text-muted-foreground">/ {max}</div>
+      </div>
+
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function InsightCard({ title, items, empty = "No insights yet." }) {
+  return (
+    <div className="rounded-3xl border bg-card p-5 shadow-sm">
+      <h2 className="text-base font-semibold">{title}</h2>
+
+      <div className="mt-4 space-y-3">
+        {items.length ? (
+          items.map((item) => (
+            <div
+              key={item.label}
+              className="flex items-center justify-between gap-4 rounded-2xl border bg-background p-3"
+            >
+              <div className="text-sm">{item.label}</div>
+              <div className="text-sm font-semibold">{item.value}</div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+            {empty}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RecentTradeRow({ journal }) {
+  const r = round2(calculateRMultiple(journal));
+  const plannedRR = round2(calculatePlannedRR(journal));
+  const pnl = calculateProfitLossUSD(journal);
+  const strategyName = journal?.strategy_snapshot?.strategy_name || "—";
+  const symbol = journal?.symbols?.symbol_name || "—";
+
+  return (
+    <div className="grid gap-3 rounded-2xl border bg-background p-4 text-sm md:grid-cols-6 md:items-center">
+      <div className="md:col-span-2">
+        <div className="font-medium">{strategyName}</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {symbol} · {journal.direction || "—"}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs text-muted-foreground">Status</div>
+        <div className="font-medium">{journal.status || "—"}</div>
+      </div>
+
+      <div>
+        <div className="text-xs text-muted-foreground">Planned</div>
+        <div className="font-medium">
+          {plannedRR > 0 ? `1:${plannedRR}` : "—"}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs text-muted-foreground">Actual R</div>
+        <div
+          className={
+            r >= 0
+              ? "font-semibold text-emerald-600 dark:text-emerald-400"
+              : "font-semibold text-red-600 dark:text-red-400"
+          }
+        >
+          {r > 0 ? `+${r}R` : `${r}R`}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs text-muted-foreground">P/L</div>
+        <div
+          className={
+            pnl >= 0
+              ? "font-semibold text-emerald-600 dark:text-emerald-400"
+              : "font-semibold text-red-600 dark:text-red-400"
+          }
+        >
+          {formatUSD(pnl)}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default async function MetricsPage() {
@@ -267,6 +371,7 @@ export default async function MetricsPage() {
     .select(
       `
       id,
+      user_id,
       purpose,
       status,
       direction,
@@ -279,6 +384,12 @@ export default async function MetricsPage() {
       risk_mode,
       risk_per_trade,
       created_at,
+      strategy_snapshot,
+      symbols:symbol_id (
+        id,
+        symbol_name,
+        category
+      ),
       trading_accounts:trading_account_id (
         id,
         account_name,
@@ -286,13 +397,13 @@ export default async function MetricsPage() {
       )
     `,
     )
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
     return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Metrics</h1>
-        <p className="mt-3 text-sm text-destructive">{error.message}</p>
+      <div className="rounded-3xl border border-destructive/30 bg-destructive/10 p-6 text-sm text-destructive">
+        {error.message}
       </div>
     );
   }
@@ -375,33 +486,6 @@ export default async function MetricsPage() {
       )
     : 0;
 
-  const deviationQualityTag =
-    avgRDeviationScore > 0
-      ? getDeviationQualityTagFromScore(avgRDeviationScore)
-      : "—";
-
-  const positiveDeviationValues = closedTrades
-    .map((journal) => calculatePositiveDeviationScore(journal))
-    .filter((n) => n > 0);
-
-  const avgPositiveDeviationScore = positiveDeviationValues.length
-    ? Math.round(
-        positiveDeviationValues.reduce((sum, value) => sum + value, 0) /
-          positiveDeviationValues.length,
-      )
-    : 0;
-
-  const negativeDeviationValues = closedTrades
-    .map((journal) => calculateNegativeDeviationScore(journal))
-    .filter((n) => n > 0);
-
-  const avgNegativeDeviationScore = negativeDeviationValues.length
-    ? Math.round(
-        negativeDeviationValues.reduce((sum, value) => sum + value, 0) /
-          negativeDeviationValues.length,
-      )
-    : 0;
-
   const disciplineCounts = {
     "Optimal Exit": 0,
     "Early exit / fear": 0,
@@ -410,125 +494,203 @@ export default async function MetricsPage() {
     "Needs review": 0,
   };
 
-  closedTrades.forEach((journal) => {
-    const tag = getTradeDiscipline(journal);
-    if (disciplineCounts[tag] !== undefined) {
-      disciplineCounts[tag]++;
-    }
-  });
-
-  // find most frequent discipline
-  let dominantDiscipline = "—";
-  let maxCount = 0;
-
-  for (const key in disciplineCounts) {
-    if (disciplineCounts[key] > maxCount) {
-      maxCount = disciplineCounts[key];
-      dominantDiscipline = key;
-    }
-  }
-
-  const tradeDisciplineDisplay = Object.entries(disciplineCounts)
-    .filter(([_, count]) => count > 0)
-    .map(([label, count]) => `• ${label} (${count})`)
-    .join("\n");
-
   const warningCounts = {
-    "⚠️ Early exit on high RR trade": 0,
-    "🚨 Psychology breakdown": 0,
+    "Early exit on high RR trade": 0,
+    "Psychology breakdown": 0,
   };
 
   closedTrades.forEach((journal) => {
+    const discipline = getTradeDiscipline(journal);
+    if (disciplineCounts[discipline] !== undefined) {
+      disciplineCounts[discipline]++;
+    }
+
     const warning = getTradeWarning(journal);
     if (warning && warningCounts[warning] !== undefined) {
       warningCounts[warning]++;
     }
   });
 
-  const warningsDisplay = Object.entries(warningCounts)
-    .filter(([_, count]) => count > 0)
-    .map(([label, count]) => `${label} (${count})`)
-    .join("\n");
+  const disciplineItems = Object.entries(disciplineCounts)
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => ({ label, value: count }));
 
-  const metrics = [
-    {
-      label: "Total Journals",
-      value: totalJournals,
-    },
-    {
-      label: "Closed Trades",
-      value: totalClosedTrades,
-    },
-    {
-      label: "Actual Profit / Loss (R)",
-      value: totalR,
-    },
-    {
-      label: "Actual Profit / Loss (USD)",
-      value: formatUSD(totalProfitLossUSD),
-    },
-    {
-      label: "Average Planned RR",
-      value: avgPlannedRR,
-    },
-    {
-      label: "Execution Quality (1–10)",
-      value: avgExecutionScore,
-    },
-    {
-      label: "Expectancy",
-      value: expectancy,
-    },
-    {
-      label: "Win Rate",
-      value: `${winRate}%`,
-    },
-    {
-      label: "Profit Factor",
-      value: profitFactor,
-    },
-    {
-      label: "R Deviation Score (1–20)",
-      value: avgRDeviationScore,
-    },
-    {
-      label: "Deviation Quality Tag",
-      value: deviationQualityTag,
-    },
-    {
-      label: "Positive Deviation Score (1–20)",
-      value: avgPositiveDeviationScore,
-    },
-    {
-      label: "Negative Deviation Score (1–20)",
-      value: avgNegativeDeviationScore,
-    },
-    {
-      label: "Trade Discipline",
-      value: tradeDisciplineDisplay || "—",
-    },
-    {
-      label: "Warnings",
-      value: warningsDisplay || "—",
-    },
-  ];
+  const warningItems = Object.entries(warningCounts)
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => ({ label, value: count }));
+
+  const recentClosedTrades = closedTrades.slice(0, 5);
+
+  const positiveTone =
+    totalProfitLossUSD > 0
+      ? "text-emerald-600 dark:text-emerald-400"
+      : totalProfitLossUSD < 0
+        ? "text-red-600 dark:text-red-400"
+        : "";
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Metrics</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Metrics overview</p>
+      <div className="overflow-hidden rounded-3xl border bg-gradient-to-br from-card via-card to-muted/40 p-6 shadow-sm md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Trading Performance
+            </div>
+
+            <h1 className="mt-4 text-3xl font-semibold tracking-tight">
+              Metrics
+            </h1>
+
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Track your closed trades, R performance, win rate, execution
+              quality, and discipline patterns.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border bg-background p-4 text-sm shadow-sm">
+            <div className="text-xs text-muted-foreground">Closed Trades</div>
+            <div className="mt-1 text-2xl font-semibold">
+              {totalClosedTrades}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-3">
-        {metrics.map((metric) => (
-          <MetricRow
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-          />
-        ))}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={Target}
+          label="Total Journals"
+          value={totalJournals}
+          sub="All journal entries"
+        />
+        <StatCard
+          icon={Activity}
+          label="Closed Trades"
+          value={totalClosedTrades}
+          sub="Used for performance metrics"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Total R"
+          value={`${totalR > 0 ? "+" : ""}${totalR}R`}
+          sub="Actual closed trade result"
+          tone={
+            totalR >= 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-red-600 dark:text-red-400"
+          }
+        />
+        <StatCard
+          icon={CircleDollarSign}
+          label="P/L USD"
+          value={formatUSD(totalProfitLossUSD)}
+          sub="Based on account risk"
+          tone={positiveTone}
+        />
       </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={CheckCircle2}
+          label="Win Rate"
+          value={`${winRate}%`}
+          sub={`${totalWinningTrades}/${totalClosedTrades} winning trades`}
+        />
+        <StatCard
+          icon={Gauge}
+          label="Expectancy"
+          value={`${expectancy > 0 ? "+" : ""}${expectancy}R`}
+          sub="Average R per closed trade"
+        />
+        <StatCard
+          icon={Flame}
+          label="Profit Factor"
+          value={profitFactor}
+          sub={`Gross profit ${grossProfit}R / loss ${grossLoss}R`}
+        />
+        <StatCard
+          icon={LineChart}
+          label="Avg Planned RR"
+          value={`1:${avgPlannedRR}`}
+          sub="Average planned reward"
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ProgressCard
+          icon={ShieldCheck}
+          title="Execution Quality"
+          value={avgExecutionScore}
+          max={10}
+          description="How closely your exits match or exceed your planned RR."
+        />
+
+        <ProgressCard
+          icon={BadgeCheck}
+          title="R Deviation Discipline"
+          value={avgRDeviationScore}
+          max={20}
+          description="Higher score means actual R stayed closer to planned R."
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <InsightCard
+          title="Trade Discipline Breakdown"
+          items={disciplineItems}
+          empty="Close trades to see discipline patterns."
+        />
+
+        <InsightCard
+          title="Warnings"
+          items={warningItems}
+          empty="No major warnings found."
+        />
+      </div>
+
+      <div className="rounded-3xl border bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Recent Closed Trades</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your latest completed trades with planned RR, actual R, and P/L.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border bg-background p-2.5">
+            <TrendingDown className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {recentClosedTrades.length ? (
+            recentClosedTrades.map((journal) => (
+              <RecentTradeRow key={journal.id} journal={journal} />
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No closed trades yet.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {totalClosedTrades === 0 ? (
+        <div className="rounded-3xl border border-amber-500/30 bg-amber-500/10 p-5 text-sm text-amber-700 dark:text-amber-300">
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <div className="font-semibold">Metrics need closed trades</div>
+              <p className="mt-1">
+                Update journals to closed statuses like TRADE CLOSE WITH PROFIT,
+                TRADE EXIT IN MID, or TRADE SL HIT to unlock full performance
+                tracking.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,23 +1,56 @@
+// app/app/_components/navbar.jsx
+
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Target, BookOpen, Share2, User } from "lucide-react";
+
+import {
+  BarChart3,
+  BookOpen,
+  CircleUserRound,
+  LogOut,
+  Share2,
+  Target,
+  User,
+} from "lucide-react";
+
 import ModeToggle from "./mode-toggle";
+import AccountDropdown from "./account-dropdown";
 
 export default async function Navbar() {
   const supabase = await createClient();
+
   const { data } = await supabase.auth.getUser();
 
-  const email = data?.user?.email || "";
-  const initial = email ? email[0].toUpperCase() : "U";
+  const user = data?.user;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user?.id)
+    .single();
+
+  const email = user?.email || "";
+
+  const fullName = profile?.full_name || "";
+
+  const initial = fullName
+    ? fullName.trim()[0].toUpperCase()
+    : email
+      ? email[0].toUpperCase()
+      : "U";
+
+  const displayName = fullName || email || "Account";
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 md:px-6">
+        {/* LEFT */}
         <div className="flex items-center gap-8">
           <Link href="/app" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-foreground text-lg font-bold text-background">
               T
             </div>
+
             <span className="text-lg font-semibold">TTC Journal</span>
           </Link>
 
@@ -45,47 +78,23 @@ export default async function Navbar() {
               <Share2 size={17} />
               Social
             </Link>
+
+            <Link
+              href="/app/metrics"
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <BarChart3 size={17} />
+              Metrics
+            </Link>
           </nav>
         </div>
 
-        <details className="relative">
-          <summary className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full border bg-background transition hover:bg-accent [&::-webkit-details-marker]:hidden">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">
-              {initial}
-            </span>
-          </summary>
-
-          <div className="absolute right-0 mt-3 w-72 overflow-hidden rounded-2xl border bg-background shadow-xl">
-            <div className="border-b p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-sm font-semibold text-background">
-                  {initial}
-                </div>
-
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Account</p>
-                  <p className="truncate text-sm font-medium">{email}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2 p-3">
-              <div className="flex items-center justify-between rounded-xl border p-2">
-                <span className="flex items-center gap-2 text-sm">
-                  <User size={16} />
-                  Theme
-                </span>
-                <ModeToggle />
-              </div>
-
-              <form action="/logout" method="post">
-                <button className="flex h-10 w-full items-center justify-center rounded-xl border text-sm font-medium hover:bg-accent">
-                  Logout
-                </button>
-              </form>
-            </div>
-          </div>
-        </details>
+        {/* RIGHT */}
+        <AccountDropdown
+          initial={initial}
+          displayName={displayName}
+          email={email}
+        />
       </div>
     </header>
   );
