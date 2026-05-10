@@ -10,6 +10,11 @@ const TABS = [
   { key: "cancelled", label: "Cancelled" },
 ];
 
+const VIEWS = [
+  { key: "my", label: "My Journals" },
+  { key: "incorporated", label: "Incorporated Journals" },
+];
+
 const PURPOSES = ["FOR OBSERVATION", "ENTRY PLANNED", "FORWARD TESTING"];
 
 const OPEN_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
@@ -45,6 +50,10 @@ export default async function JournalsPage({ searchParams }) {
   const activeTab = TABS.some((t) => t.key === params?.tab)
     ? params.tab
     : "open";
+
+  const activeView = VIEWS.some((v) => v.key === params?.view)
+    ? params.view
+    : "my";
 
   const supabase = await createClient();
 
@@ -143,34 +152,41 @@ export default async function JournalsPage({ searchParams }) {
     (j) => !j.copied_from_journal_id,
   );
 
-  const incorporatedJournals = journalsWithImageUrls.filter(
+  const incorporatedJournalsAll = journalsWithImageUrls.filter(
     (j) => j.copied_from_journal_id,
   );
 
-  const filteredOwnJournals = ownJournalsAll.filter(
+  const activeSource =
+    activeView === "incorporated" ? incorporatedJournalsAll : ownJournalsAll;
+
+  const activeJournals = activeSource.filter(
     (j) => getJournalTab(j) === activeTab,
   );
 
-  const counts = TABS.reduce((acc, tab) => {
-    acc[tab.key] = ownJournalsAll.filter(
-      (j) => getJournalTab(j) === tab.key,
-    ).length;
+  const counts = VIEWS.reduce((acc, view) => {
+    const source =
+      view.key === "incorporated" ? incorporatedJournalsAll : ownJournalsAll;
+
+    acc[view.key] = TABS.reduce((tabAcc, tab) => {
+      tabAcc[tab.key] = source.filter(
+        (j) => getJournalTab(j) === tab.key,
+      ).length;
+
+      return tabAcc;
+    }, {});
 
     return acc;
   }, {});
 
-  const ownJournalsByPurpose = PURPOSES.map((purpose) => ({
+  const activeJournalsByPurpose = PURPOSES.map((purpose) => ({
     purpose,
-    data: filteredOwnJournals.filter((j) => norm(j.purpose) === purpose),
+    data: activeJournals.filter((j) => norm(j.purpose) === purpose),
   })).filter((group) => group.data.length > 0);
 
-  const incorporatedJournalsByPurpose = PURPOSES.map((purpose) => ({
-    purpose,
-    data: incorporatedJournals.filter((j) => norm(j.purpose) === purpose),
-  })).filter((group) => group.data.length > 0);
-
-  const totalVisibleCount =
-    filteredOwnJournals.length + incorporatedJournals.length;
+  const totalCurrentView =
+    activeView === "incorporated"
+      ? incorporatedJournalsAll.length
+      : ownJournalsAll.length;
 
   return (
     <div className="space-y-6">
@@ -178,7 +194,10 @@ export default async function JournalsPage({ searchParams }) {
         <div>
           <h1 className="text-xl font-semibold">Journals</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {journalsWithImageUrls.length} journals
+            {totalCurrentView}{" "}
+            {activeView === "incorporated"
+              ? "incorporated journals"
+              : "my journals"}
           </p>
         </div>
 
@@ -190,68 +209,57 @@ export default async function JournalsPage({ searchParams }) {
         </Link>
       </div>
 
+      <div className="grid gap-3 rounded-2xl border bg-card p-3 md:grid-cols-2">
+        {VIEWS.map((view) => {
+          const active = activeView === view.key;
+          const total =
+            view.key === "incorporated"
+              ? incorporatedJournalsAll.length
+              : ownJournalsAll.length;
+
+          return (
+            <Link
+              key={view.key}
+              href={`/app/journals?view=${view.key}&tab=${activeTab}`}
+              className={`rounded-xl px-4 py-3 text-center text-sm font-medium transition ${
+                active
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              {view.label} ({total})
+            </Link>
+          );
+        })}
+      </div>
+
       <div className="flex flex-wrap gap-2 border-b">
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
+          const count = counts?.[activeView]?.[tab.key] || 0;
 
           return (
             <Link
               key={tab.key}
-              href={`/app/journals?tab=${tab.key}`}
+              href={`/app/journals?view=${activeView}&tab=${tab.key}`}
               className={`border-b-2 px-4 py-3 text-sm font-medium ${
                 active
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
-              {tab.label} ({counts[tab.key] || 0})
+              {tab.label} ({count})
             </Link>
           );
         })}
       </div>
 
-      {totalVisibleCount === 0 ? (
+      {activeJournalsByPurpose.length === 0 ? (
         <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">
           No journals in this tab.
         </div>
       ) : (
-        <div className="space-y-10">
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">My Journals</h2>
-              <p className="text-sm text-muted-foreground">
-                Journals created from your own strategies
-              </p>
-            </div>
-
-            {ownJournalsByPurpose.length === 0 ? (
-              <div className="rounded-xl border p-6 text-sm text-muted-foreground">
-                No own journals in this tab.
-              </div>
-            ) : (
-              <JournalsClient journalsByPurpose={ownJournalsByPurpose} />
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold">Incorporated Journals</h2>
-              <p className="text-sm text-muted-foreground">
-                Journals copied from Social
-              </p>
-            </div>
-
-            {incorporatedJournalsByPurpose.length === 0 ? (
-              <div className="rounded-xl border p-6 text-sm text-muted-foreground">
-                No incorporated journals.
-              </div>
-            ) : (
-              <JournalsClient
-                journalsByPurpose={incorporatedJournalsByPurpose}
-              />
-            )}
-          </div>
-        </div>
+        <JournalsClient journalsByPurpose={activeJournalsByPurpose} />
       )}
     </div>
   );

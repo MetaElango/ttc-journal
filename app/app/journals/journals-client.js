@@ -2,6 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import {
+  ArrowUpRight,
+  Calendar,
+  Eye,
+  Pencil,
+  Share2,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import JournalDetailsModal from "./journal-details-modal";
 
 const EDITABLE_ACTIVE_STATUSES = [
@@ -31,12 +40,6 @@ function canEditJournal(journal) {
 
 function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
-}
-
-function shortText(value, max = 24) {
-  const text = String(value || "—");
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}...`;
 }
 
 function getWeightedTakeProfit(journal) {
@@ -104,130 +107,251 @@ function formatRisk(journal) {
   return risk;
 }
 
-function JournalsTable({ journals, setSelectedJournal }) {
+function formatDate(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function getStatusStyle(status) {
+  const s = norm(status);
+
+  if (["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"].includes(s)) {
+    return {
+      border: "border-l-emerald-500",
+      badge:
+        "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+      label: status || "Open",
+    };
+  }
+
+  if (["TRADE CLOSE WITH PROFIT"].includes(s)) {
+    return {
+      border: "border-l-blue-500",
+      badge:
+        "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300",
+      label: status,
+    };
+  }
+
+  if (["TRADE SL HIT"].includes(s)) {
+    return {
+      border: "border-l-red-500",
+      badge: "border-red-500/25 bg-red-500/10 text-red-700 dark:text-red-300",
+      label: status,
+    };
+  }
+
+  if (["ENTRY CANCELLED", "ENTRY MISSED"].includes(s)) {
+    return {
+      border: "border-l-muted-foreground/40",
+      badge: "border-border bg-muted text-muted-foreground",
+      label: status,
+    };
+  }
+
+  return {
+    border: "border-l-border",
+    badge: "border-border bg-background text-muted-foreground",
+    label: status || "No status",
+  };
+}
+
+function MiniStat({ label, value }) {
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="relative w-full min-w-[1134px] table-fixed text-sm">
-        <thead className="bg-background">
-          <tr className="border-b">
-            <th className="sticky left-0 z-30 w-[240px] bg-background px-4 py-3 text-left font-medium shadow-[2px_0_5px_rgba(0,0,0,0.08)]">
-              Strategy
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Symbol
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Direction
-            </th>
-            <th className="w-[160px] bg-background px-4 py-3 text-left font-medium">
-              Trading Style
-            </th>
-            <th className="w-[140px] bg-background px-4 py-3 text-left font-medium">
-              Setup
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Entry
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              SL
-            </th>
-            <th className="w-[120px] bg-background px-4 py-3 text-left font-medium">
-              Risk
-            </th>
-            <th className="w-[100px] bg-background px-4 py-3 text-left font-medium">
-              RR
-            </th>
-            <th className="sticky right-[208px] z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
-              Share
-            </th>
-            <th className="sticky right-[104px] z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
-              Edit
-            </th>
-            <th className="sticky right-0 z-30 w-[104px] bg-background px-4 py-3 text-left font-medium shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
+    <div className="rounded-2xl border bg-background/70 p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold">{value ?? "—"}</div>
+    </div>
+  );
+}
+
+function ImageStrip({ journal }) {
+  const images = [
+    ...(journal.setupImageUrls || []),
+    ...(journal.referenceImageUrls || []),
+  ].slice(0, 3);
+
+  if (!images.length) return null;
+
+  return (
+    <div className="flex gap-2">
+      {images.map((url, index) => (
+        <div
+          key={`${url}-${index}`}
+          className="h-14 w-16 overflow-hidden rounded-xl border bg-muted"
+        >
+          <img
+            src={url}
+            alt={`Journal image ${index + 1}`}
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function JournalCard({ journal, index, setSelectedJournal }) {
+  const strategyName = journal?.strategy_snapshot?.strategy_name || "—";
+  const tradingStyle = journal?.strategy_snapshot?.trading_style || "—";
+  const setup = journal?.strategy_snapshot?.setup_type || "—";
+  const symbol = journal?.symbols?.symbol_name || "—";
+  const rr = calculatePlannedRR(journal);
+  const statusStyle = getStatusStyle(journal.status);
+  const isBuy = norm(journal.direction) === "BUY";
+
+  async function shareJournal() {
+    const res = await fetch("/api/journals/share", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ journalId: journal.id }),
+    });
+
+    const json = await res.json();
+
+    if (!json.ok) {
+      alert(json.message || "Failed to share journal.");
+      return;
+    }
+
+    window.location.reload();
+  }
+
+  return (
+    <article
+      className={[
+        "group overflow-hidden rounded-3xl border border-l-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+        statusStyle.border,
+        index % 2 === 0 ? "bg-card" : "bg-muted/20",
+      ].join(" ")}
+    >
+      <div className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="truncate text-lg font-semibold tracking-tight">
+                  {strategyName}
+                </h3>
+
+                <span
+                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyle.badge}`}
+                >
+                  {statusStyle.label}
+                </span>
+              </div>
+
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{journal.purpose || "—"}</span>
+                <span>•</span>
+                <span>{tradingStyle}</span>
+                <span>•</span>
+                <span>{setup}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs font-medium">
+                {isBuy ? (
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                ) : (
+                  <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                )}
+                {journal.direction || "—"}
+              </span>
+
+              <span className="rounded-full border bg-background px-2.5 py-1 text-xs font-medium">
+                {symbol}
+              </span>
+
+              <span className="rounded-full border bg-background px-2.5 py-1 text-xs font-medium">
+                RR: {rr > 0 ? `1:${round2(rr)}` : "—"}
+              </span>
+
+              <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground">
+                <Calendar className="h-3.5 w-3.5" />
+                {formatDate(journal.journal_start_at || journal.created_at)}
+              </span>
+            </div>
+          </div>
+
+          <ImageStrip journal={journal} />
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <MiniStat label="Entry" value={journal.entry_price} />
+          <MiniStat label="SL" value={journal.stop_loss} />
+          <MiniStat
+            label="TP"
+            value={
+              Array.isArray(journal.take_profit) && journal.take_profit.length
+                ? journal.take_profit.join(", ")
+                : "—"
+            }
+          />
+          <MiniStat label="Risk" value={formatRisk(journal)} />
+          <MiniStat label="Qty" value={journal.quantity} />
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <div className="text-xs text-muted-foreground">
+            End: {formatDate(journal.journal_end_at)}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={journal.is_shared}
+              onClick={shareJournal}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              {journal.is_shared ? "Shared" : "Share"}
+            </button>
+
+            {canEditJournal(journal) ? (
+              <Link
+                href={`/app/journals/${journal.id}/edit`}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Link>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setSelectedJournal(journal)}
+              className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90"
+            >
+              <Eye className="h-3.5 w-3.5" />
               Details
-            </th>
-          </tr>
-        </thead>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
 
-        <tbody>
-          {journals.map((j) => {
-            const strategyName = j?.strategy_snapshot?.strategy_name || "—";
-            const tradingStyle = j?.strategy_snapshot?.trading_style || "—";
-            const setup = j?.strategy_snapshot?.setup_type || "—";
-            const symbol = j?.symbols?.symbol_name || "—";
-            const rr = calculatePlannedRR(j);
-
-            return (
-              <tr key={j.id} className="border-b last:border-b-0">
-                <td className="sticky left-0 z-20 w-[240px] bg-background px-4 py-3 font-medium shadow-[2px_0_5px_rgba(0,0,0,0.08)]">
-                  {shortText(strategyName, 26)}
-                </td>
-
-                <td className="w-[120px] px-4 py-3">{symbol}</td>
-                <td className="w-[120px] px-4 py-3">{j.direction || "—"}</td>
-                <td className="w-[160px] px-4 py-3">{tradingStyle}</td>
-                <td className="w-[140px] px-4 py-3">{setup}</td>
-                <td className="w-[120px] px-4 py-3">{j.entry_price ?? "—"}</td>
-                <td className="w-[120px] px-4 py-3">{j.stop_loss ?? "—"}</td>
-                <td className="w-[120px] px-4 py-3">{formatRisk(j)}</td>
-                <td className="w-[100px] px-4 py-3">
-                  {rr > 0 ? `1:${round2(rr)}` : "—"}
-                </td>
-                <td className="sticky right-[208px] z-20 w-[104px] bg-background px-4 py-3 shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
-                  <button
-                    type="button"
-                    disabled={j.is_shared}
-                    onClick={async () => {
-                      const res = await fetch("/api/journals/share", {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({ journalId: j.id }),
-                      });
-
-                      const json = await res.json();
-
-                      if (!json.ok) {
-                        alert(json.message || "Failed to share journal.");
-                        return;
-                      }
-
-                      window.location.reload();
-                    }}
-                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-50"
-                  >
-                    {j.is_shared ? "Shared" : "Share"}
-                  </button>
-                </td>
-
-                <td className="sticky right-[104px] z-20 w-[104px] bg-background px-4 py-3 shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
-                  {canEditJournal(j) ? (
-                    <Link
-                      href={`/app/journals/${j.id}/edit`}
-                      className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
-                    >
-                      Edit
-                    </Link>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-
-                <td className="sticky right-0 z-20 w-[104px] bg-background px-4 py-3 shadow-[-2px_0_5px_rgba(0,0,0,0.08)]">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedJournal(j)}
-                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent"
-                  >
-                    Details
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+function JournalsGrid({ journals, setSelectedJournal }) {
+  return (
+    <div className="grid gap-4">
+      {journals.map((journal, index) => (
+        <JournalCard
+          key={journal.id}
+          journal={journal}
+          index={index}
+          setSelectedJournal={setSelectedJournal}
+        />
+      ))}
     </div>
   );
 }
@@ -240,11 +364,17 @@ export default function JournalsClient({ journalsByPurpose }) {
       <div className="space-y-8">
         {journalsByPurpose.map((group) => (
           <section key={group.purpose} className="space-y-3">
-            <h2 className="px-1 text-sm font-semibold text-muted-foreground">
-              {group.purpose} ({group.data.length})
-            </h2>
+            <div className="flex items-center justify-between px-1">
+              <h2 className="text-sm font-semibold text-muted-foreground">
+                {group.purpose}
+              </h2>
 
-            <JournalsTable
+              <span className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground">
+                {group.data.length}
+              </span>
+            </div>
+
+            <JournalsGrid
               journals={group.data}
               setSelectedJournal={setSelectedJournal}
             />
