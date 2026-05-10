@@ -12,6 +12,14 @@ function Field({ label, value }) {
     </div>
   );
 }
+function formatDateTime(value) {
+  if (!value) return "—";
+
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 function ImageCarousel({ images, index, onClose, onPrev, onNext }) {
   if (!images?.length) return null;
 
@@ -147,9 +155,7 @@ export default function JournalDetailsModal({ journal, onClose }) {
                 {strategy.strategy_name || "Journal Details"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {journal.created_at
-                  ? new Date(journal.created_at).toLocaleString()
-                  : "—"}
+                Journal Date: {formatDateTime(journal.journal_start_at)}
               </p>
             </div>
 
@@ -172,6 +178,16 @@ export default function JournalDetailsModal({ journal, onClose }) {
               <Field
                 label="Risk"
                 value={`${journal.risk_per_trade} ${journal.risk_mode}`}
+              />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field
+                label="Journal Start Date"
+                value={formatDateTime(journal.journal_start_at)}
+              />
+              <Field
+                label="Journal End Date"
+                value={formatDateTime(journal.journal_end_at)}
               />
             </div>
 

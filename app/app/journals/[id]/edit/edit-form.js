@@ -5,6 +5,27 @@ import { useMemo, useState } from "react";
 
 const EXIT_REQUIRED_STATUSES = ["TRADE CLOSE WITH PROFIT", "TRADE EXIT IN MID"];
 
+const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+
+function needsEndDate(status) {
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
+  return value && !ACTIVE_STATUSES.includes(value);
+}
+
+function toDatetimeLocal(value) {
+  if (!value) {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  }
+
+  const date = new Date(value);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 function Pill({ children }) {
   return (
     <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
@@ -17,14 +38,17 @@ function sanitize2dp(raw) {
   const s = String(raw ?? "");
   let out = s.replace(/[^\d.]/g, "");
   const firstDot = out.indexOf(".");
+
   if (firstDot !== -1) {
     out =
       out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
   }
+
   if (firstDot !== -1) {
     const [a, b] = out.split(".");
     out = a + "." + (b || "").slice(0, 2);
   }
+
   return out;
 }
 
@@ -37,20 +61,46 @@ export default function EditJournalForm({
   errorType,
 }) {
   const [status, setStatus] = useState(journal.status || "");
+
+  const [journalStartAt, setJournalStartAt] = useState(
+    toDatetimeLocal(journal.journal_start_at),
+  );
+
+  const [journalEndAt, setJournalEndAt] = useState(
+    toDatetimeLocal(journal.journal_end_at),
+  );
+
   const [exitPrice, setExitPrice] = useState(
     journal.exit_price != null ? String(journal.exit_price) : "",
   );
+
   const [exitReason, setExitReason] = useState(journal.exit_reason || "");
 
   const exitRequired = useMemo(() => {
     return EXIT_REQUIRED_STATUSES.includes(status);
   }, [status]);
 
+  const endDateRequired = useMemo(() => {
+    return needsEndDate(status);
+  }, [status]);
+
   const canSubmit = useMemo(() => {
     if (!status) return false;
+    if (!journalStartAt) return false;
+    if (endDateRequired && !journalEndAt) return false;
+
     if (!exitRequired) return true;
+
     return exitReason.trim() !== "" && exitPrice.trim() !== "";
-  }, [status, exitRequired, exitReason, exitPrice]);
+  }, [
+    status,
+    journalStartAt,
+    journalEndAt,
+    endDateRequired,
+    exitRequired,
+    exitReason,
+    exitPrice,
+  ]);
 
   return (
     <div className="rounded-xl border">
@@ -69,28 +119,9 @@ export default function EditJournalForm({
 
       <div className="p-4">
         <form action={action} className="space-y-6">
-          {errorType === "status" ? (
-            <p className="text-sm text-destructive">
-              Please select a valid status.
-            </p>
-          ) : null}
-
           {errorType ? (
             <p className="text-sm text-destructive">
               {decodeURIComponent(errorType)}
-            </p>
-          ) : null}
-
-          {errorType === "exit_price" || errorType === "exit_price_required" ? (
-            <p className="text-sm text-destructive">
-              Exit price is required and must be a valid number for the selected
-              status.
-            </p>
-          ) : null}
-
-          {errorType === "save" ? (
-            <p className="text-sm text-destructive">
-              Failed to save journal. Please try again.
             </p>
           ) : null}
 
@@ -99,6 +130,7 @@ export default function EditJournalForm({
               <label className="text-sm font-medium">
                 Status <span className="text-destructive">*</span>
               </label>
+
               <select
                 name="status"
                 value={status}
@@ -109,6 +141,7 @@ export default function EditJournalForm({
                 <option value="" disabled>
                   Select status
                 </option>
+
                 {statusOptions.map((x) => (
                   <option key={x} value={x}>
                     {x}
@@ -119,6 +152,40 @@ export default function EditJournalForm({
 
             <div className="space-y-2">
               <label className="text-sm font-medium">
+                Journal Start Date <span className="text-destructive">*</span>
+              </label>
+
+              <input
+                name="journal_start_at"
+                type="datetime-local"
+                value={journalStartAt}
+                onChange={(e) => setJournalStartAt(e.target.value)}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                required
+              />
+            </div>
+
+            {endDateRequired ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Journal End Date <span className="text-destructive">*</span>
+                </label>
+
+                <input
+                  name="journal_end_at"
+                  type="datetime-local"
+                  value={journalEndAt}
+                  onChange={(e) => setJournalEndAt(e.target.value)}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  required
+                />
+              </div>
+            ) : (
+              <input type="hidden" name="journal_end_at" value="" />
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
                 Exit Price{" "}
                 {exitRequired ? (
                   <span className="text-destructive">*</span>
@@ -126,6 +193,7 @@ export default function EditJournalForm({
                   <span className="text-muted-foreground">(optional)</span>
                 )}
               </label>
+
               <input
                 name="exit_price"
                 type="text"
@@ -148,6 +216,7 @@ export default function EditJournalForm({
                 <span className="text-muted-foreground">(optional)</span>
               )}
             </label>
+
             <textarea
               name="exit_reason"
               rows={4}
@@ -168,9 +237,7 @@ export default function EditJournalForm({
 
           {!canSubmit ? (
             <p className="text-sm text-destructive">
-              {exitRequired
-                ? "Exit reason and exit price are required for the selected status."
-                : "Please select a status."}
+              Fill the required status/date fields before updating.
             </p>
           ) : null}
 

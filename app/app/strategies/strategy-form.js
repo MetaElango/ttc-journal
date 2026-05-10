@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +75,9 @@ export default function StrategyForm({
   strategy = null,
   mode = "create",
 }) {
+  const router = useRouter();
+  const supabase = createClient();
+
   const [state, formAction, pending] = useActionState(action, {
     ok: true,
     message: "",
@@ -133,7 +138,83 @@ export default function StrategyForm({
     strategy?.preparation_status || "Preparing",
   );
 
+  const [strategyImages, setStrategyImages] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+
   const isEdit = mode === "edit";
+
+  useEffect(() => {
+    async function uploadImagesAndRedirect() {
+      if (!state?.ok || !state?.strategyId) return;
+
+      if (strategyImages.length === 0) {
+        router.push(state.redirectTo || "/app/strategies");
+        return;
+      }
+
+      setUploadingImages(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("Unauthorized.");
+        setUploadingImages(false);
+        return;
+      }
+
+      const uploadedPaths = [];
+
+      for (let i = 0; i < strategyImages.length; i++) {
+        const file = strategyImages[i];
+        const ext = file.name.split(".").pop() || "jpg";
+
+        const filePath = `${user.id}/${state.strategyId}/${Date.now()}-${i}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("strategy-images")
+          .upload(filePath, file, {
+            contentType: file.type,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          alert(uploadError.message);
+          setUploadingImages(false);
+          return;
+        }
+
+        uploadedPaths.push(filePath);
+      }
+
+      const existingImages = Array.isArray(strategy?.strategy_images)
+        ? strategy.strategy_images
+        : [];
+
+      const finalImages = isEdit
+        ? [...existingImages, ...uploadedPaths].slice(0, 5)
+        : uploadedPaths;
+
+      const { error: updateError } = await supabase
+        .from("strategies")
+        .update({
+          strategy_images: finalImages,
+        })
+        .eq("id", state.strategyId)
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        alert(updateError.message);
+        setUploadingImages(false);
+        return;
+      }
+
+      router.push(state.redirectTo || "/app/strategies");
+    }
+
+    uploadImagesAndRedirect();
+  }, [state, strategyImages, router, supabase, strategy, isEdit]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -405,13 +486,67 @@ export default function StrategyForm({
               </div>
             </div>
 
-            {state?.message ? (
+            <div className="space-y-2">
+              <Label>Strategy Images</Label>
+
+              {isEdit && strategy?.strategyImageUrls?.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {strategy.strategyImageUrls.map((url, index) => (
+                    <div
+                      key={url}
+                      className="overflow-hidden rounded-lg border bg-muted"
+                    >
+                      <img
+                        src={url}
+                        alt={`Strategy image ${index + 1}`}
+                        className="h-36 w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+
+                  const existingCount = Array.isArray(strategy?.strategy_images)
+                    ? strategy.strategy_images.length
+                    : 0;
+
+                  if (isEdit && existingCount + files.length > 5) {
+                    alert(
+                      `Maximum 5 images allowed. You already have ${existingCount}.`,
+                    );
+                    e.target.value = "";
+                    setStrategyImages([]);
+                    return;
+                  }
+
+                  if (!isEdit && files.length > 5) {
+                    alert("Maximum 5 images allowed.");
+                    e.target.value = "";
+                    setStrategyImages([]);
+                    return;
+                  }
+
+                  setStrategyImages(files);
+                }}
+              />
+
+              <p className="text-xs text-muted-foreground">Maximum 5 images.</p>
+            </div>
+
+            {state?.message && !state?.ok ? (
               <p className="text-sm text-destructive">{state.message}</p>
             ) : null}
 
             <div className="flex items-center gap-3">
-              <Button type="submit" disabled={pending}>
-                {pending
+              <Button type="submit" disabled={pending || uploadingImages}>
+                {pending || uploadingImages
                   ? "Saving..."
                   : isEdit
                     ? "Update Strategy"

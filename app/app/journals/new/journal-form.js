@@ -1,4 +1,4 @@
-// app/app/strategies/new-journal/journal-form.js  (or wherever your form lives)
+// app/app/journals/new/journal-form.js
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,36 +13,43 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-/* -----------------------------
-  Helpers (critical for your bug)
------------------------------- */
 function normPurpose(v) {
   return String(v || "")
     .trim()
     .toUpperCase();
 }
 
-function getStatusOptions(purpose) {
-  const key = normPurpose(purpose);
-  return (
-    STATUS_OPTIONS_BY_PURPOSE[key] ||
-    STATUS_OPTIONS_BY_PURPOSE["FOR OBSERVATION"]
-  );
+const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+
+function needsEndDate(status) {
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
+  return value && !ACTIVE_STATUSES.includes(value);
 }
 
-/* -----------------------------
-   PURPOSE CONFIG (single source)
------------------------------- */
+function nowLocalDateTimeValue() {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+}
+
+function toDatetimeLocal(value) {
+  if (!value) return nowLocalDateTimeValue();
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return nowLocalDateTimeValue();
+
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
 const PURPOSE_CONFIG = {
   "FOR OBSERVATION": {
     showStatusDropdown: true,
-    forcedStatus: null,
-    disable: {
-      tradingAccount: true,
-      risk: true,
-    },
+    disable: { tradingAccount: true, risk: true },
     required: {
-      tradingAccount: false, // ✅ observation: don't capture it
+      tradingAccount: false,
       symbol: true,
       quantity: true,
       direction: true,
@@ -61,7 +68,6 @@ const PURPOSE_CONFIG = {
 
   "ENTRY PLANNED": {
     showStatusDropdown: true,
-    forcedStatus: null,
     disable: { tradingAccount: false, risk: false },
     required: {
       tradingAccount: true,
@@ -83,7 +89,6 @@ const PURPOSE_CONFIG = {
 
   "FORWARD TESTING": {
     showStatusDropdown: true,
-    forcedStatus: null,
     disable: { tradingAccount: false, risk: false },
     required: {
       tradingAccount: true,
@@ -130,9 +135,14 @@ const STATUS_OPTIONS_BY_PURPOSE = {
   ],
 };
 
-/* -----------------------------
-   Small UI blocks
------------------------------- */
+function getStatusOptions(purpose) {
+  const key = normPurpose(purpose);
+  return (
+    STATUS_OPTIONS_BY_PURPOSE[key] ||
+    STATUS_OPTIONS_BY_PURPOSE["FOR OBSERVATION"]
+  );
+}
+
 function Pill({ children }) {
   return (
     <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
@@ -147,6 +157,7 @@ function StrategyBlueprint({ s }) {
       <CardHeader>
         <CardTitle>Strategy Blueprint</CardTitle>
       </CardHeader>
+
       <CardContent className="space-y-3">
         <div className="text-lg font-semibold">{s.strategy_name}</div>
 
@@ -197,32 +208,30 @@ function StrategyBlueprint({ s }) {
   );
 }
 
-/* -----------------------------
-   Helpers
------------------------------- */
 function round2(n) {
   const v = Number(n);
   if (Number.isNaN(v)) return 0;
   return Math.round(v * 100) / 100;
 }
 
-// allow only digits + one dot, max 2 decimals
 function sanitize2dp(raw) {
   const s = String(raw ?? "");
   let out = s.replace(/[^\d.]/g, "");
+
   const firstDot = out.indexOf(".");
   if (firstDot !== -1) {
     out =
       out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
   }
+
   if (firstDot !== -1) {
     const [a, b] = out.split(".");
     out = a + "." + (b || "").slice(0, 2);
   }
+
   return out;
 }
 
-// 0.5, 0.25, 0.125 ... last gets remaining
 function defaultSplitWeights(n) {
   if (n <= 0) return [];
   if (n === 1) return [1];
@@ -235,6 +244,7 @@ function defaultSplitWeights(n) {
       w.push(remaining);
       break;
     }
+
     const next = i === 0 ? 0.5 : w[i - 1] / 2;
     w.push(next);
     remaining -= next;
@@ -242,12 +252,10 @@ function defaultSplitWeights(n) {
 
   const sum = w.reduce((a, b) => a + b, 0);
   if (Math.abs(1 - sum) > 1e-10) w[w.length - 1] += 1 - sum;
+
   return w;
 }
 
-/* -----------------------------
-   TP Editor
------------------------------- */
 function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
   const total = round2(totalLots);
   const totalOk = total > 0 ? total : 0;
@@ -259,90 +267,52 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
 
   const sumOk = totalOk > 0 ? Math.abs(sumTpLots - totalOk) <= 0.01 : false;
 
-  function autoSplitAll() {
-    if (disabled) return;
-    if (!totalOk || items.length === 0) return;
+  function applySplit(next) {
+    if (!totalOk || next.length === 0) return next;
 
-    const weights = defaultSplitWeights(items.length);
-    const next = items.map((it, idx) => ({
+    const weights = defaultSplitWeights(next.length);
+
+    const applied = next.map((it, idx) => ({
       ...it,
       qty: round2(weights[idx] * totalOk),
     }));
 
-    const s = next.reduce((a, b) => a + (Number(b.qty) || 0), 0);
+    const s = applied.reduce((a, b) => a + (Number(b.qty) || 0), 0);
     const diff = round2(totalOk - s);
-    if (next.length > 0 && diff !== 0) {
-      next[next.length - 1] = {
-        ...next[next.length - 1],
-        qty: round2((Number(next[next.length - 1].qty) || 0) + diff),
+
+    if (applied.length > 0 && diff !== 0) {
+      applied[applied.length - 1] = {
+        ...applied[applied.length - 1],
+        qty: round2((Number(applied[applied.length - 1].qty) || 0) + diff),
       };
     }
 
-    setItems(next);
+    return applied;
+  }
+
+  function autoSplitAll() {
+    if (disabled) return;
+    setItems(applySplit(items));
   }
 
   function addRow() {
     if (disabled) return;
-    const next = [...items, { price: "", qty: "" }];
-    setItems(next);
-
-    if (totalOk) {
-      const weights = defaultSplitWeights(next.length);
-      const applied = next.map((it, idx) => ({
-        ...it,
-        qty: round2(weights[idx] * totalOk),
-      }));
-
-      const s = applied.reduce((a, b) => a + (Number(b.qty) || 0), 0);
-      const diff = round2(totalOk - s);
-      if (applied.length > 0 && diff !== 0) {
-        applied[applied.length - 1] = {
-          ...applied[applied.length - 1],
-          qty: round2((Number(applied[applied.length - 1].qty) || 0) + diff),
-        };
-      }
-
-      setItems(applied);
-    }
+    setItems(applySplit([...items, { price: "", qty: "" }]));
   }
 
   function removeRow(i) {
     if (disabled) return;
-    const next = items.filter((_, idx) => idx !== i);
-    if (next.length === 0) {
-      setItems([]);
-      return;
-    }
-    setItems(next);
-
-    if (totalOk) {
-      const weights = defaultSplitWeights(next.length);
-      const applied = next.map((it, idx) => ({
-        ...it,
-        qty: round2(weights[idx] * totalOk),
-      }));
-      const s = applied.reduce((a, b) => a + (Number(b.qty) || 0), 0);
-      const diff = round2(totalOk - s);
-      if (applied.length > 0 && diff !== 0) {
-        applied[applied.length - 1] = {
-          ...applied[applied.length - 1],
-          qty: round2((Number(applied[applied.length - 1].qty) || 0) + diff),
-        };
-      }
-      setItems(applied);
-    }
+    setItems(applySplit(items.filter((_, idx) => idx !== i)));
   }
 
   function updatePrice(i, raw) {
     if (disabled) return;
-    const v = sanitize2dp(raw);
+
     const next = [...items];
-    next[i] = { ...next[i], price: v };
+    next[i] = { ...next[i], price: sanitize2dp(raw) };
     setItems(next);
   }
 
-  // edit middle => split remainder across below
-  // edit last => manual
   function updateQty(i, raw) {
     if (disabled) return;
 
@@ -379,11 +349,12 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
       next[idx] = { ...next[idx], qty: round2(weights[t] * remaining) };
     }
 
-    let sumNow = 0;
-    for (let k = 0; k < next.length; k++) sumNow += Number(next[k].qty) || 0;
-    sumNow = round2(sumNow);
+    const sumNow = round2(
+      next.reduce((acc, it) => acc + (Number(it.qty) || 0), 0),
+    );
 
     const diff = round2(totalOk - sumNow);
+
     if (diff !== 0 && next.length > 0) {
       next[lastIndex] = {
         ...next[lastIndex],
@@ -410,6 +381,7 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
           >
             Auto Split
           </Button>
+
           <Button type="button" onClick={addRow} disabled={disabled}>
             Add TP
           </Button>
@@ -431,11 +403,11 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
                 key={idx}
                 className="grid grid-cols-12 items-center gap-2 rounded-md border p-3"
               >
-                <div className="col-span-12 md:col-span-1 text-sm font-medium">
+                <div className="col-span-12 text-sm font-medium md:col-span-1">
                   TP {idx + 1}
                 </div>
 
-                <div className="col-span-12 md:col-span-5 space-y-1">
+                <div className="col-span-12 space-y-1 md:col-span-5">
                   <div className="text-xs text-muted-foreground">Price</div>
                   <Input
                     value={it.price}
@@ -447,7 +419,7 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
                   />
                 </div>
 
-                <div className="col-span-12 md:col-span-4 space-y-1">
+                <div className="col-span-12 space-y-1 md:col-span-4">
                   <div className="text-xs text-muted-foreground">
                     Qty (LOTS) — sum must equal total lots
                   </div>
@@ -466,7 +438,7 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
                   </div>
                 </div>
 
-                <div className="col-span-12 md:col-span-2 flex justify-end">
+                <div className="col-span-12 flex justify-end md:col-span-2">
                   <Button
                     type="button"
                     variant="ghost"
@@ -489,35 +461,33 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
         </div>
 
         <div className="text-muted-foreground">
-          Tip: edit any TP qty (except last) to auto-split the remainder below.
+          Tip: edit any TP qty except last to auto-split the remainder below.
         </div>
       </div>
-
-      {!sumOk && items.length > 0 && totalOk ? (
-        <p className="text-sm text-destructive">
-          TP quantities must sum to total lots. Fix the last TP (or click Auto
-          Split).
-        </p>
-      ) : null}
     </div>
   );
 }
 
-/* -----------------------------
-   PurposeRenderer
------------------------------- */
-function PurposeRenderer({ purpose, status, setStatus, children }) {
+function PurposeRenderer({
+  purpose,
+  status,
+  setStatus,
+  journalStartAt,
+  setJournalStartAt,
+  journalEndAt,
+  setJournalEndAt,
+  children,
+}) {
   const purposeKey = normPurpose(purpose);
   const cfg = PURPOSE_CONFIG[purposeKey] || PURPOSE_CONFIG["FOR OBSERVATION"];
-  const showStatus = cfg.showStatusDropdown === true;
   const statusOptions = getStatusOptions(purposeKey);
   const statusRequired = !!cfg.required?.status;
 
   return (
     <div className="space-y-4">
-      {children({ cfg, showStatus, purposeKey })}
+      {children({ cfg, purposeKey })}
 
-      {showStatus ? (
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <Label>
             Status{" "}
@@ -527,6 +497,7 @@ function PurposeRenderer({ purpose, status, setStatus, children }) {
               <span className="text-muted-foreground">(optional)</span>
             )}
           </Label>
+
           <select
             name="status"
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -537,6 +508,7 @@ function PurposeRenderer({ purpose, status, setStatus, children }) {
             <option value="">
               {statusRequired ? "Select status" : "No status"}
             </option>
+
             {statusOptions.map((x) => (
               <option key={x} value={x}>
                 {x}
@@ -544,60 +516,120 @@ function PurposeRenderer({ purpose, status, setStatus, children }) {
             ))}
           </select>
         </div>
-      ) : (
-        <input type="hidden" name="status" value={status} />
-      )}
+
+        <div className="space-y-2">
+          <Label>
+            Create Date & Time <span className="text-destructive">*</span>
+          </Label>
+
+          <Input
+            name="journal_start_at"
+            type="datetime-local"
+            value={journalStartAt}
+            onChange={(e) => setJournalStartAt(e.target.value)}
+            required
+          />
+        </div>
+
+        {needsEndDate(status) ? (
+          <div className="space-y-2">
+            <Label>
+              End Date & Time <span className="text-destructive">*</span>
+            </Label>
+
+            <Input
+              name="journal_end_at"
+              type="datetime-local"
+              value={journalEndAt}
+              onChange={(e) => setJournalEndAt(e.target.value)}
+              required
+            />
+          </div>
+        ) : (
+          <input type="hidden" name="journal_end_at" value="" />
+        )}
+      </div>
     </div>
   );
 }
 
-/* -----------------------------
-   JournalDetailsCommon
------------------------------- */
+function ExistingImageGrid({ title, images, onRemove }) {
+  if (!images?.length) return null;
+
+  return (
+    <div className="space-y-2">
+      <Label>{title}</Label>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {images.map((img) => (
+          <div
+            key={img.path}
+            className="relative overflow-hidden rounded-lg border bg-muted"
+          >
+            {img.url ? (
+              <img
+                src={img.url}
+                alt={title}
+                className="h-40 w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+                Image URL missing
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => onRemove(img.path)}
+              className="absolute right-2 top-2 rounded bg-black/80 px-2 py-1 text-xs text-white"
+            >
+              Remove
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 function JournalDetailsCommon({
   cfg,
   purpose,
   setPurpose,
-
   status,
   setStatus,
-
   accounts,
   symbols,
-
   tpItems,
   setTpItems,
-
   direction,
   setDirection,
-
   quantity,
   setQuantity,
-
   riskMode,
   setRiskMode,
-
   strategy,
-
   entryPrice,
   setEntryPrice,
   stopLoss,
   setStopLoss,
-
-  setupImages,
   setSetupImages,
-  referenceImages,
   setReferenceImages,
+  prefillJournal,
+  existingSetupImages,
+  setExistingSetupImages,
+  existingReferenceImages,
+  setExistingReferenceImages,
 }) {
   const disableTradingAccount = !!cfg.disable?.tradingAccount;
   const disableRisk = !!cfg.disable?.risk;
-
   const required = cfg.required || {};
 
   const [symbolQuery, setSymbolQuery] = useState("");
+
   const filteredSymbols = useMemo(() => {
     const q = symbolQuery.trim().toLowerCase();
     if (!q) return symbols;
+
     return symbols.filter(
       (s) =>
         s.symbol_name.toLowerCase().includes(q) ||
@@ -617,17 +649,16 @@ function JournalDetailsCommon({
   const sumOk =
     totalLotsOk > 0 ? Math.abs(round2(sumTpLots) - totalLotsOk) <= 0.01 : false;
 
-  // BUY/SELL SL validation (client-side)
   const entryNum = Number(entryPrice);
   const slNum = Number(stopLoss);
-  const hasEntry = entryPrice !== "" && !Number.isNaN(entryNum);
-  const hasSl = stopLoss !== "" && !Number.isNaN(slNum);
 
   let slDirectionError = "";
-  if (hasEntry && hasSl) {
+
+  if (entryPrice !== "" && stopLoss !== "") {
     if (direction === "BUY" && !(slNum < entryNum)) {
       slDirectionError = "For BUY, stop loss must be less than entry price.";
     }
+
     if (direction === "SELL" && !(slNum > entryNum)) {
       slDirectionError =
         "For SELL, stop loss must be greater than entry price.";
@@ -637,17 +668,11 @@ function JournalDetailsCommon({
   const exitReasonRequired = !!required.exit_reason;
   const exitPriceRequired = !!required.exit_price;
 
-  function onQuantityChange(raw) {
-    setQuantity(sanitize2dp(raw));
-  }
-
   function onPurposeChange(next) {
     const nextKey = normPurpose(next);
     setPurpose(nextKey);
 
-    const nextOptions = getStatusOptions(nextKey);
-
-    if (!nextOptions.includes(status)) {
+    if (!getStatusOptions(nextKey).includes(status)) {
       setStatus("");
     }
   }
@@ -660,7 +685,20 @@ function JournalDetailsCommon({
         value={JSON.stringify(tpItems)}
       />
 
-      {/* Top controls */}
+      <input
+        type="hidden"
+        name="existing_setup_images"
+        value={JSON.stringify((existingSetupImages || []).map((x) => x.path))}
+      />
+
+      <input
+        type="hidden"
+        name="existing_reference_images"
+        value={JSON.stringify(
+          (existingReferenceImages || []).map((x) => x.path),
+        )}
+      />
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>
@@ -674,12 +712,13 @@ function JournalDetailsCommon({
             name="trading_account_id"
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
             required={!!required.tradingAccount}
-            defaultValue=""
+            defaultValue={prefillJournal?.trading_account_id || ""}
             disabled={disableTradingAccount}
           >
             <option value="" disabled>
               Select account
             </option>
+
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.account_name} — {a.framework} — {a.account_size}
@@ -698,6 +737,7 @@ function JournalDetailsCommon({
           <Label>
             Purpose <span className="text-destructive">*</span>
           </Label>
+
           <select
             name="purpose"
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -714,28 +754,28 @@ function JournalDetailsCommon({
         </div>
       </div>
 
-      {/* Status is rendered by PurposeRenderer */}
-
-      {/* Symbol */}
       <div className="space-y-2">
         <Label>
           Symbol{" "}
           {required.symbol ? <span className="text-destructive">*</span> : null}
         </Label>
+
         <Input
           value={symbolQuery}
           onChange={(e) => setSymbolQuery(e.target.value)}
-          placeholder="Search symbol (e.g. GOLD, EURUSD, Indices)"
+          placeholder="Search symbol e.g. GOLD, EURUSD, Indices"
         />
+
         <select
           name="symbol_id"
           className="h-10 w-full rounded-md border bg-background px-3 text-sm"
           required={!!required.symbol}
-          defaultValue=""
+          defaultValue={prefillJournal?.symbol_id || ""}
         >
           <option value="" disabled>
             Select symbol
           </option>
+
           {filteredSymbols.map((s) => (
             <option key={s.id} value={s.id}>
               {s.symbol_name} — {s.category}
@@ -744,7 +784,6 @@ function JournalDetailsCommon({
         </select>
       </div>
 
-      {/* Direction / Qty / Entry / SL */}
       <div className="grid gap-4 md:grid-cols-4">
         <div className="space-y-2">
           <Label>
@@ -753,6 +792,7 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
+
           <select
             name="direction"
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -772,15 +812,15 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
+
           <Input
             name="quantity"
             inputMode="decimal"
             value={quantity}
-            onChange={(e) => onQuantityChange(e.target.value)}
+            onChange={(e) => setQuantity(sanitize2dp(e.target.value))}
             required={!!required.quantity}
             placeholder="1"
           />
-          <p className="text-xs text-muted-foreground">Max 2 decimals.</p>
         </div>
 
         <div className="space-y-2">
@@ -790,6 +830,7 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
+
           <Input
             name="entry_price"
             inputMode="decimal"
@@ -806,6 +847,7 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
+
           <Input
             name="stop_loss"
             inputMode="decimal"
@@ -813,13 +855,13 @@ function JournalDetailsCommon({
             required={!!required.stop_loss}
             onChange={(e) => setStopLoss(sanitize2dp(e.target.value))}
           />
+
           {slDirectionError ? (
             <p className="text-xs text-destructive">{slDirectionError}</p>
           ) : null}
         </div>
       </div>
 
-      {/* TP */}
       <TakeProfitEditor
         items={tpItems}
         setItems={setTpItems}
@@ -827,7 +869,6 @@ function JournalDetailsCommon({
         disabled={false}
       />
 
-      {/* Reasons */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>
@@ -836,9 +877,11 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
+
           <Textarea
             name="entry_reason"
             rows={3}
+            defaultValue={prefillJournal?.entry_reason || ""}
             required={!!required.entry_reason}
           />
         </div>
@@ -850,12 +893,13 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
-          <Textarea name="exit_reason" rows={3} required={exitReasonRequired} />
-          {cfg.exitRule === "reason_required_price_optional" ? (
-            <p className="text-xs text-muted-foreground">
-              For {purpose}: exit reason is mandatory; exit price is optional.
-            </p>
-          ) : null}
+
+          <Textarea
+            name="exit_reason"
+            rows={3}
+            defaultValue={prefillJournal?.exit_reason || ""}
+            required={exitReasonRequired}
+          />
         </div>
 
         <div className="space-y-2">
@@ -867,9 +911,11 @@ function JournalDetailsCommon({
               <span className="text-muted-foreground">(optional)</span>
             )}
           </Label>
+
           <Input
             name="exit_price"
             inputMode="decimal"
+            defaultValue={prefillJournal?.exit_price ?? ""}
             required={exitPriceRequired}
             onChange={(e) => {
               e.target.value = sanitize2dp(e.target.value);
@@ -877,18 +923,40 @@ function JournalDetailsCommon({
           />
         </div>
       </div>
+
+      <ExistingImageGrid
+        title="Existing Setup Images"
+        images={existingSetupImages}
+        onRemove={(path) =>
+          setExistingSetupImages((prev) => prev.filter((x) => x.path !== path))
+        }
+      />
+
+      <ExistingImageGrid
+        title="Existing Reference Images"
+        images={existingReferenceImages}
+        onRemove={(path) =>
+          setExistingReferenceImages((prev) =>
+            prev.filter((x) => x.path !== path),
+          )
+        }
+      />
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label>Setup Images</Label>
+          <Label>Add Setup Images</Label>
+
           <Input
             type="file"
             accept="image/*"
             multiple
             onChange={(e) => {
               const files = Array.from(e.target.files || []);
+              const totalCount =
+                files.length + (existingSetupImages?.length || 0);
 
-              if (files.length > 3) {
-                alert("Setup images can be maximum 3.");
+              if (totalCount > 3) {
+                alert("Setup images can be maximum 3 total.");
                 e.target.value = "";
                 setSetupImages([]);
                 return;
@@ -897,20 +965,24 @@ function JournalDetailsCommon({
               setSetupImages(files);
             }}
           />
-          <p className="text-xs text-muted-foreground">Max 3 images.</p>
+
+          <p className="text-xs text-muted-foreground">Max 3 images total.</p>
         </div>
 
         <div className="space-y-2">
-          <Label>Reference Images</Label>
+          <Label>Add Reference Images</Label>
+
           <Input
             type="file"
             accept="image/*"
             multiple
             onChange={(e) => {
               const files = Array.from(e.target.files || []);
+              const totalCount =
+                files.length + (existingReferenceImages?.length || 0);
 
-              if (files.length > 3) {
-                alert("Reference images can be maximum 3.");
+              if (totalCount > 3) {
+                alert("Reference images can be maximum 3 total.");
                 e.target.value = "";
                 setReferenceImages([]);
                 return;
@@ -919,11 +991,11 @@ function JournalDetailsCommon({
               setReferenceImages(files);
             }}
           />
-          <p className="text-xs text-muted-foreground">Max 3 images.</p>
+
+          <p className="text-xs text-muted-foreground">Max 3 images total.</p>
         </div>
       </div>
 
-      {/* Risk */}
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <Label>
@@ -932,6 +1004,7 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
+
           <select
             name="risk_mode"
             className="h-10 w-full rounded-md border bg-background px-3 text-sm"
@@ -945,12 +1018,7 @@ function JournalDetailsCommon({
           </select>
 
           {disableRisk ? (
-            <>
-              <input type="hidden" name="risk_mode" value={riskMode} />
-              <p className="text-xs text-muted-foreground">
-                Disabled for {purpose}.
-              </p>
-            </>
+            <input type="hidden" name="risk_mode" value={riskMode} />
           ) : null}
         </div>
 
@@ -961,9 +1029,11 @@ function JournalDetailsCommon({
               <span className="text-destructive">*</span>
             ) : null}
           </Label>
+
           <Input
             name="risk_per_trade"
             inputMode="decimal"
+            defaultValue={prefillJournal?.risk_per_trade ?? ""}
             required={!!required.risk_per_trade && !disableRisk}
             placeholder={riskMode === "PERCENT" ? "e.g. 1.5" : "e.g. 25"}
             disabled={disableRisk}
@@ -971,8 +1041,13 @@ function JournalDetailsCommon({
               e.target.value = sanitize2dp(e.target.value);
             }}
           />
+
           {disableRisk ? (
-            <input type="hidden" name="risk_per_trade" value="0" />
+            <input
+              type="hidden"
+              name="risk_per_trade"
+              value={strategy.risk_per_trade || 1}
+            />
           ) : null}
         </div>
 
@@ -984,7 +1059,6 @@ function JournalDetailsCommon({
         </div>
       </div>
 
-      {/* Client hints */}
       {!sumOk && tpItems.length > 0 && totalLotsOk ? (
         <p className="text-xs text-destructive">
           Fix TP quantities to match total lots.
@@ -993,15 +1067,12 @@ function JournalDetailsCommon({
     </>
   );
 }
-
-/* -----------------------------
-   Main
------------------------------- */
 export default function NewJournalForm({
   action,
   strategy,
   accounts,
   symbols,
+  prefillJournal = null,
 }) {
   const router = useRouter();
 
@@ -1009,28 +1080,110 @@ export default function NewJournalForm({
   const [referenceImages, setReferenceImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
+  const [existingSetupImages, setExistingSetupImages] = useState([]);
+  const [existingReferenceImages, setExistingReferenceImages] = useState([]);
+
+  useEffect(() => {
+    async function loadSignedUrls() {
+      if (!prefillJournal) return;
+
+      const supabase = createClient();
+
+      async function buildImages(paths = []) {
+        const results = await Promise.all(
+          paths.map(async (path) => {
+            const { data } = await supabase.storage
+              .from("journal-images")
+              .createSignedUrl(path, 60 * 60);
+
+            return {
+              path,
+              url: data?.signedUrl || "",
+            };
+          }),
+        );
+
+        return results;
+      }
+
+      const setup = await buildImages(prefillJournal.setup_images || []);
+      const reference = await buildImages(
+        prefillJournal.reference_images || [],
+      );
+
+      setExistingSetupImages(setup);
+      setExistingReferenceImages(reference);
+    }
+
+    loadSignedUrls();
+  }, [prefillJournal]);
+
   const [state, formAction, pending] = useActionState(action, {
     ok: true,
     message: "",
   });
 
-  const [purpose, setPurpose] = useState("FOR OBSERVATION");
+  const [purpose, setPurpose] = useState(
+    prefillJournal?.purpose || "FOR OBSERVATION",
+  );
+
   const purposeKey = normPurpose(purpose);
   const cfg = PURPOSE_CONFIG[purposeKey] || PURPOSE_CONFIG["FOR OBSERVATION"];
 
-  // ✅ start empty (user chooses status for observation)
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(prefillJournal?.status || "");
 
-  const [riskMode, setRiskMode] = useState("PERCENT");
-  const [direction, setDirection] = useState("BUY");
-  const [quantity, setQuantity] = useState("1");
-  const [tpItems, setTpItems] = useState([]);
+  const [journalStartAt, setJournalStartAt] = useState(
+    prefillJournal?.journal_start_at
+      ? toDatetimeLocal(prefillJournal.journal_start_at)
+      : nowLocalDateTimeValue(),
+  );
 
-  // controlled entry/sl for client validation
-  const [entryPrice, setEntryPrice] = useState("");
-  const [stopLoss, setStopLoss] = useState("");
+  const [journalEndAt, setJournalEndAt] = useState(
+    prefillJournal?.journal_end_at
+      ? toDatetimeLocal(prefillJournal.journal_end_at)
+      : nowLocalDateTimeValue(),
+  );
 
-  // submit disable: TP sum must match
+  const [riskMode, setRiskMode] = useState(
+    prefillJournal?.risk_mode || "PERCENT",
+  );
+
+  const [direction, setDirection] = useState(
+    prefillJournal?.direction || "BUY",
+  );
+
+  const [quantity, setQuantity] = useState(
+    prefillJournal?.quantity != null ? String(prefillJournal.quantity) : "1",
+  );
+
+  const [entryPrice, setEntryPrice] = useState(
+    prefillJournal?.entry_price != null
+      ? String(prefillJournal.entry_price)
+      : "",
+  );
+
+  const [stopLoss, setStopLoss] = useState(
+    prefillJournal?.stop_loss != null ? String(prefillJournal.stop_loss) : "",
+  );
+
+  const [tpItems, setTpItems] = useState(() => {
+    if (!prefillJournal) return [];
+
+    const prices = Array.isArray(prefillJournal.take_profit)
+      ? prefillJournal.take_profit
+      : [];
+
+    const qtys = Array.isArray(prefillJournal.take_profit_qty)
+      ? prefillJournal.take_profit_qty
+      : [];
+
+    return prices.map((price, index) => ({
+      price: String(price),
+      qty: String(qtys[index] || ""),
+    }));
+  });
+
   const totalLotsNum = Number(quantity);
   const totalLotsOk =
     !Number.isNaN(totalLotsNum) && totalLotsNum > 0 ? round2(totalLotsNum) : 0;
@@ -1043,17 +1196,16 @@ export default function NewJournalForm({
   const sumOk =
     totalLotsOk > 0 ? Math.abs(round2(sumTpLots) - totalLotsOk) <= 0.01 : false;
 
-  // SL direction validation for disabling submit
   const entryNum = Number(entryPrice);
   const slNum = Number(stopLoss);
-  const hasEntry = entryPrice !== "" && !Number.isNaN(entryNum);
-  const hasSl = stopLoss !== "" && !Number.isNaN(slNum);
 
   let slOk = true;
-  if (hasEntry && hasSl) {
+
+  if (entryPrice !== "" && stopLoss !== "") {
     if (direction === "BUY") slOk = slNum < entryNum;
     if (direction === "SELL") slOk = slNum > entryNum;
   }
+
   useEffect(() => {
     async function uploadImagesAndRedirect() {
       if (!state?.ok || !state?.journalId) return;
@@ -1071,6 +1223,36 @@ export default function NewJournalForm({
 
         if (userError || !user) {
           throw new Error("User not found.");
+        }
+
+        let copiedSetupImages = [];
+        let copiedReferenceImages = [];
+
+        const hasExistingImages =
+          (state.existingSetupImages || []).length > 0 ||
+          (state.existingReferenceImages || []).length > 0;
+
+        if (hasExistingImages) {
+          const copyRes = await fetch("/api/journals/copy-images", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              journalId: state.journalId,
+              setupImages: state.existingSetupImages || [],
+              referenceImages: state.existingReferenceImages || [],
+            }),
+          });
+
+          const copyJson = await copyRes.json();
+
+          if (!copyJson.ok) {
+            throw new Error(copyJson.message || "Failed to copy images.");
+          }
+
+          copiedSetupImages = copyJson.setupImages || [];
+          copiedReferenceImages = copyJson.referenceImages || [];
         }
 
         async function uploadFiles(files, type) {
@@ -1097,17 +1279,24 @@ export default function NewJournalForm({
           return uploadedPaths;
         }
 
-        const setupImagePaths = await uploadFiles(setupImages, "setup");
-        const referenceImagePaths = await uploadFiles(
+        const uploadedSetupImages = await uploadFiles(setupImages, "setup");
+        const uploadedReferenceImages = await uploadFiles(
           referenceImages,
           "reference",
         );
 
+        const finalSetupImages = [...copiedSetupImages, ...uploadedSetupImages];
+
+        const finalReferenceImages = [
+          ...copiedReferenceImages,
+          ...uploadedReferenceImages,
+        ];
+
         const { error: updateError } = await supabase
           .from("journals")
           .update({
-            setup_images: setupImagePaths,
-            reference_images: referenceImagePaths,
+            setup_images: finalSetupImages,
+            reference_images: finalReferenceImages,
           })
           .eq("id", state.journalId);
 
@@ -1127,11 +1316,12 @@ export default function NewJournalForm({
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Create Journal</h1>
+        <h1 className="text-xl font-semibold">
+          {prefillJournal ? "Incorporate Journal" : "Create Journal"}
+        </h1>
       </div>
 
-      <StrategyBlueprint s={strategy} />
-
+      {!prefillJournal ? <StrategyBlueprint s={strategy} /> : null}
       <Card>
         <CardHeader>
           <CardTitle>Journal Details</CardTitle>
@@ -1143,6 +1333,10 @@ export default function NewJournalForm({
               purpose={purposeKey}
               status={status}
               setStatus={setStatus}
+              journalStartAt={journalStartAt}
+              setJournalStartAt={setJournalStartAt}
+              journalEndAt={journalEndAt}
+              setJournalEndAt={setJournalEndAt}
             >
               {({ cfg: derivedCfg }) => (
                 <JournalDetailsCommon
@@ -1166,10 +1360,13 @@ export default function NewJournalForm({
                   setEntryPrice={setEntryPrice}
                   stopLoss={stopLoss}
                   setStopLoss={setStopLoss}
-                  setupImages={setupImages}
                   setSetupImages={setSetupImages}
-                  referenceImages={referenceImages}
                   setReferenceImages={setReferenceImages}
+                  prefillJournal={prefillJournal}
+                  existingSetupImages={existingSetupImages}
+                  setExistingSetupImages={setExistingSetupImages}
+                  existingReferenceImages={existingReferenceImages}
+                  setExistingReferenceImages={setExistingReferenceImages}
                 />
               )}
             </PurposeRenderer>
@@ -1177,9 +1374,11 @@ export default function NewJournalForm({
             {state?.message ? (
               <p className="text-sm text-destructive">{state.message}</p>
             ) : null}
+
             {uploadError ? (
               <p className="text-sm text-destructive">{uploadError}</p>
             ) : null}
+
             <div className="flex items-center gap-3">
               <Button
                 type="submit"
@@ -1196,19 +1395,15 @@ export default function NewJournalForm({
                   ? "Saving..."
                   : uploadingImages
                     ? "Uploading Images..."
-                    : "Create Journal"}
+                    : prefillJournal
+                      ? "Incorporate Journal"
+                      : "Create Journal"}
               </Button>
-
-              {cfg.required?.status && !status ? (
-                <p className="text-xs text-destructive">
-                  Please select a status.
-                </p>
-              ) : null}
 
               {!slOk ? (
                 <p className="text-xs text-destructive">
-                  Fix Stop Loss based on direction (BUY: SL &lt; Entry, SELL: SL
-                  &gt; Entry).
+                  Fix Stop Loss based on direction. BUY: SL &lt; Entry, SELL: SL
+                  &gt; Entry.
                 </p>
               ) : null}
             </div>

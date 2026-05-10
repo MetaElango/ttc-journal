@@ -1,74 +1,173 @@
-// app/app/strategies/new-journal/page.js  (or wherever your page lives)
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import NewJournalForm from "./journal-form";
 
+const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+
+function needsEndDate(status) {
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
+  return value && !ACTIVE_STATUSES.includes(value);
+}
+
+function getFormValue(formData, key) {
+  return formData.get(key);
+}
+
+async function getSignedImageUrls(supabase, paths = []) {
+  if (!Array.isArray(paths) || paths.length === 0) return [];
+
+  const { data, error } = await supabase.storage
+    .from("journal-images")
+    .createSignedUrls(paths, 60 * 60);
+
+  if (error) {
+    console.log("SIGNED URL ERROR:", error.message);
+    return [];
+  }
+
+  return data?.map((x) => x.signedUrl).filter(Boolean) || [];
+}
+
 export default async function NewJournalPage({ searchParams }) {
   const params = await searchParams;
-  const strategyId = params?.strategyId;
 
-  if (!strategyId) redirect("/app/strategies");
+  const strategyId = params?.strategyId;
+  const sharedJournalId = params?.sharedJournalId;
+
+  if (!strategyId && !sharedJournalId) redirect("/app/strategies");
 
   const supabase = await createClient();
 
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user;
+
   if (!user) redirect("/login");
 
-  const { data: strategy, error: sErr } = await supabase
+  let strategy = null;
+  let prefillJournal = null;
 
-    .from("strategies")
+  if (sharedJournalId) {
+    const { data: sharedJournal, error: sharedError } = await supabase
+      .from("journals")
+      .select(
+        `
+        id,
+        user_id,
+        strategy_id,
+        trading_account_id,
+        symbol_id,
+        strategy_snapshot,
+        purpose,
+        status,
+        direction,
+        quantity,
+        entry_price,
+        stop_loss,
+        take_profit,
+        take_profit_qty,
+        entry_reason,
+        exit_reason,
+        exit_price,
+        risk_mode,
+        risk_per_trade,
+        setup_images,
+        reference_images,
+        journal_start_at,
+        journal_end_at,
+        is_shared,
+        shared_at,
+        symbols:symbol_id (
+          id,
+          symbol_name,
+          category
+        )
+        `,
+      )
+      .eq("id", sharedJournalId)
+      .eq("is_shared", true)
+      .neq("user_id", user.id)
+      .single();
 
-    .select(
-      `
+    if (sharedError || !sharedJournal) {
+      return (
+        <div className="p-6">
+          <h1 className="text-xl font-semibold">Incorporate Journal</h1>
+          <p className="mt-3 text-sm text-destructive">
+            Shared journal not found.
+          </p>
+        </div>
+      );
+    }
 
-    id,
+    const setupImageUrls = await getSignedImageUrls(
+      supabase,
+      sharedJournal.setup_images || [],
+    );
 
-    strategy_name,
+    const referenceImageUrls = await getSignedImageUrls(
+      supabase,
+      sharedJournal.reference_images || [],
+    );
 
-    strategy_type,
+    prefillJournal = {
+      ...sharedJournal,
+      setupImageUrls,
+      referenceImageUrls,
+    };
+    strategy = sharedJournal.strategy_snapshot || null;
+  }
 
-    preparation_status,
+  if (strategyId) {
+    const { data: fetchedStrategy, error: sErr } = await supabase
+      .from("strategies")
+      .select(
+        `
+        id,
+        strategy_name,
+        strategy_type,
+        preparation_status,
+        strategy_status,
+        trading_style,
+        setup_type,
+        bias_confluence,
+        htf,
+        intermediate_tf,
+        entry_tf,
+        checklist,
+        entry_rules,
+        exit_rules,
+        sl_management_rules,
+        risk_per_trade,
+        avg_planned_rr,
+        planned_r_year
+        `,
+      )
+      .eq("id", strategyId)
+      .eq("user_id", user.id)
+      .single();
 
-    strategy_status,
+    if (sErr || !fetchedStrategy) {
+      return (
+        <div className="p-6">
+          <h1 className="text-xl font-semibold">Create Journal</h1>
+          <p className="mt-3 text-sm text-destructive">
+            Strategy not found or you don’t have access.
+          </p>
+        </div>
+      );
+    }
 
-    trading_style,
+    strategy = fetchedStrategy;
+  }
 
-    setup_type,
-
-    bias_confluence,
-
-    htf,
-
-    intermediate_tf,
-
-    entry_tf,
-
-    checklist,
-
-    entry_rules,
-
-    exit_rules,
-
-    sl_management_rules,
-
-    risk_per_trade,
-
-    avg_planned_rr,
-
-    planned_r_year
-
-  `,
-    )
-    .eq("id", strategyId)
-    .single();
-
-  if (sErr || !strategy) {
+  if (!strategy) {
     return (
       <div className="p-6">
         <h1 className="text-xl font-semibold">Create Journal</h1>
         <p className="mt-3 text-sm text-destructive">
-          Strategy not found or you don’t have access.
+          Strategy data is missing.
         </p>
       </div>
     );
@@ -77,6 +176,7 @@ export default async function NewJournalPage({ searchParams }) {
   const { data: accounts } = await supabase
     .from("trading_accounts")
     .select("id, account_name, account_size, framework")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   const { data: symbols } = await supabase
@@ -89,6 +189,13 @@ export default async function NewJournalPage({ searchParams }) {
     "use server";
 
     const supabase = await createClient();
+
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+
+    if (!user) {
+      return { ok: false, message: "Unauthorized." };
+    }
 
     const PURPOSES = new Set([
       "FOR OBSERVATION",
@@ -120,15 +227,15 @@ export default async function NewJournalPage({ searchParams }) {
       ],
     };
 
-    const purpose = String(formData.get("purpose") || "")
+    const purpose = String(getFormValue(formData, "purpose") || "")
       .trim()
       .toUpperCase();
+
     if (!PURPOSES.has(purpose)) {
       return { ok: false, message: "Invalid purpose selected." };
     }
 
-    // ✅ status optional for FOR OBSERVATION
-    const statusRaw = String(formData.get("status") || "")
+    const statusRaw = String(getFormValue(formData, "status") || "")
       .trim()
       .toUpperCase();
 
@@ -142,67 +249,78 @@ export default async function NewJournalPage({ searchParams }) {
       if (!allowedStatuses.includes(statusRaw)) {
         return { ok: false, message: "Select a valid status." };
       }
+
       status = statusRaw;
     }
 
-    // status is required only for non-observation purposes
     if (purpose !== "FOR OBSERVATION" && !status) {
       return { ok: false, message: "Select a status." };
     }
 
-    // ✅ FOR OBSERVATION doesn't capture trading_account_id
-    let trading_account_id = String(formData.get("trading_account_id") || "");
+    let trading_account_id = String(
+      getFormValue(formData, "trading_account_id") || "",
+    );
+
     if (purpose === "FOR OBSERVATION") trading_account_id = "";
+
     trading_account_id = trading_account_id ? trading_account_id : null;
 
     if (purpose !== "FOR OBSERVATION" && !trading_account_id) {
       return { ok: false, message: "Select a trading account." };
     }
 
-    const symbol_id = String(formData.get("symbol_id") || "") || null;
+    const symbol_id = String(getFormValue(formData, "symbol_id") || "") || null;
 
-    // ✅ Direction (BUY / SELL)
-    const directionRaw = String(formData.get("direction") || "")
+    const directionRaw = String(getFormValue(formData, "direction") || "")
       .trim()
       .toUpperCase();
+
     const direction =
       directionRaw === "BUY" ? "BUY" : directionRaw === "SELL" ? "SELL" : "";
+
     if (!direction) {
       return { ok: false, message: "Select direction (BUY or SELL)." };
     }
 
-    const entry_price = Number(formData.get("entry_price"));
-    const stop_loss = Number(formData.get("stop_loss"));
-    const quantity = Number(formData.get("quantity"));
+    const entry_price = Number(getFormValue(formData, "entry_price"));
+    const stop_loss = Number(getFormValue(formData, "stop_loss"));
+    const quantity = Number(getFormValue(formData, "quantity"));
 
-    const entry_reason = String(formData.get("entry_reason") || "").trim();
+    const entry_reason = String(
+      getFormValue(formData, "entry_reason") || "",
+    ).trim();
 
-    // ✅ Exit fields OPTIONAL & independent
-    const exit_reason_raw = String(formData.get("exit_reason") || "").trim();
+    const exit_reason_raw = String(
+      getFormValue(formData, "exit_reason") || "",
+    ).trim();
+
     const exit_reason = exit_reason_raw ? exit_reason_raw : null;
 
-    const exit_price_raw = String(formData.get("exit_price") || "").trim();
+    const exit_price_raw = String(
+      getFormValue(formData, "exit_price") || "",
+    ).trim();
+
     const exit_price = exit_price_raw ? Number(exit_price_raw) : null;
 
-    // Risk fields: for OBSERVATION they are disabled in UI, so fallback
     const risk_mode =
-      String(formData.get("risk_mode") || "")
+      String(getFormValue(formData, "risk_mode") || "")
         .trim()
         .toUpperCase() || (purpose === "FOR OBSERVATION" ? "PERCENT" : "");
 
-    let risk_per_trade_raw = String(
-      formData.get("risk_per_trade") || "",
+    const risk_per_trade_raw = String(
+      getFormValue(formData, "risk_per_trade") || "",
     ).trim();
+
     let risk_per_trade = risk_per_trade_raw ? Number(risk_per_trade_raw) : NaN;
 
     if (purpose === "FOR OBSERVATION") {
-      // You said risk is disabled for observation; we store strategy value
-      risk_per_trade = Number(strategy.risk_per_trade);
+      risk_per_trade = Number(strategy.risk_per_trade || 0);
     }
 
-    // ---- Parse TP JSON (editable price + qty) ----
-    const tpRaw = String(formData.get("take_profit_json") || "[]");
+    const tpRaw = String(getFormValue(formData, "take_profit_json") || "[]");
+
     let tpItems = [];
+
     try {
       const parsed = JSON.parse(tpRaw);
       tpItems = Array.isArray(parsed) ? parsed : [];
@@ -218,27 +336,57 @@ export default async function NewJournalPage({ searchParams }) {
       .map((x) => Number(x?.qty))
       .filter((n) => !Number.isNaN(n));
 
-    // ---- Validate ----
+    const journal_start_at_raw = String(
+      getFormValue(formData, "journal_start_at") || "",
+    ).trim();
+
+    const journal_end_at_raw = String(
+      getFormValue(formData, "journal_end_at") || "",
+    ).trim();
+
+    const journal_start_at = journal_start_at_raw
+      ? new Date(journal_start_at_raw).toISOString()
+      : null;
+
+    const journal_end_at = journal_end_at_raw
+      ? new Date(journal_end_at_raw).toISOString()
+      : null;
+
+    if (!journal_start_at) {
+      return { ok: false, message: "Create date is required." };
+    }
+
+    if (needsEndDate(status) && !journal_end_at) {
+      return {
+        ok: false,
+        message: "End date is required for this status.",
+      };
+    }
+
     if (!symbol_id) return { ok: false, message: "Select a symbol." };
 
-    if (Number.isNaN(quantity) || quantity <= 0)
+    if (Number.isNaN(quantity) || quantity <= 0) {
       return { ok: false, message: "Quantity must be a positive number." };
+    }
 
-    if (Number.isNaN(entry_price))
+    if (Number.isNaN(entry_price)) {
       return { ok: false, message: "Entry price must be a number." };
+    }
 
-    if (Number.isNaN(stop_loss))
+    if (Number.isNaN(stop_loss)) {
       return { ok: false, message: "Stop loss must be a number." };
+    }
 
-    if (!entry_reason)
+    if (!entry_reason) {
       return { ok: false, message: "Entry reason is required." };
+    }
 
-    // Exit price if provided => must be number
     if (exit_price_raw && (exit_price === null || Number.isNaN(exit_price))) {
       return { ok: false, message: "Exit price must be a valid number." };
     }
 
     if (!risk_mode) return { ok: false, message: "Select risk mode." };
+
     if (Number.isNaN(risk_per_trade) || risk_per_trade <= 0) {
       return {
         ok: false,
@@ -246,13 +394,13 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
-    // ✅ Direction based SL validation
     if (direction === "BUY" && !(stop_loss < entry_price)) {
       return {
         ok: false,
         message: "For BUY, stop loss must be less than entry price.",
       };
     }
+
     if (direction === "SELL" && !(stop_loss > entry_price)) {
       return {
         ok: false,
@@ -260,9 +408,9 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
-    // TP validation
-    if (!tpItems || tpItems.length === 0)
+    if (!tpItems || tpItems.length === 0) {
       return { ok: false, message: "Add at least one Take Profit." };
+    }
 
     if (
       take_profit.length !== tpItems.length ||
@@ -275,11 +423,13 @@ export default async function NewJournalPage({ searchParams }) {
     }
 
     for (const q of take_profit_qty) {
-      if (!(q > 0))
+      if (!(q > 0)) {
         return { ok: false, message: "Each TP quantity must be > 0." };
+      }
     }
 
     const sumQty = take_profit_qty.reduce((a, b) => a + b, 0);
+
     if (Math.abs(quantity - sumQty) > 0.0001) {
       return {
         ok: false,
@@ -287,7 +437,10 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
-    const strategy_snapshot = {
+    let finalStrategyId = strategy.id;
+    let copied_from_journal_id = null;
+
+    const baseSnapshot = {
       id: strategy.id,
       strategy_name: strategy.strategy_name,
       strategy_type: strategy.strategy_type,
@@ -295,10 +448,10 @@ export default async function NewJournalPage({ searchParams }) {
       strategy_status: strategy.strategy_status,
       trading_style: strategy.trading_style,
       setup_type: strategy.setup_type,
-      bias_confluence: strategy.bias_confluence,
-      htf: strategy.htf,
-      intermediate_tf: strategy.intermediate_tf,
-      entry_tf: strategy.entry_tf,
+      bias_confluence: strategy.bias_confluence || [],
+      htf: strategy.htf || [],
+      intermediate_tf: strategy.intermediate_tf || [],
+      entry_tf: strategy.entry_tf || [],
       checklist: strategy.checklist,
       entry_rules: strategy.entry_rules,
       exit_rules: strategy.exit_rules,
@@ -308,27 +461,81 @@ export default async function NewJournalPage({ searchParams }) {
       planned_r_year: strategy.planned_r_year,
       snapshotted_at: new Date().toISOString(),
     };
-    const setupImages = formData
-      .getAll("setup_images")
-      .filter((file) => file && file.size > 0);
 
-    const referenceImages = formData
-      .getAll("reference_images")
-      .filter((file) => file && file.size > 0);
+    let strategy_snapshot = baseSnapshot;
 
-    if (setupImages.length > 3) {
-      return { ok: false, message: "Setup images can be maximum 3." };
+    if (sharedJournalId && prefillJournal) {
+      const { data: copiedStrategy, error: copiedStrategyError } =
+        await supabase
+          .from("strategies")
+          .insert({
+            user_id: user.id,
+            strategy_name: strategy.strategy_name
+              ? `${strategy.strategy_name} (Copied)`
+              : "Copied Strategy",
+            strategy_type: strategy.strategy_type,
+            trading_style: strategy.trading_style,
+            setup_type: strategy.setup_type,
+            bias_confluence: strategy.bias_confluence || [],
+            htf: strategy.htf || [],
+            intermediate_tf: strategy.intermediate_tf || [],
+            entry_tf: strategy.entry_tf || [],
+            checklist: strategy.checklist,
+            entry_rules: strategy.entry_rules,
+            exit_rules: strategy.exit_rules,
+            sl_management_rules: strategy.sl_management_rules,
+            risk_per_trade: strategy.risk_per_trade,
+            avg_planned_rr: strategy.avg_planned_rr,
+            planned_r_year: strategy.planned_r_year,
+            preparation_status: strategy.preparation_status || "Active",
+            strategy_status:
+              strategy.preparation_status === "Active"
+                ? strategy.strategy_status || "LIVE"
+                : null,
+            copied_from_strategy_id: prefillJournal.strategy_id || null,
+            source_shared_journal_id: prefillJournal.id,
+          })
+          .select("id")
+          .single();
+
+      if (copiedStrategyError) {
+        return { ok: false, message: copiedStrategyError.message };
+      }
+
+      finalStrategyId = copiedStrategy.id;
+      copied_from_journal_id = prefillJournal.id;
+
+      strategy_snapshot = {
+        ...baseSnapshot,
+        copied_at: new Date().toISOString(),
+        copied_from_journal_id: prefillJournal.id,
+        copied_from_strategy_id: prefillJournal.strategy_id || strategy.id,
+      };
     }
 
-    if (referenceImages.length > 3) {
-      return { ok: false, message: "Reference images can be maximum 3." };
+    let existingSetupImages = [];
+    let existingReferenceImages = [];
+
+    try {
+      existingSetupImages = JSON.parse(
+        String(getFormValue(formData, "existing_setup_images") || "[]"),
+      );
+      existingReferenceImages = JSON.parse(
+        String(getFormValue(formData, "existing_reference_images") || "[]"),
+      );
+
+      if (!Array.isArray(existingSetupImages)) existingSetupImages = [];
+      if (!Array.isArray(existingReferenceImages)) existingReferenceImages = [];
+    } catch {
+      existingSetupImages = [];
+      existingReferenceImages = [];
     }
+
     const { data: insertedJournal, error } = await supabase
       .from("journals")
       .insert({
         user_id: user.id,
-        strategy_id: strategy.id,
-
+        strategy_id: finalStrategyId,
         trading_account_id,
         symbol_id,
 
@@ -354,6 +561,12 @@ export default async function NewJournalPage({ searchParams }) {
 
         setup_images: [],
         reference_images: [],
+
+        journal_start_at,
+        journal_end_at: needsEndDate(status) ? journal_end_at : null,
+
+        copied_from_journal_id,
+        is_shared: false,
       })
       .select("id")
       .single();
@@ -362,63 +575,13 @@ export default async function NewJournalPage({ searchParams }) {
 
     return {
       ok: true,
-      message: "Journal created.",
+      message: sharedJournalId
+        ? "Journal ready. You can now review it in your dashboard."
+        : "Journal created.",
       journalId: insertedJournal.id,
+      existingSetupImages,
+      existingReferenceImages,
     };
-
-    async function uploadJournalImages(files, type) {
-      const uploadedPaths = [];
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-
-        const ext = file.name.split(".").pop() || "jpg";
-        const filePath = `${user.id}/${insertedJournal.id}/${type}/${Date.now()}-${i}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("journal-images")
-          .upload(filePath, file, {
-            contentType: file.type,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          throw new Error(uploadError.message);
-        }
-
-        uploadedPaths.push(filePath);
-      }
-
-      return uploadedPaths;
-    }
-
-    try {
-      const setupImagePaths = await uploadJournalImages(setupImages, "setup");
-      const referenceImagePaths = await uploadJournalImages(
-        referenceImages,
-        "reference",
-      );
-
-      const { error: imageUpdateError } = await supabase
-        .from("journals")
-        .update({
-          setup_images: setupImagePaths,
-          reference_images: referenceImagePaths,
-        })
-        .eq("id", insertedJournal.id)
-        .eq("user_id", user.id);
-
-      if (imageUpdateError) {
-        return { ok: false, message: imageUpdateError.message };
-      }
-    } catch (uploadErr) {
-      return {
-        ok: false,
-        message: uploadErr.message || "Image upload failed.",
-      };
-    }
-
-    redirect("/app/journals");
   }
 
   return (
@@ -427,6 +590,7 @@ export default async function NewJournalPage({ searchParams }) {
       strategy={strategy}
       accounts={accounts || []}
       symbols={symbols || []}
+      prefillJournal={prefillJournal}
     />
   );
 }

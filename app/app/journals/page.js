@@ -73,6 +73,8 @@ export default async function JournalsPage({ searchParams }) {
       status,
       is_shared,
       shared_at,
+      journal_start_at,
+      journal_end_at,
       direction,
       quantity,
       entry_price,

@@ -44,6 +44,7 @@ export default async function EditStrategyPage({ params }) {
       planned_r_year,
       preparation_status,
       strategy_status,
+      strategy_images,
       copied_from_strategy_id,
       source_shared_journal_id
       `,
@@ -63,6 +64,30 @@ export default async function EditStrategyPage({ params }) {
     );
   }
 
+  async function getSignedStrategyImageUrls(paths = []) {
+    if (!Array.isArray(paths) || paths.length === 0) return [];
+
+    const { data, error } = await supabase.storage
+      .from("strategy-images")
+      .createSignedUrls(paths, 60 * 60);
+
+    if (error) {
+      console.log("Strategy image signed URL error:", error.message);
+      return [];
+    }
+
+    return data?.map((x) => x.signedUrl).filter(Boolean) || [];
+  }
+
+  const strategyImageUrls = await getSignedStrategyImageUrls(
+    strategy.strategy_images,
+  );
+
+  const strategyWithImageUrls = {
+    ...strategy,
+    strategyImageUrls,
+  };
+
   async function updateStrategy(prevState, formData) {
     "use server";
 
@@ -71,9 +96,7 @@ export default async function EditStrategyPage({ params }) {
     const { data: authData } = await supabase.auth.getUser();
     const user = authData?.user;
 
-    if (!user) {
-      return { ok: false, message: "Unauthorized." };
-    }
+    if (!user) return { ok: false, message: "Unauthorized." };
 
     const strategy_name = String(formData.get("strategy_name") || "").trim();
     const strategy_type = String(formData.get("strategy_type") || "").trim();
@@ -160,7 +183,7 @@ export default async function EditStrategyPage({ params }) {
         setup_type,
         bias_confluence,
         htf,
-        intermediate_tf,
+        intermediate_tf: intermediate_tf.length ? intermediate_tf : null,
         entry_tf,
         checklist,
         entry_rules,
@@ -175,14 +198,21 @@ export default async function EditStrategyPage({ params }) {
       .eq("id", id)
       .eq("user_id", user.id);
 
-    if (updateError) {
-      return { ok: false, message: updateError.message };
-    }
+    if (updateError) return { ok: false, message: updateError.message };
 
-    redirect("/app/strategies");
+    return {
+      ok: true,
+      message: "Strategy updated.",
+      strategyId: id,
+      redirectTo: "/app/strategies",
+    };
   }
 
   return (
-    <StrategyForm action={updateStrategy} strategy={strategy} mode="edit" />
+    <StrategyForm
+      action={updateStrategy}
+      strategy={strategyWithImageUrls}
+      mode="edit"
+    />
   );
 }

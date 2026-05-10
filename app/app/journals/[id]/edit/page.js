@@ -35,6 +35,15 @@ const EDITABLE_ACTIVE_STATUSES = [
 
 const EXIT_REQUIRED_STATUSES = ["TRADE CLOSE WITH PROFIT", "TRADE EXIT IN MID"];
 
+const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+
+function needsEndDate(status) {
+  const value = String(status || "")
+    .trim()
+    .toUpperCase();
+  return value && !ACTIVE_STATUSES.includes(value);
+}
+
 function canEditJournal(journal) {
   if (!journal) return false;
 
@@ -56,15 +65,28 @@ function sanitize2dp(raw) {
   const s = String(raw ?? "");
   let out = s.replace(/[^\d.]/g, "");
   const firstDot = out.indexOf(".");
+
   if (firstDot !== -1) {
     out =
       out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
   }
+
   if (firstDot !== -1) {
     const [a, b] = out.split(".");
     out = a + "." + (b || "").slice(0, 2);
   }
+
   return out;
+}
+
+function getFormValue(formData, key) {
+  for (const [k, value] of formData.entries()) {
+    if (k === key || k.endsWith(`_${key}`)) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 export default async function EditJournalPage({ params, searchParams }) {
@@ -76,6 +98,7 @@ export default async function EditJournalPage({ params, searchParams }) {
 
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user;
+
   if (!user) redirect("/login");
 
   const { data: journal, error } = await supabase
@@ -85,6 +108,8 @@ export default async function EditJournalPage({ params, searchParams }) {
       id,
       purpose,
       status,
+      journal_start_at,
+      journal_end_at,
       exit_price,
       exit_reason,
       direction,
@@ -96,9 +121,10 @@ export default async function EditJournalPage({ params, searchParams }) {
         category
       ),
       strategy_snapshot
-    `,
+      `,
     )
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
   if (error || !journal) notFound();
@@ -112,6 +138,7 @@ export default async function EditJournalPage({ params, searchParams }) {
         <p className="text-sm text-muted-foreground">
           This journal can no longer be edited.
         </p>
+
         <Link
           href="/app/journals"
           className="inline-flex rounded-md border px-4 py-2 text-sm hover:bg-accent"
@@ -123,6 +150,7 @@ export default async function EditJournalPage({ params, searchParams }) {
   }
 
   const strategyName = journal?.strategy_snapshot?.strategy_name || "—";
+
   const symbolLabel = journal?.symbols
     ? `${journal.symbols.symbol_name} — ${journal.symbols.category}`
     : "—";
@@ -138,12 +166,14 @@ export default async function EditJournalPage({ params, searchParams }) {
 
     const { data: authData } = await supabase.auth.getUser();
     const user = authData?.user;
+
     if (!user) redirect("/login");
 
     const { data: existing, error: existingError } = await supabase
       .from("journals")
       .select("id, purpose, status")
       .eq("id", id)
+      .eq("user_id", user.id)
       .single();
 
     if (existingError || !existing) notFound();
@@ -154,14 +184,35 @@ export default async function EditJournalPage({ params, searchParams }) {
       redirect("/app/journals");
     }
 
-    const statusRaw = String(formData.get("status") || "")
+    const statusRaw = String(getFormValue(formData, "status") || "")
       .trim()
       .toUpperCase();
 
-    const exitReasonRaw = String(formData.get("exit_reason") || "").trim();
+    const journalStartAtRaw = String(
+      getFormValue(formData, "journal_start_at") || "",
+    ).trim();
+
+    const journalEndAtRaw = String(
+      getFormValue(formData, "journal_end_at") || "",
+    ).trim();
+
+    const journal_start_at = journalStartAtRaw
+      ? new Date(journalStartAtRaw).toISOString()
+      : null;
+
+    const journal_end_at = journalEndAtRaw
+      ? new Date(journalEndAtRaw).toISOString()
+      : null;
+
+    const exitReasonRaw = String(
+      getFormValue(formData, "exit_reason") || "",
+    ).trim();
+
     const exit_reason = exitReasonRaw || null;
 
-    const exitPriceRaw = sanitize2dp(formData.get("exit_price") || "");
+    const exitPriceRaw = sanitize2dp(
+      getFormValue(formData, "exit_price") || "",
+    );
     const exit_price = exitPriceRaw ? Number(exitPriceRaw) : null;
 
     const allowedStatuses =
@@ -170,6 +221,22 @@ export default async function EditJournalPage({ params, searchParams }) {
 
     if (!allowedStatuses.includes(statusRaw)) {
       redirect(`/app/journals/${id}/edit?error=status`);
+    }
+
+    if (!journal_start_at) {
+      redirect(
+        `/app/journals/${id}/edit?error=${encodeURIComponent(
+          "Journal start date is required.",
+        )}`,
+      );
+    }
+
+    if (needsEndDate(statusRaw) && !journal_end_at) {
+      redirect(
+        `/app/journals/${id}/edit?error=${encodeURIComponent(
+          "Journal end date is required for this status.",
+        )}`,
+      );
     }
 
     if (exitPriceRaw && Number.isNaN(exit_price)) {
@@ -190,6 +257,8 @@ export default async function EditJournalPage({ params, searchParams }) {
       .from("journals")
       .update({
         status: statusRaw,
+        journal_start_at,
+        journal_end_at: needsEndDate(statusRaw) ? journal_end_at : null,
         exit_reason,
         exit_price,
       })
@@ -197,9 +266,10 @@ export default async function EditJournalPage({ params, searchParams }) {
       .eq("user_id", user.id);
 
     if (updateError) {
-      console.log("UPDATE ERROR:", updateError);
       redirect(
-        `/app/journals/${id}/edit?error=${encodeURIComponent(updateError.message)}`,
+        `/app/journals/${id}/edit?error=${encodeURIComponent(
+          updateError.message,
+        )}`,
       );
     }
 
@@ -210,6 +280,7 @@ export default async function EditJournalPage({ params, searchParams }) {
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Edit Journal</h1>
+
         <Link
           href="/app/journals"
           className="rounded-md border px-4 py-2 text-sm hover:bg-accent"

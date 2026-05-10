@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import JournalDetailsModal from "../journals/journal-details-modal";
 
@@ -114,32 +115,6 @@ function ImagePreviewRow({ setupImages = [], referenceImages = [] }) {
 
 export default function SocialClient({ journals }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
-  const [copyingId, setCopyingId] = useState(null);
-
-  async function incorporateJournal(journalId) {
-    setCopyingId(journalId);
-
-    try {
-      const res = await fetch("/api/journals/incorporate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ journalId }),
-      });
-
-      const json = await res.json();
-
-      if (!json.ok) {
-        alert(json.message || "Failed to incorporate journal.");
-        return;
-      }
-
-      alert("Journal incorporated into your dashboard.");
-    } finally {
-      setCopyingId(null);
-    }
-  }
 
   return (
     <>
@@ -206,16 +181,12 @@ export default function SocialClient({ journals }) {
                         Details
                       </button>
 
-                      <button
-                        type="button"
-                        disabled={copyingId === journal.id}
-                        onClick={() => incorporateJournal(journal.id)}
-                        className="rounded-md border px-3 py-2 text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                      <Link
+                        href={`/app/journals/new?sharedJournalId=${journal.id}`}
+                        className="rounded-md border px-3 py-2 text-sm hover:bg-accent"
                       >
-                        {copyingId === journal.id
-                          ? "Copying..."
-                          : "Incorporate"}
-                      </button>
+                        Incorporate
+                      </Link>
                     </div>
                   </div>
 
