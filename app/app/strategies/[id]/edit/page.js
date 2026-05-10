@@ -107,6 +107,9 @@ export default async function EditStrategyPage({ params }) {
     const htf = parseJsonArray(formData.get("htf"));
     const intermediate_tf = parseJsonArray(formData.get("intermediate_tf"));
     const entry_tf = parseJsonArray(formData.get("entry_tf"));
+    const existing_strategy_images = parseJsonArray(
+      formData.get("existing_strategy_images"),
+    );
 
     const checklist = String(formData.get("checklist") || "").trim();
     const entry_rules = String(formData.get("entry_rules") || "").trim();
@@ -194,6 +197,7 @@ export default async function EditStrategyPage({ params }) {
         planned_r_year,
         preparation_status,
         strategy_status,
+        strategy_images: existing_strategy_images,
       })
       .eq("id", id)
       .eq("user_id", user.id);
@@ -205,6 +209,7 @@ export default async function EditStrategyPage({ params }) {
       message: "Strategy updated.",
       strategyId: id,
       redirectTo: "/app/strategies",
+      existingStrategyImages: existing_strategy_images,
     };
   }
 
