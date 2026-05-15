@@ -60,6 +60,14 @@ export default async function JournalsPage({ searchParams }) {
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user;
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("type")
+    .eq("id", user.id)
+    .single();
+
+  const isAdmin = profile?.type === "admin";
+
   if (!user) {
     return (
       <div className="p-6">
@@ -99,6 +107,10 @@ export default async function JournalsPage({ searchParams }) {
       reference_images,
       created_at,
       strategy_snapshot,
+      owner_note,
+      admin_note,
+      owner_note_updated_at,
+      admin_note_updated_at,
       symbols:symbol_id (
         id,
         symbol_name,
@@ -259,7 +271,11 @@ export default async function JournalsPage({ searchParams }) {
           No journals in this tab.
         </div>
       ) : (
-        <JournalsClient journalsByPurpose={activeJournalsByPurpose} />
+        <JournalsClient
+          journalsByPurpose={activeJournalsByPurpose}
+          currentUserId={user.id}
+          isAdmin={isAdmin}
+        />
       )}
     </div>
   );

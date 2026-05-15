@@ -89,7 +89,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.87 0.00 0);
+  --primary: oklch(0.87 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -122,5 +122,71 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  .ProseMirror ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+  }
+
+  .ProseMirror ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+  }
+
+  .ProseMirror li {
+    margin: 0.25rem 0;
+  }
+
+  .ProseMirror a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .prose ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+  }
+
+  .prose ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+  }
+
+  .prose a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .note-content ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0.75rem 0;
+  }
+
+  .note-content ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+    margin: 0.75rem 0;
+  }
+
+  .note-content li {
+    margin: 0.25rem 0;
+  }
+
+  .note-content p {
+    margin: 0.5rem 0;
+  }
+
+  .note-content a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .note-content u {
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 }

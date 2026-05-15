@@ -10,8 +10,20 @@ import {
   Share2,
   TrendingDown,
   TrendingUp,
+  Bold,
+  Italic,
+  Link2,
+  List,
+  ListOrdered,
+  MessageSquareText,
+  Save,
+  Underline,
 } from "lucide-react";
 import JournalDetailsModal from "./journal-details-modal";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import TiptapUnderline from "@tiptap/extension-underline";
+import TiptapLink from "@tiptap/extension-link";
 
 const EDITABLE_ACTIVE_STATUSES = [
   "RUNNING TRADE",
@@ -200,8 +212,232 @@ function ImageStrip({ journal }) {
     </div>
   );
 }
+function RichTextEditor({ value, onChange }) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TiptapUnderline,
+      TiptapLink.configure({
+        openOnClick: false,
+      }),
+    ],
 
-function JournalCard({ journal, index, setSelectedJournal }) {
+    content: value || "",
+
+    editorProps: {
+      attributes: {
+        class:
+          "note-content prose prose-sm dark:prose-invert max-w-none min-h-[180px] px-4 py-3 focus:outline-none",
+      },
+    },
+
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+  });
+
+  if (!editor) return null;
+
+  function addLink() {
+    const previousUrl = editor.getAttributes("link").href || "";
+
+    const url = window.prompt("Enter URL", previousUrl);
+
+    if (url === null) return;
+
+    if (url === "") {
+      editor.chain().focus().unsetLink().run();
+      return;
+    }
+
+    editor
+      .chain()
+      .focus()
+      .extendMarkRange("link")
+      .setLink({
+        href: url.startsWith("http") ? url : `https://${url}`,
+      })
+      .run();
+  }
+
+  const buttonClass =
+    "flex h-9 w-9 items-center justify-center rounded-xl border bg-background transition hover:bg-accent";
+
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-background">
+      <div className="flex flex-wrap items-center gap-2 border-b bg-muted/30 p-2">
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          className={buttonClass}
+        >
+          <Bold className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          className={buttonClass}
+        >
+          <Italic className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={buttonClass}
+        >
+          <Underline className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          className={buttonClass}
+        >
+          <List className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          className={buttonClass}
+        >
+          <ListOrdered className="h-4 w-4" />
+        </button>
+
+        <button type="button" onClick={addLink} className={buttonClass}>
+          <Link2 className="h-4 w-4" />
+        </button>
+      </div>
+
+      <EditorContent editor={editor} />
+    </div>
+  );
+}
+
+function NoteBox({ title, value, canEdit, onSave, saving, updatedAt }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+
+  return (
+    <div className="rounded-2xl border bg-background/70 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+            {title}
+          </div>
+
+          {updatedAt ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Updated {formatDate(updatedAt)}
+            </p>
+          ) : null}
+        </div>
+
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            className="rounded-xl border px-3 py-1.5 text-xs hover:bg-accent"
+          >
+            {editing ? "Cancel" : value ? "Edit" : "Add"}
+          </button>
+        ) : null}
+      </div>
+
+      {editing ? (
+        <div className="space-y-3">
+          <RichTextEditor value={draft} onChange={setDraft} />
+
+          <button
+            type="button"
+            disabled={saving}
+            onClick={async () => {
+              await onSave(draft);
+              setEditing(false);
+            }}
+            className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-50"
+          >
+            <Save className="h-3.5 w-3.5" />
+            {saving ? "Saving..." : "Save Note"}
+          </button>
+        </div>
+      ) : value ? (
+        <div
+          className="note-content prose prose-sm max-w-none text-sm dark:prose-invert"
+          dangerouslySetInnerHTML={{ __html: value }}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">No note added yet.</p>
+      )}
+    </div>
+  );
+}
+
+function NotesSection({ journal, currentUserId, isAdmin, onNoteUpdated }) {
+  const [savingType, setSavingType] = useState("");
+
+  const isOwner = journal.user_id === currentUserId;
+
+  async function saveNote(type, note) {
+    setSavingType(type);
+
+    const res = await fetch("/api/journals/notes", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        journalId: journal.id,
+        type,
+        note,
+      }),
+    });
+
+    const json = await res.json();
+
+    setSavingType("");
+
+    if (!json.ok) {
+      alert(json.message || "Failed to save note.");
+      return;
+    }
+
+    onNoteUpdated(journal.id, type, json.note);
+  }
+
+  return (
+    <div className="mt-5 grid gap-3 border-t pt-4 md:grid-cols-2">
+      <NoteBox
+        title="Trader Note"
+        value={journal.owner_note}
+        updatedAt={journal.owner_note_updated_at}
+        canEdit={isOwner}
+        saving={savingType === "owner"}
+        onSave={(note) => saveNote("owner", note)}
+      />
+
+      <NoteBox
+        title="Admin Note"
+        value={journal.admin_note}
+        updatedAt={journal.admin_note_updated_at}
+        canEdit={isAdmin}
+        saving={savingType === "admin"}
+        onSave={(note) => saveNote("admin", note)}
+      />
+    </div>
+  );
+}
+function JournalCard({
+  journal,
+  index,
+  setSelectedJournal,
+  currentUserId,
+  isAdmin,
+  onNoteUpdated,
+}) {
   const strategyName = journal?.strategy_snapshot?.strategy_name || "—";
   const tradingStyle = journal?.strategy_snapshot?.trading_style || "—";
   const setup = journal?.strategy_snapshot?.setup_type || "—";
@@ -343,11 +579,25 @@ function JournalCard({ journal, index, setSelectedJournal }) {
           </div>
         </div>
       </div>
+      <div className="px-5 pb-5">
+        <NotesSection
+          journal={journal}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onNoteUpdated={onNoteUpdated}
+        />
+      </div>
     </article>
   );
 }
 
-function JournalsGrid({ journals, setSelectedJournal }) {
+function JournalsGrid({
+  journals,
+  setSelectedJournal,
+  currentUserId,
+  isAdmin,
+  onNoteUpdated,
+}) {
   return (
     <div className="grid gap-4">
       {journals.map((journal, index) => (
@@ -356,19 +606,53 @@ function JournalsGrid({ journals, setSelectedJournal }) {
           journal={journal}
           index={index}
           setSelectedJournal={setSelectedJournal}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onNoteUpdated={onNoteUpdated}
         />
       ))}
     </div>
   );
 }
 
-export default function JournalsClient({ journalsByPurpose }) {
+export default function JournalsClient({
+  journalsByPurpose,
+  currentUserId,
+  isAdmin,
+}) {
   const [selectedJournal, setSelectedJournal] = useState(null);
+
+  const [groups, setGroups] = useState(journalsByPurpose);
+
+  function handleNoteUpdated(journalId, type, note) {
+    setGroups((prev) =>
+      prev.map((group) => ({
+        ...group,
+        data: group.data.map((journal) => {
+          if (journal.id !== journalId) return journal;
+
+          if (type === "owner") {
+            return {
+              ...journal,
+              owner_note: note,
+              owner_note_updated_at: new Date().toISOString(),
+            };
+          }
+
+          return {
+            ...journal,
+            admin_note: note,
+            admin_note_updated_at: new Date().toISOString(),
+          };
+        }),
+      })),
+    );
+  }
 
   return (
     <>
       <div className="space-y-8">
-        {journalsByPurpose.map((group) => (
+        {groups.map((group) => (
           <section key={group.purpose} className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <h2 className="text-sm font-semibold text-muted-foreground">
@@ -383,6 +667,9 @@ export default function JournalsClient({ journalsByPurpose }) {
             <JournalsGrid
               journals={group.data}
               setSelectedJournal={setSelectedJournal}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+              onNoteUpdated={handleNoteUpdated}
             />
           </section>
         ))}
