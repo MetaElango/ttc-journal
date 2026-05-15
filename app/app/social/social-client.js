@@ -15,6 +15,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import JournalDetailsModal from "../journals/journal-details-modal";
+import CommentsSection from "./comments-section";
 
 function norm(v) {
   return String(v || "")
@@ -187,6 +188,98 @@ function NotePreview({ title, value }) {
         className="note-content prose prose-sm max-w-none text-sm text-muted-foreground dark:prose-invert"
         dangerouslySetInnerHTML={{ __html: value }}
       />
+    </div>
+  );
+}
+function JournalCardTabs({ journal }) {
+  const [activeTab, setActiveTab] = useState("images");
+  const [parentCommentCount, setParentCommentCount] = useState(0);
+
+  const imageCount =
+    (journal.setupImageUrls || []).length +
+    (journal.referenceImageUrls || []).length;
+
+  const hasNotes = Boolean(journal.owner_note || journal.admin_note);
+
+  const tabs = [
+    {
+      key: "images",
+      label: `Images (${imageCount})`,
+    },
+    {
+      key: "notes",
+      label: "Notes",
+      hasDot: hasNotes,
+    },
+    {
+      key: "comments",
+      label: `Comments (${parentCommentCount})`,
+    },
+  ];
+
+  return (
+    <div className="lg:col-span-3 space-y-4">
+      <div className="flex flex-wrap gap-2 rounded-2xl border bg-background/60 p-2">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.key;
+
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+
+              {tab.hasDot ? (
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    active ? "bg-primary-foreground" : "bg-emerald-500"
+                  }`}
+                />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === "images" ? (
+        <ImagePreviewRow
+          setupImages={journal.setupImageUrls || []}
+          referenceImages={journal.referenceImageUrls || []}
+        />
+      ) : null}
+
+      {activeTab === "notes" ? (
+        journal.owner_note || journal.admin_note ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <NotePreview title="Trader Note" value={journal.owner_note} />
+            <NotePreview title="Admin Note" value={journal.admin_note} />
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+            No notes added yet.
+          </div>
+        )
+      ) : null}
+
+      {activeTab === "comments" ? (
+        <CommentsSection
+          journalId={journal.id}
+          onParentCountChange={setParentCommentCount}
+        />
+      ) : (
+        <CommentsSection
+          journalId={journal.id}
+          onParentCountChange={setParentCommentCount}
+          hidden
+        />
+      )}
     </div>
   );
 }
@@ -507,24 +600,7 @@ export default function SocialClient({ journals }) {
                       </div>
                     </div>
 
-                    <div className="lg:col-span-3">
-                      <ImagePreviewRow
-                        setupImages={journal.setupImageUrls || []}
-                        referenceImages={journal.referenceImageUrls || []}
-                      />
-                    </div>
-                    {journal.owner_note || journal.admin_note ? (
-                      <div className="grid gap-4 lg:col-span-3 md:grid-cols-2">
-                        <NotePreview
-                          title="Trader Note"
-                          value={journal.owner_note}
-                        />
-                        <NotePreview
-                          title="Admin Note"
-                          value={journal.admin_note}
-                        />
-                      </div>
-                    ) : null}
+                    <JournalCardTabs journal={journal} />
                   </div>
                 </article>
               );
