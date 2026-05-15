@@ -18,8 +18,13 @@ import {
   MessageSquareText,
   Save,
   Underline,
+  Images,
+  StickyNote,
 } from "lucide-react";
+
 import JournalDetailsModal from "./journal-details-modal";
+import CommentsSection from "../social/comments-section";
+
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import TiptapUnderline from "@tiptap/extension-underline";
@@ -191,16 +196,22 @@ function ImageStrip({ journal }) {
   const images = [
     ...(journal.setupImageUrls || []),
     ...(journal.referenceImageUrls || []),
-  ].slice(0, 3);
+  ];
 
-  if (!images.length) return null;
+  if (!images.length) {
+    return (
+      <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+        No images uploaded.
+      </div>
+    );
+  }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-3">
       {images.map((url, index) => (
         <div
           key={`${url}-${index}`}
-          className="h-14 w-16 overflow-hidden rounded-xl border bg-muted"
+          className="h-24 w-32 overflow-hidden rounded-2xl border bg-muted"
         >
           <img
             src={url}
@@ -212,6 +223,7 @@ function ImageStrip({ journal }) {
     </div>
   );
 }
+
 function RichTextEditor({ value, onChange }) {
   const editor = useEditor({
     extensions: [
@@ -221,16 +233,13 @@ function RichTextEditor({ value, onChange }) {
         openOnClick: false,
       }),
     ],
-
     content: value || "",
-
     editorProps: {
       attributes: {
         class:
           "note-content prose prose-sm dark:prose-invert max-w-none min-h-[180px] px-4 py-3 focus:outline-none",
       },
     },
-
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
@@ -240,7 +249,6 @@ function RichTextEditor({ value, onChange }) {
 
   function addLink() {
     const previousUrl = editor.getAttributes("link").href || "";
-
     const url = window.prompt("Enter URL", previousUrl);
 
     if (url === null) return;
@@ -409,7 +417,7 @@ function NotesSection({ journal, currentUserId, isAdmin, onNoteUpdated }) {
   }
 
   return (
-    <div className="mt-5 grid gap-3 border-t pt-4 md:grid-cols-2">
+    <div className="grid gap-3 md:grid-cols-2">
       <NoteBox
         title="Trader Note"
         value={journal.owner_note}
@@ -430,6 +438,73 @@ function NotesSection({ journal, currentUserId, isAdmin, onNoteUpdated }) {
     </div>
   );
 }
+
+function JournalTabs({ journal, activeTab, setActiveTab, commentCount }) {
+  const imageCount =
+    (journal.setupImageUrls || []).length +
+    (journal.referenceImageUrls || []).length;
+
+  const hasNotes = Boolean(journal.owner_note || journal.admin_note);
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={() => setActiveTab("images")}
+        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+          activeTab === "images"
+            ? "bg-primary text-primary-foreground"
+            : "bg-background hover:bg-accent"
+        }`}
+      >
+        <Images className="h-3.5 w-3.5" />
+        Images
+        <span className="rounded-full bg-black/10 px-2 py-0.5 text-[10px] dark:bg-white/10">
+          {imageCount}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setActiveTab("notes")}
+        className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+          activeTab === "notes"
+            ? "bg-primary text-primary-foreground"
+            : "bg-background hover:bg-accent"
+        }`}
+      >
+        <StickyNote className="h-3.5 w-3.5" />
+        Notes
+        {hasNotes ? (
+          <span
+            className={`h-2 w-2 rounded-full ${
+              activeTab === "notes" ? "bg-primary-foreground" : "bg-emerald-500"
+            }`}
+          />
+        ) : null}
+      </button>
+
+      {journal.is_shared ? (
+        <button
+          type="button"
+          onClick={() => setActiveTab("comments")}
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+            activeTab === "comments"
+              ? "bg-primary text-primary-foreground"
+              : "bg-background hover:bg-accent"
+          }`}
+        >
+          <MessageSquareText className="h-3.5 w-3.5" />
+          Comments
+          <span className="rounded-full bg-black/10 px-2 py-0.5 text-[10px] dark:bg-white/10">
+            {commentCount}
+          </span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function JournalCard({
   journal,
   index,
@@ -438,6 +513,9 @@ function JournalCard({
   isAdmin,
   onNoteUpdated,
 }) {
+  const [activeTab, setActiveTab] = useState("images");
+  const [commentCount, setCommentCount] = useState(0);
+
   const strategyName = journal?.strategy_snapshot?.strategy_name || "—";
   const tradingStyle = journal?.strategy_snapshot?.trading_style || "—";
   const setup = journal?.strategy_snapshot?.setup_type || "—";
@@ -523,7 +601,12 @@ function JournalCard({
             </div>
           </div>
 
-          <ImageStrip journal={journal} />
+          <JournalTabs
+            journal={journal}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            commentCount={commentCount}
+          />
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -579,13 +662,41 @@ function JournalCard({
           </div>
         </div>
       </div>
+
       <div className="px-5 pb-5">
-        <NotesSection
-          journal={journal}
-          currentUserId={currentUserId}
-          isAdmin={isAdmin}
-          onNoteUpdated={onNoteUpdated}
-        />
+        {activeTab === "images" ? (
+          <div className="pt-4">
+            <ImageStrip journal={journal} />
+          </div>
+        ) : null}
+
+        {activeTab === "notes" ? (
+          <div className="pt-4">
+            <NotesSection
+              journal={journal}
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+              onNoteUpdated={onNoteUpdated}
+            />
+          </div>
+        ) : null}
+
+        {activeTab === "comments" && journal.is_shared ? (
+          <div className="pt-4">
+            <CommentsSection
+              journalId={journal.id}
+              onParentCountChange={setCommentCount}
+            />
+          </div>
+        ) : null}
+
+        {journal.is_shared && activeTab !== "comments" ? (
+          <CommentsSection
+            journalId={journal.id}
+            onParentCountChange={setCommentCount}
+            hidden
+          />
+        ) : null}
       </div>
     </article>
   );
@@ -621,7 +732,6 @@ export default function JournalsClient({
   isAdmin,
 }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
-
   const [groups, setGroups] = useState(journalsByPurpose);
 
   function handleNoteUpdated(journalId, type, note) {
