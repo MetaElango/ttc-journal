@@ -37,11 +37,11 @@ export async function PATCH(request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("type")
       .eq("id", user.id)
       .single();
 
-    const isAdmin = profile?.role === "admin";
+    const isAdmin = profile?.type === "admin";
 
     const { data: journal, error: journalError } = await supabase
       .from("journals")
