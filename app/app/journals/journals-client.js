@@ -109,11 +109,17 @@ function formatRisk(journal) {
 
 function formatDate(value) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, {
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
-  });
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function getStatusStyle(status) {

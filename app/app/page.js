@@ -144,33 +144,15 @@ export default async function AppPage() {
       <div className="flex flex-col gap-4 rounded-3xl border bg-card p-6 shadow-sm md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Welcome back, {profile?.full_name?.split(" ")[0] || "Trader"} 👋
+            Welcome back, {profile?.full_name?.split(" ")[0] || "Trader"}
           </h1>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/app/journals/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" />
-            New Journal
-          </Link>
-
-          <Link
-            href="/app/strategies/new"
-            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium hover:bg-accent"
-          >
-            <Target className="h-4 w-4" />
-            New Strategy
-          </Link>
         </div>
       </div>
 
       {/* STATS */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card
-          title="Total Journals"
+          title="Total Setups"
           value={journals.length}
           subtext="All journal entries"
           icon={BookOpen}
@@ -191,56 +173,11 @@ export default async function AppPage() {
         />
 
         <Card
-          title="Shared Journals"
+          title="Shared Playbooks"
           value={sharedJournals}
           subtext="Visible on social feed"
           icon={Share2}
         />
-      </div>
-
-      {/* QUICK ACTIONS */}
-      <div>
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold">Quick Access</h2>
-
-          <p className="text-sm text-muted-foreground">
-            Jump directly into your workflow
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <ActionCard
-            title="Journals"
-            description="Manage and review all your trading journals."
-            href="/app/journals"
-            icon={BookOpen}
-            buttonText="Open Journals"
-          />
-
-          <ActionCard
-            title="Strategies"
-            description="View and manage your strategy blueprints."
-            href="/app/strategies"
-            icon={Target}
-            buttonText="Open Strategies"
-          />
-
-          <ActionCard
-            title="Metrics"
-            description="Analyze your trading performance deeply."
-            href="/app/metrics"
-            icon={BarChart3}
-            buttonText="Open Metrics"
-          />
-
-          <ActionCard
-            title="Social"
-            description="Explore journals shared by other traders."
-            href="/app/social"
-            icon={Share2}
-            buttonText="Open Social"
-          />
-        </div>
       </div>
 
       {/* ACTIVE TRADES */}
@@ -290,7 +227,7 @@ export default async function AppPage() {
                     href="/app/journals"
                     className="inline-flex items-center text-sm font-medium text-primary"
                   >
-                    View Journal
+                    View
                   </Link>
                 </div>
               ))}
