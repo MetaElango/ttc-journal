@@ -177,7 +177,19 @@ function ImagePreviewRow({ setupImages = [], referenceImages = [] }) {
     </div>
   );
 }
+function NotePreview({ title, value }) {
+  if (!value) return null;
 
+  return (
+    <div className="rounded-2xl border bg-background/60 p-4">
+      <div className="mb-2 text-sm font-semibold">{title}</div>
+      <div
+        className="note-content prose prose-sm max-w-none text-sm text-muted-foreground dark:prose-invert"
+        dangerouslySetInnerHTML={{ __html: value }}
+      />
+    </div>
+  );
+}
 export default function SocialClient({ journals }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [purposeFilter, setPurposeFilter] = useState("ALL");
@@ -501,6 +513,18 @@ export default function SocialClient({ journals }) {
                         referenceImages={journal.referenceImageUrls || []}
                       />
                     </div>
+                    {journal.owner_note || journal.admin_note ? (
+                      <div className="grid gap-4 lg:col-span-3 md:grid-cols-2">
+                        <NotePreview
+                          title="Trader Note"
+                          value={journal.owner_note}
+                        />
+                        <NotePreview
+                          title="Admin Note"
+                          value={journal.admin_note}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </article>
               );

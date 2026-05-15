@@ -51,6 +51,10 @@ export default async function SocialPage() {
       created_at,
       shared_at,
       strategy_snapshot,
+      owner_note,
+      admin_note,
+      owner_note_updated_at,
+      admin_note_updated_at,
       symbols:symbol_id (
         id,
         symbol_name,
