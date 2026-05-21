@@ -439,6 +439,20 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
+    if (existingSetupImages.length > 2) {
+      return {
+        ok: false,
+        message: "Setup images can be maximum 2.",
+      };
+    }
+
+    if (existingReferenceImages.length > 5) {
+      return {
+        ok: false,
+        message: "Reference images can be maximum 5.",
+      };
+    }
+
     let htf = [];
     let entry_tf = [];
 

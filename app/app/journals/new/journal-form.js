@@ -1269,7 +1269,7 @@ function JournalDetailsCommon({
               files={setupImages}
               setFiles={setSetupImages}
               existingCount={existingSetupImages?.length || 0}
-              max={3}
+              max={2}
               error={setupImageError}
               setError={setSetupImageError}
             />
@@ -1279,7 +1279,7 @@ function JournalDetailsCommon({
               files={referenceImages}
               setFiles={setReferenceImages}
               existingCount={existingReferenceImages?.length || 0}
-              max={3}
+              max={5}
               error={referenceImageError}
               setError={setReferenceImageError}
             />
@@ -1612,6 +1612,10 @@ export default function NewJournalForm({
 
     uploadImagesAndRedirect();
   }, [state?.ok, state?.journalId]);
+  const setupImageCount =
+    (existingSetupImages?.length || 0) + (setupImages?.length || 0);
+
+  const setupImagesOk = setupImageCount >= 1 && setupImageCount <= 2;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -1725,6 +1729,7 @@ export default function NewJournalForm({
                 !slOk ||
                 selectedHtf.length === 0 ||
                 selectedEntryTf.length === 0 ||
+                !setupImagesOk ||
                 (cfg.required?.status && !status)
               }
               className="h-11 rounded-2xl px-5"
@@ -1757,6 +1762,12 @@ export default function NewJournalForm({
           {cfg.required?.status && !status ? (
             <p className="mt-2 text-xs text-destructive">
               Please select a status.
+            </p>
+          ) : null}
+
+          {!setupImagesOk ? (
+            <p className="mt-2 text-xs text-destructive">
+              Please upload at least 1 setup image. Maximum allowed is 2.
             </p>
           ) : null}
         </div>
