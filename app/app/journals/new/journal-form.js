@@ -40,6 +40,29 @@ function normPurpose(v) {
     .toUpperCase();
 }
 
+const TF = [
+  "MN",
+  "Week",
+  "2D",
+  "D",
+  "H16",
+  "H14",
+  "H12",
+  "H10",
+  "H8",
+  "H6",
+  "H4",
+  "H3",
+  "H2",
+  "H1",
+  "30",
+  "30M",
+  "15M",
+  "10M",
+  "5M",
+  "1M",
+];
+
 const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
 
 function needsEndDate(status) {
@@ -740,7 +763,76 @@ function NewImageUploader({
     </div>
   );
 }
+function TimeframePreview({ title, values = [] }) {
+  const items = Array.isArray(values) ? values : [];
 
+  return (
+    <div className="rounded-2xl border bg-background/60 p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
+
+      {items.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {items.map((item) => (
+            <span
+              key={item}
+              className="rounded-full border bg-card px-3 py-1 text-xs font-medium"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-destructive">No {title} found.</p>
+      )}
+    </div>
+  );
+}
+function TimeframeSelector({ title, values = [], selected, setSelected }) {
+  const items = Array.isArray(values) ? values : [];
+
+  function toggle(item) {
+    setSelected((prev) =>
+      prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item],
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border bg-background/60 p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title} <span className="text-destructive">*</span>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {items.map((item) => {
+          const active = selected.includes(item);
+
+          return (
+            <button
+              key={item}
+              type="button"
+              onClick={() => toggle(item)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card hover:bg-accent"
+              }`}
+            >
+              {item}
+            </button>
+          );
+        })}
+      </div>
+
+      {selected.length === 0 ? (
+        <p className="mt-3 text-xs text-destructive">
+          Select at least one {title}.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 function JournalDetailsCommon({
   cfg,
   purpose,
@@ -779,6 +871,10 @@ function JournalDetailsCommon({
   setJournalStartAt,
   journalEndAt,
   setJournalEndAt,
+  selectedHtf,
+  setSelectedHtf,
+  selectedEntryTf,
+  setSelectedEntryTf,
 }) {
   const disableTradingAccount = !!cfg.disable?.tradingAccount;
   const disableRisk = !!cfg.disable?.risk;
@@ -859,6 +955,17 @@ function JournalDetailsCommon({
         value={JSON.stringify(
           (existingReferenceImages || []).map((x) => x.path),
         )}
+      />
+      <input
+        type="hidden"
+        name="htf_json"
+        value={JSON.stringify(selectedHtf)}
+      />
+
+      <input
+        type="hidden"
+        name="entry_tf_json"
+        value={JSON.stringify(selectedEntryTf)}
       />
 
       <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
@@ -994,6 +1101,22 @@ function JournalDetailsCommon({
           title="Trade Levels"
           description="Enter direction, quantity, entry, stop loss and targets."
         />
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <TimeframeSelector
+            title="HTF"
+            values={prefillJournal ? TF : strategy?.htf || []}
+            selected={selectedHtf}
+            setSelected={setSelectedHtf}
+          />
+
+          <TimeframeSelector
+            title="Entry TF"
+            values={prefillJournal ? TF : strategy?.entry_tf || []}
+            selected={selectedEntryTf}
+            setSelected={setSelectedEntryTf}
+          />
+        </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-4">
           <FieldShell label="Direction" required={required.direction}>
@@ -1245,6 +1368,21 @@ export default function NewJournalForm({
 
   const [existingSetupImages, setExistingSetupImages] = useState([]);
   const [existingReferenceImages, setExistingReferenceImages] = useState([]);
+  const [selectedHtf, setSelectedHtf] = useState(() => {
+    if (prefillJournal?.htf?.length) {
+      return prefillJournal.htf;
+    }
+
+    return [];
+  });
+
+  const [selectedEntryTf, setSelectedEntryTf] = useState(() => {
+    if (prefillJournal?.entry_tf?.length) {
+      return prefillJournal.entry_tf;
+    }
+
+    return [];
+  });
 
   useEffect(() => {
     async function loadSignedUrls() {
@@ -1547,6 +1685,10 @@ export default function NewJournalForm({
           setJournalStartAt={setJournalStartAt}
           journalEndAt={journalEndAt}
           setJournalEndAt={setJournalEndAt}
+          selectedHtf={selectedHtf}
+          setSelectedHtf={setSelectedHtf}
+          selectedEntryTf={selectedEntryTf}
+          setSelectedEntryTf={setSelectedEntryTf}
         />
 
         {state?.message ? (
@@ -1581,6 +1723,8 @@ export default function NewJournalForm({
                 tpItems.length === 0 ||
                 !sumOk ||
                 !slOk ||
+                selectedHtf.length === 0 ||
+                selectedEntryTf.length === 0 ||
                 (cfg.required?.status && !status)
               }
               className="h-11 rounded-2xl px-5"

@@ -76,6 +76,8 @@ export default async function NewJournalPage({ searchParams }) {
         reference_images,
         journal_start_at,
         journal_end_at,
+        htf,
+        entry_tf,
         is_shared,
         shared_at,
         symbols:symbol_id (
@@ -437,6 +439,34 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
+    let htf = [];
+    let entry_tf = [];
+
+    try {
+      htf = JSON.parse(String(getFormValue(formData, "htf_json") || "[]"));
+      entry_tf = JSON.parse(
+        String(getFormValue(formData, "entry_tf_json") || "[]"),
+      );
+    } catch {
+      htf = [];
+      entry_tf = [];
+    }
+
+    if (!Array.isArray(htf) || htf.length === 0) {
+      return {
+        ok: false,
+        message: "HTF is required. Please select a strategy with HTF.",
+      };
+    }
+
+    if (!Array.isArray(entry_tf) || entry_tf.length === 0) {
+      return {
+        ok: false,
+        message:
+          "Entry TF is required. Please select a strategy with Entry TF.",
+      };
+    }
+
     let finalStrategyId = strategy.id;
     let copied_from_journal_id = null;
 
@@ -544,6 +574,8 @@ export default async function NewJournalPage({ searchParams }) {
         direction,
 
         strategy_snapshot,
+        htf,
+        entry_tf,
 
         quantity,
         entry_price,
