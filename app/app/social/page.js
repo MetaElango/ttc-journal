@@ -25,53 +25,67 @@ export default async function SocialPage() {
 
   if (!user) redirect("/login");
 
-  const { data: journals, error } = await supabase
+  const { data: adminProfiles } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("type", "admin");
+
+  const adminIds = (adminProfiles || []).map((p) => p.id);
+
+  let query = supabase
     .from("journals")
     .select(
       `
+    id,
+    user_id,
+    purpose,
+    status,
+    direction,
+    quantity,
+    entry_price,
+    stop_loss,
+    take_profit,
+    take_profit_qty,
+    risk_mode,
+    risk_per_trade,
+    entry_reason,
+    exit_reason,
+    exit_price,
+    setup_images,
+    reference_images,
+    journal_start_at,
+    journal_end_at,
+    created_at,
+    shared_at,
+    strategy_snapshot,
+    owner_note,
+    admin_note,
+    owner_note_updated_at,
+    admin_note_updated_at,
+    symbols:symbol_id (
       id,
-      user_id,
-      purpose,
-      status,
-      direction,
-      quantity,
-      entry_price,
-      stop_loss,
-      take_profit,
-      take_profit_qty,
-      risk_mode,
-      risk_per_trade,
-      entry_reason,
-      exit_reason,
-      exit_price,
-      setup_images,
-      reference_images,
-      journal_start_at,
-      journal_end_at,
-      created_at,
-      shared_at,
-      strategy_snapshot,
-      owner_note,
-      admin_note,
-      owner_note_updated_at,
-      admin_note_updated_at,
-      symbols:symbol_id (
-        id,
-        symbol_name,
-        category
-      ),
-      trading_accounts:trading_account_id (
-        id,
-        account_name,
-        account_size,
-        framework,
-        tag
-      )
-      `,
+      symbol_name,
+      category
+    ),
+    trading_accounts:trading_account_id (
+      id,
+      account_name,
+      account_size,
+      framework,
+      tag
+    )
+    `,
     )
     .eq("is_shared", true)
-    .neq("user_id", user.id)
-    .order("shared_at", { ascending: false });
+    .neq("user_id", user.id);
+
+  if (adminIds.length > 0) {
+    query = query.not("user_id", "in", `(${adminIds.join(",")})`);
+  }
+
+  const { data: journals, error } = await query.order("shared_at", {
+    ascending: false,
+  });
 
   if (error) {
     return (
