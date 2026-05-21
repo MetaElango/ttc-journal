@@ -23,46 +23,33 @@ export default async function HomePage() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,140,255,0.10),transparent_42%)]" />
 
       <header className="relative z-20">
-        <div className="mx-auto flex h-28 max-w-7xl items-center justify-between px-8">
-          <Link href="/" className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/30 bg-cyan-400/10 shadow-[0_0_25px_rgba(0,180,255,0.25)]">
-              <span className="text-2xl font-bold text-cyan-300">E</span>
-            </div>
-
-            <div>
-              <div className="text-2xl font-semibold tracking-[0.22em] text-white">
-                EXCELLION
-              </div>
-
-              <div className="mt-1 flex items-center gap-3">
-                <span className="h-px w-12 bg-cyan-300" />
-                <span className="text-xs font-semibold tracking-[0.5em] text-cyan-300">
-                  TTC
-                </span>
-              </div>
-            </div>
+        <div className="mx-auto flex h-32 max-w-7xl items-center justify-between px-8">
+          <Link href="/" className="flex items-center">
+            <img
+              src="/logo.png"
+              alt="EXCELLION TTC"
+              className="h-40 w-auto object-contain"
+            />
           </Link>
 
-          <nav className="hidden items-center gap-12 md:flex">
-            {["Home", "About", "Framework", "Resources", "Community"].map(
-              (item, index) => (
-                <a
-                  key={item}
-                  href="#"
-                  className={`relative text-base font-medium transition ${
-                    index === 0
-                      ? "text-cyan-300"
-                      : "text-white/85 hover:text-cyan-300"
-                  }`}
-                >
-                  {item}
-                  {index === 0 ? (
-                    <span className="absolute -bottom-5 left-1/2 h-[2px] w-16 -translate-x-1/2 rounded-full bg-cyan-400 shadow-[0_0_18px_rgba(0,180,255,1)]" />
-                  ) : null}
-                </a>
-              ),
-            )}
-          </nav>
+          {/* <nav className="hidden items-center gap-12 md:flex">
+            {["Contact"].map((item, index) => (
+              <a
+                key={item}
+                href="#"
+                className={`relative text-base font-medium transition ${
+                  index === 0
+                    ? "text-cyan-300"
+                    : "text-white/85 hover:text-cyan-300"
+                }`}
+              >
+                {item}
+                {index === 0 ? (
+                  <span className="absolute -bottom-5 left-1/2 h-[2px] w-16 -translate-x-1/2 rounded-full bg-cyan-400 shadow-[0_0_18px_rgba(0,180,255,1)]" />
+                ) : null}
+              </a>
+            ))}
+          </nav> */}
 
           <div className="flex items-center gap-6">
             <Link
@@ -110,7 +97,7 @@ export default async function HomePage() {
 
         <p className="mt-7 max-w-3xl text-base leading-8 text-white/72 md:text-[21px] md:leading-[38px]">
           An ecosystem centered on disciplined execution, transparent learning,
-          and collective accountability — shaping long-term market mastery.
+          and collective accountability shaping long-term market mastery.
         </p>
 
         <Link
