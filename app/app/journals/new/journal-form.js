@@ -64,7 +64,7 @@ const TF = [
   "1M",
 ];
 
-const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED"];
 
 function needsEndDate(status) {
   const value = String(status || "")
@@ -161,7 +161,6 @@ const STATUS_OPTIONS_BY_PURPOSE = {
     "ENTRY TRIGGERED",
     "ENTRY CANCELLED",
     "ENTRY MISSED",
-    "RUNNING TRADE",
     "TRADE SL HIT",
     "TRADE CLOSE WITH PROFIT",
     "TRADE EXIT IN MID",
@@ -171,7 +170,6 @@ const STATUS_OPTIONS_BY_PURPOSE = {
     "ENTRY TRIGGERED",
     "ENTRY CANCELLED",
     "ENTRY MISSED",
-    "RUNNING TRADE",
     "TRADE SL HIT",
     "TRADE CLOSE WITH PROFIT",
     "TRADE EXIT IN MID",

@@ -6,18 +6,29 @@ import JournalsClient from "./journals-client";
 
 const TABS = [
   { key: "open", label: "Open" },
-  { key: "closed", label: "Closed" },
-  { key: "cancelled", label: "Cancelled" },
+  { key: "active", label: "Active" },
 ];
 
 const VIEWS = [
-  { key: "my", label: "My Journals" },
-  { key: "incorporated", label: "Incorporated Journals" },
+  { key: "my", label: "My Opportunities" },
+  { key: "incorporated", label: "Incorporated Opportunities" },
 ];
+
+const OPEN_STATUSES = ["ENTRY PLACED"];
+const ACTIVE_STATUSES = ["ENTRY TRIGGERED"];
+
+function getJournalTab(journal) {
+  const status = norm(journal.status);
+
+  if (OPEN_STATUSES.includes(status)) return "open";
+  if (ACTIVE_STATUSES.includes(status)) return "active";
+
+  return null;
+}
 
 const PURPOSES = ["FOR OBSERVATION", "ENTRY PLANNED", "FORWARD TESTING"];
 
-const OPEN_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+// const OPEN_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
 
 const CLOSED_STATUSES = [
   "TRADE SL HIT",
@@ -34,15 +45,15 @@ function norm(v) {
     .toUpperCase();
 }
 
-function getJournalTab(journal) {
-  const status = norm(journal.status);
+// function getJournalTab(journal) {
+//   const status = norm(journal.status);
 
-  if (OPEN_STATUSES.includes(status)) return "open";
-  if (CLOSED_STATUSES.includes(status)) return "closed";
-  if (CANCELLED_STATUSES.includes(status)) return "cancelled";
+//   if (OPEN_STATUSES.includes(status)) return "open";
+//   if (CLOSED_STATUSES.includes(status)) return "closed";
+//   if (CANCELLED_STATUSES.includes(status)) return "cancelled";
 
-  return null;
-}
+//   return null;
+// }
 
 export default async function JournalsPage({ searchParams }) {
   const params = await searchParams;
@@ -201,27 +212,42 @@ export default async function JournalsPage({ searchParams }) {
       : ownJournalsAll.length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Journals</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {totalCurrentView}{" "}
-            {activeView === "incorporated"
-              ? "incorporated journals"
-              : "my journals"}
-          </p>
-        </div>
+    <div className="space-y-6 rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6">
+        <img
+          src="/playbook-bg.png"
+          alt=""
+          className="absolute right-0 top-0 h-full w-[65%] object-cover opacity-80"
+        />
 
-        <Link
-          href="/app/strategies"
-          className="rounded-md border px-4 py-2 text-sm hover:bg-accent"
-        >
-          Create from Strategy
-        </Link>
+        <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white/80 px-4 py-2 text-sm font-semibold text-sky-600">
+              OPPORTUNITIES
+            </div>
+
+            <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">
+              My <span className="text-sky-500">Opportunities</span>
+            </h1>
+
+            <p className="mt-3 text-sm text-slate-500">
+              {totalCurrentView}{" "}
+              {activeView === "incorporated"
+                ? "incorporated opportunities"
+                : "my opportunities"}
+            </p>
+          </div>
+
+          <Link
+            href="/app/journals/new"
+            className="inline-flex h-12 items-center rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
+          >
+            + New Opportunity
+          </Link>
+        </div>
       </div>
 
-      <div className="grid gap-3 rounded-2xl border bg-card p-3 md:grid-cols-2">
+      <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-3 md:grid-cols-2">
         {VIEWS.map((view) => {
           const active = activeView === view.key;
           const total =
@@ -233,10 +259,10 @@ export default async function JournalsPage({ searchParams }) {
             <Link
               key={view.key}
               href={`/app/journals?view=${view.key}&tab=${activeTab}`}
-              className={`rounded-xl px-4 py-3 text-center text-sm font-medium transition ${
+              className={`rounded-2xl px-4 py-3 text-center text-sm font-semibold transition ${
                 active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+                  ? "bg-sky-600 text-white shadow-sm"
+                  : "bg-slate-50 text-slate-600 hover:bg-sky-50 hover:text-sky-600"
               }`}
             >
               {view.label} ({total})
@@ -245,7 +271,7 @@ export default async function JournalsPage({ searchParams }) {
         })}
       </div>
 
-      <div className="flex flex-wrap gap-2 border-b">
+      <div className="flex flex-wrap gap-2 rounded-3xl border border-slate-200 bg-white p-3">
         {TABS.map((tab) => {
           const active = activeTab === tab.key;
           const count = counts?.[activeView]?.[tab.key] || 0;
@@ -254,10 +280,10 @@ export default async function JournalsPage({ searchParams }) {
             <Link
               key={tab.key}
               href={`/app/journals?view=${activeView}&tab=${tab.key}`}
-              className={`border-b-2 px-4 py-3 text-sm font-medium ${
+              className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
                 active
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-slate-950 text-white"
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100"
               }`}
             >
               {tab.label} ({count})

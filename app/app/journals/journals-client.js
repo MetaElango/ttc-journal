@@ -512,6 +512,8 @@ function JournalCard({
   currentUserId,
   isAdmin,
   onNoteUpdated,
+  expanded,
+  toggleExpand,
 }) {
   const [activeTab, setActiveTab] = useState("images");
   const [commentCount, setCommentCount] = useState(0);
@@ -527,16 +529,14 @@ function JournalCard({
   async function shareJournal() {
     const res = await fetch("/api/journals/share", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ journalId: journal.id }),
     });
 
     const json = await res.json();
 
     if (!json.ok) {
-      alert(json.message || "Failed to share journal.");
+      alert(json.message || "Failed to share opportunity.");
       return;
     }
 
@@ -601,103 +601,118 @@ function JournalCard({
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => toggleExpand(journal.id)}
+            className="inline-flex h-9 items-center rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent"
+          >
+            {expanded ? "Collapse" : "Expand"}
+          </button>
+        </div>
+
+        {expanded ? (
+          <>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <MiniStat label="Entry" value={journal.entry_price} />
+              <MiniStat label="SL" value={journal.stop_loss} />
+              <MiniStat
+                label="TP"
+                value={
+                  Array.isArray(journal.take_profit) &&
+                  journal.take_profit.length
+                    ? journal.take_profit.join(", ")
+                    : "—"
+                }
+              />
+              <MiniStat label="Risk" value={formatRisk(journal)} />
+              <MiniStat label="Qty" value={journal.quantity} />
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+              <div className="text-xs text-muted-foreground">
+                End: {formatDate(journal.journal_end_at)}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={journal.is_shared}
+                  onClick={shareJournal}
+                  className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  {journal.is_shared ? "Shared" : "Share"}
+                </button>
+
+                {canEditJournal(journal) ? (
+                  <Link
+                    href={`/app/journals/${journal.id}/edit`}
+                    className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </Link>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedJournal(journal)}
+                  className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Details
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      {expanded ? (
+        <div className="px-5 pb-5">
           <JournalTabs
             journal={journal}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             commentCount={commentCount}
           />
-        </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <MiniStat label="Entry" value={journal.entry_price} />
-          <MiniStat label="SL" value={journal.stop_loss} />
-          <MiniStat
-            label="TP"
-            value={
-              Array.isArray(journal.take_profit) && journal.take_profit.length
-                ? journal.take_profit.join(", ")
-                : "—"
-            }
-          />
-          <MiniStat label="Risk" value={formatRisk(journal)} />
-          <MiniStat label="Qty" value={journal.quantity} />
-        </div>
+          {activeTab === "images" ? (
+            <div className="pt-4">
+              <ImageStrip journal={journal} />
+            </div>
+          ) : null}
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <div className="text-xs text-muted-foreground">
-            End: {formatDate(journal.journal_end_at)}
-          </div>
+          {activeTab === "notes" ? (
+            <div className="pt-4">
+              <NotesSection
+                journal={journal}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+                onNoteUpdated={onNoteUpdated}
+              />
+            </div>
+          ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={journal.is_shared}
-              onClick={shareJournal}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              {journal.is_shared ? "Shared" : "Share"}
-            </button>
+          {activeTab === "comments" && journal.is_shared ? (
+            <div className="pt-4">
+              <CommentsSection
+                journalId={journal.id}
+                onParentCountChange={setCommentCount}
+              />
+            </div>
+          ) : null}
 
-            {canEditJournal(journal) ? (
-              <Link
-                href={`/app/journals/${journal.id}/edit`}
-                className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </Link>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => setSelectedJournal(journal)}
-              className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Details
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="px-5 pb-5">
-        {activeTab === "images" ? (
-          <div className="pt-4">
-            <ImageStrip journal={journal} />
-          </div>
-        ) : null}
-
-        {activeTab === "notes" ? (
-          <div className="pt-4">
-            <NotesSection
-              journal={journal}
-              currentUserId={currentUserId}
-              isAdmin={isAdmin}
-              onNoteUpdated={onNoteUpdated}
-            />
-          </div>
-        ) : null}
-
-        {activeTab === "comments" && journal.is_shared ? (
-          <div className="pt-4">
+          {journal.is_shared && activeTab !== "comments" ? (
             <CommentsSection
               journalId={journal.id}
               onParentCountChange={setCommentCount}
+              hidden
             />
-          </div>
-        ) : null}
-
-        {journal.is_shared && activeTab !== "comments" ? (
-          <CommentsSection
-            journalId={journal.id}
-            onParentCountChange={setCommentCount}
-            hidden
-          />
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -708,6 +723,8 @@ function JournalsGrid({
   currentUserId,
   isAdmin,
   onNoteUpdated,
+  expandedRows,
+  toggleExpand,
 }) {
   return (
     <div className="grid gap-4">
@@ -720,6 +737,8 @@ function JournalsGrid({
           currentUserId={currentUserId}
           isAdmin={isAdmin}
           onNoteUpdated={onNoteUpdated}
+          expanded={!!expandedRows[journal.id]}
+          toggleExpand={toggleExpand}
         />
       ))}
     </div>
@@ -733,6 +752,23 @@ export default function JournalsClient({
 }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [groups, setGroups] = useState(journalsByPurpose);
+
+  const initialExpanded = {};
+
+  journalsByPurpose.forEach((group) => {
+    if (group.data?.length) {
+      initialExpanded[group.data[0].id] = true;
+    }
+  });
+
+  const [expandedRows, setExpandedRows] = useState(initialExpanded);
+
+  function toggleExpand(id) {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  }
 
   function handleNoteUpdated(journalId, type, note) {
     setGroups((prev) =>
@@ -780,6 +816,8 @@ export default function JournalsClient({
               currentUserId={currentUserId}
               isAdmin={isAdmin}
               onNoteUpdated={handleNoteUpdated}
+              expandedRows={expandedRows}
+              toggleExpand={toggleExpand}
             />
           </section>
         ))}

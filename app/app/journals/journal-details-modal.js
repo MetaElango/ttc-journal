@@ -1,22 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   X,
   ChevronLeft,
   ChevronRight,
-  CalendarClock,
-  Target,
-  Wallet,
-  ShieldCheck,
-  FileText,
   ImageIcon,
   TrendingUp,
   TrendingDown,
-  BadgeCheck,
-  StickyNote,
-  MessageSquareText,
 } from "lucide-react";
+
 import CommentsSection from "../social/comments-section";
 
 function norm(v) {
@@ -25,82 +18,60 @@ function norm(v) {
     .toUpperCase();
 }
 
-function formatDateTime(value) {
-  if (!value) return "—";
-
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function formatTP(tp = [], qty = []) {
-  if (!Array.isArray(tp) || tp.length === 0) return "—";
-
-  if (Array.isArray(qty) && qty.length === tp.length) {
-    return tp.map((p, i) => `TP ${i + 1}: ${p} (${qty[i] ?? "—"} lots)`);
-  }
-
-  return tp.map((p, i) => `TP ${i + 1}: ${p}`);
-}
-
 function getStatusTone(status) {
   const s = norm(status);
 
   if (["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"].includes(s)) {
-    return "border-blue-500/25 bg-blue-500/10 text-blue-700 dark:text-blue-300";
+    return "border-blue-500/25 bg-blue-500/10 text-blue-700";
   }
 
   if (["TRADE CLOSE WITH PROFIT"].includes(s)) {
-    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+    return "border-emerald-500/25 bg-emerald-500/10 text-emerald-700";
   }
 
   if (["TRADE SL HIT"].includes(s)) {
-    return "border-red-500/25 bg-red-500/10 text-red-700 dark:text-red-300";
+    return "border-red-500/25 bg-red-500/10 text-red-700";
   }
 
   if (["ENTRY CANCELLED", "ENTRY MISSED"].includes(s)) {
-    return "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300";
+    return "border-amber-500/25 bg-amber-500/10 text-amber-700";
   }
 
-  return "border-border bg-muted text-muted-foreground";
+  return "border-slate-200 bg-slate-100 text-slate-600";
 }
 
 function Pill({ children, className = "" }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${className}`}
+      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold ${className}`}
     >
       {children}
     </span>
   );
 }
 
-function StatCard({ icon: Icon, label, value }) {
+function InfoBlock({ label, value, className = "" }) {
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl border bg-background">
-          <Icon className="h-4 w-4 text-muted-foreground" />
-        </div>
-
-        <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{value ?? "—"}</div>
-          <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
-        </div>
+    <div
+      className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 ${className}`}
+    >
+      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+      <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
+        {value || "—"}
       </div>
     </div>
   );
 }
 
-function InfoBlock({ label, value, className = "" }) {
+function ReasonBox({ label, value }) {
   return (
-    <div className={`rounded-2xl border bg-background/60 p-4 ${className}`}>
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div>
+      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
         {label}
       </div>
-
-      <div className="mt-2 text-sm leading-6 whitespace-pre-wrap">
+      <div className="min-h-[120px] resize-y overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-wrap">
         {value || "—"}
       </div>
     </div>
@@ -109,40 +80,18 @@ function InfoBlock({ label, value, className = "" }) {
 
 function NoteBlock({ title, value }) {
   return (
-    <div className="rounded-2xl border bg-background/60 p-4">
-      <div className="mb-2 text-sm font-semibold">{title}</div>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="mb-2 text-sm font-bold text-slate-950">{title}</div>
 
       {value ? (
         <div
-          className="note-content prose prose-sm max-w-none text-sm dark:prose-invert"
+          className="note-content prose prose-sm max-w-none text-sm"
           dangerouslySetInnerHTML={{ __html: value }}
         />
       ) : (
-        <p className="text-sm text-muted-foreground">No note added yet.</p>
+        <p className="text-sm text-slate-500">No note added yet.</p>
       )}
     </div>
-  );
-}
-
-function Section({ icon: Icon, title, description, children }) {
-  return (
-    <section className="rounded-3xl border bg-card p-5 shadow-sm">
-      <div className="mb-5 flex gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border bg-background">
-          <Icon className="h-5 w-5 text-muted-foreground" />
-        </div>
-
-        <div>
-          <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-
-          {description ? (
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          ) : null}
-        </div>
-      </div>
-
-      {children}
-    </section>
   );
 }
 
@@ -160,13 +109,23 @@ function ImageCarousel({ images, index, onClose, onPrev, onNext }) {
       </button>
 
       {images.length > 1 ? (
-        <button
-          type="button"
-          onClick={onPrev}
-          className="absolute left-4 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20"
-        >
-          <ChevronLeft className="h-6 w-6" />
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={onPrev}
+            className="absolute left-4 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onNext}
+            className="absolute right-4 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+        </>
       ) : null}
 
       <img
@@ -175,408 +134,335 @@ function ImageCarousel({ images, index, onClose, onPrev, onNext }) {
         className="max-h-[86vh] max-w-[92vw] rounded-2xl object-contain shadow-2xl"
       />
 
-      {images.length > 1 ? (
-        <button
-          type="button"
-          onClick={onNext}
-          className="absolute right-4 rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20"
-        >
-          <ChevronRight className="h-6 w-6" />
-        </button>
-      ) : null}
-
-      <div className="absolute bottom-4 rounded-full bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur">
+      <div className="absolute bottom-4 rounded-full bg-white/10 px-4 py-2 text-xs font-bold text-white backdrop-blur">
         {index + 1} / {images.length}
       </div>
     </div>
   );
 }
 
-function ImageGrid({ title, images = [], onOpen }) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h4 className="text-sm font-semibold">{title}</h4>
-
-        <span className="text-xs text-muted-foreground">
-          {images.length} image{images.length === 1 ? "" : "s"}
-        </span>
-      </div>
-
-      {images.length === 0 ? (
-        <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed bg-muted/30 text-sm text-muted-foreground">
-          No images uploaded.
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {images.map((url, index) => (
-            <button
-              key={`${url}-${index}`}
-              type="button"
-              onClick={() => onOpen(images, index)}
-              className="group overflow-hidden rounded-2xl border bg-muted"
-            >
-              <img
-                src={url}
-                alt={`${title} ${index + 1}`}
-                className="h-40 w-full object-cover transition duration-300 group-hover:scale-105"
-              />
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DetailTabs({
-  activeTab,
-  setActiveTab,
-  imageCount,
-  hasNotes,
-  commentCount,
-  showComments,
-}) {
-  const tabs = [
-    {
-      key: "images",
-      label: "Images",
-      icon: ImageIcon,
-      count: imageCount,
-    },
-    {
-      key: "notes",
-      label: "Notes",
-      icon: StickyNote,
-      hasDot: hasNotes,
-    },
-  ];
-
-  if (showComments) {
-    tabs.push({
-      key: "comments",
-      label: "Comments",
-      icon: MessageSquareText,
-      count: commentCount,
-    });
-  }
-
-  return (
-    <div className="flex flex-wrap gap-2 rounded-2xl border bg-background/60 p-2">
-      {tabs.map((tab) => {
-        const Icon = tab.icon;
-        const active = activeTab === tab.key;
-
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-medium transition ${
-              active
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-            {tab.label}
-
-            {typeof tab.count === "number" ? (
-              <span className="rounded-full bg-black/10 px-2 py-0.5 text-[10px] dark:bg-white/10">
-                {tab.count}
-              </span>
-            ) : null}
-
-            {tab.hasDot ? (
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  active ? "bg-primary-foreground" : "bg-emerald-500"
-                }`}
-              />
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function JournalDetailsModal({ journal, onClose }) {
-  const [carousel, setCarousel] = useState(null);
-  const [activeTab, setActiveTab] = useState("images");
+  const [carousel, setCarousel] = useState({ images: [], index: 0 });
+  const [activeIndex, setActiveIndex] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
+
+  const allImages = useMemo(() => {
+    if (!journal) return [];
+
+    return [
+      ...(journal.setupImageUrls || []),
+      ...(journal.referenceImageUrls || []),
+    ];
+  }, [journal]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+    setCarousel({ images: [], index: 0 });
+  }, [journal?.id]);
 
   if (!journal) return null;
 
   const strategy = journal.strategy_snapshot || {};
+  const activeImages = allImages;
 
   const symbol = journal.symbols
     ? `${journal.symbols.symbol_name} — ${journal.symbols.category}`
     : "—";
 
-  const account = journal.trading_accounts
-    ? `${journal.trading_accounts.account_name} — ${journal.trading_accounts.account_size}`
-    : "—";
-
-  const tpItems = formatTP(journal.take_profit, journal.take_profit_qty);
-
-  const imageCount =
-    (journal.setupImageUrls || []).length +
-    (journal.referenceImageUrls || []).length;
-
-  const hasNotes = Boolean(journal.owner_note || journal.admin_note);
-  const showComments = Boolean(journal.is_shared);
-
-  function openCarousel(images, index) {
-    setCarousel({ images, index });
-  }
-
-  function closeCarousel() {
-    setCarousel(null);
-  }
-
   function prevImage() {
-    setCarousel((current) => {
-      if (!current) return current;
-
-      return {
-        ...current,
-        index:
-          current.index === 0 ? current.images.length - 1 : current.index - 1,
-      };
-    });
+    if (!activeImages.length) return;
+    setActiveIndex((current) =>
+      current === 0 ? activeImages.length - 1 : current - 1,
+    );
   }
 
   function nextImage() {
-    setCarousel((current) => {
-      if (!current) return current;
-
-      return {
-        ...current,
-        index:
-          current.index === current.images.length - 1 ? 0 : current.index + 1,
-      };
-    });
+    if (!activeImages.length) return;
+    setActiveIndex((current) =>
+      current === activeImages.length - 1 ? 0 : current + 1,
+    );
   }
+
+  function closeCarousel() {
+    setCarousel({ images: [], index: 0 });
+  }
+
+  function carouselPrev() {
+    setCarousel((current) => ({
+      ...current,
+      index:
+        current.index === 0 ? current.images.length - 1 : current.index - 1,
+    }));
+  }
+
+  function carouselNext() {
+    setCarousel((current) => ({
+      ...current,
+      index:
+        current.index === current.images.length - 1 ? 0 : current.index + 1,
+    }));
+  }
+
+  const directionLabel = norm(journal.direction) === "SELL" ? "SHORT" : "LONG";
 
   return (
     <>
       <div className="fixed inset-0 z-50 bg-black/60 p-4 backdrop-blur-sm">
-        <div className="mx-auto flex max-h-[92vh] max-w-6xl flex-col overflow-hidden rounded-3xl border bg-background shadow-2xl">
-          <div className="border-b bg-gradient-to-br from-card via-card to-muted/40 p-5 md:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
-                  <BadgeCheck className="h-3.5 w-3.5" />
-                  Journal Details
-                </div>
-
-                <h2 className="mt-4 truncate text-2xl font-semibold tracking-tight md:text-3xl">
-                  {strategy.strategy_name || "Journal Details"}
-                </h2>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Pill className={getStatusTone(journal.status)}>
-                    {journal.status || "No status"}
-                  </Pill>
-
-                  <Pill>{journal.purpose || "—"}</Pill>
-
-                  <Pill>{formatDateTime(journal.journal_start_at)}</Pill>
-                </div>
+        <div className="mx-auto flex max-h-[92vh] max-w-7xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-white p-5">
+            <div>
+              <div className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-600">
+                OPPORTUNITY DETAILS
               </div>
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-full border bg-background p-2.5 hover:bg-accent"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              <h2 className="mt-3 text-2xl font-bold text-slate-950">
+                {strategy.strategy_name || "Opportunity"}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {strategy.trading_style || "—"} • {strategy.setup_type || "—"}
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-slate-200 bg-white p-2.5 hover:bg-slate-50"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
-          <div className="space-y-6 overflow-y-auto p-5 md:p-6">
-            <div className="grid gap-3 md:grid-cols-4">
-              <StatCard icon={Target} label="Symbol" value={symbol} />
+          <div className="grid overflow-y-auto lg:grid-cols-[1.4fr_430px]">
+            <div className="border-r border-slate-200 bg-slate-50 p-5">
+              <div>
+                {activeImages.length ? (
+                  <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-black">
+                    <img
+                      src={activeImages[activeIndex]}
+                      alt="Chart"
+                      className="h-[640px] w-full object-contain"
+                    />
 
-              <StatCard
-                icon={
-                  norm(journal.direction) === "SELL" ? TrendingDown : TrendingUp
-                }
-                label="Direction"
-                value={journal.direction || "—"}
-              />
+                    {activeImages.length > 1 ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={prevImage}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white backdrop-blur transition hover:bg-black/70"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
 
-              <StatCard icon={Wallet} label="Trading Account" value={account} />
+                        <button
+                          type="button"
+                          onClick={nextImage}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-3 text-white backdrop-blur transition hover:bg-black/70"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </>
+                    ) : null}
 
-              <StatCard
-                icon={ShieldCheck}
-                label="Risk"
-                value={
-                  journal.risk_per_trade != null
-                    ? `${journal.risk_per_trade} ${journal.risk_mode || ""}`
-                    : "—"
-                }
-              />
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-xs font-bold text-white">
+                      {activeIndex + 1} / {activeImages.length}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex h-[640px] items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white">
+                    <div className="text-center">
+                      <ImageIcon className="mx-auto h-10 w-10 text-slate-400" />
+                      <p className="mt-3 text-sm text-slate-500">
+                        No setup images uploaded
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {allImages.length ? (
+                <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+                  {allImages.map((img, idx) => (
+                    <button
+                      key={`${img}-${idx}`}
+                      type="button"
+                      onClick={() =>
+                        setCarousel({
+                          images: allImages,
+                          index: idx,
+                        })
+                      }
+                      className={`overflow-hidden rounded-2xl border transition ${
+                        activeIndex === idx
+                          ? "border-sky-500 ring-2 ring-sky-500/20"
+                          : "border-slate-200"
+                      }`}
+                    >
+                      <img
+                        src={img}
+                        alt=""
+                        className="h-20 w-28 object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
 
-            <Section
-              icon={CalendarClock}
-              title="Trade Timeline"
-              description="Start and end time recorded for this journal."
-            >
-              <div className="grid gap-3 md:grid-cols-2">
-                <InfoBlock
-                  label="Journal Start Date"
-                  value={formatDateTime(journal.journal_start_at)}
-                />
+            <div className="space-y-4 overflow-y-auto bg-white p-5">
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold uppercase text-slate-500">
+                      Symbol
+                    </div>
 
-                <InfoBlock
-                  label="Journal End Date"
-                  value={formatDateTime(journal.journal_end_at)}
-                />
-              </div>
-            </Section>
+                    <div className="mt-2 text-2xl font-bold text-slate-950">
+                      {journal.symbols?.symbol_name || "—"}
+                    </div>
 
-            <Section
-              icon={Target}
-              title="Trade Plan"
-              description="Entry, stop loss, quantity, take profit, and exit details."
-            >
-              <div className="grid gap-3 md:grid-cols-5">
-                <InfoBlock label="Quantity" value={journal.quantity} />
-                <InfoBlock label="Entry Price" value={journal.entry_price} />
-                <InfoBlock label="Stop Loss" value={journal.stop_loss} />
-                <InfoBlock label="Exit Price" value={journal.exit_price} />
-
-                <InfoBlock
-                  label="Take Profit"
-                  value={
-                    Array.isArray(tpItems) ? tpItems.join("\n") : tpItems || "—"
-                  }
-                  className="md:col-span-5"
-                />
-              </div>
-            </Section>
-
-            <Section
-              icon={FileText}
-              title="Journal Reasoning"
-              description="Reasoning recorded for entry and exit."
-            >
-              <div className="grid gap-3 md:grid-cols-2">
-                <InfoBlock label="Entry Reason" value={journal.entry_reason} />
-                <InfoBlock label="Exit Reason" value={journal.exit_reason} />
-              </div>
-            </Section>
-
-            <Section
-              icon={ShieldCheck}
-              title="Strategy Snapshot"
-              description="The strategy details saved at the time of journaling."
-            >
-              <div className="grid gap-3 md:grid-cols-4">
-                <InfoBlock
-                  label="Trading Style"
-                  value={strategy.trading_style}
-                />
-
-                <InfoBlock label="Setup Type" value={strategy.setup_type} />
-
-                <InfoBlock
-                  label="Strategy Status"
-                  value={strategy.strategy_status}
-                />
-
-                <InfoBlock
-                  label="Preparation Status"
-                  value={strategy.preparation_status}
-                />
-              </div>
-            </Section>
-
-            <Section
-              icon={FileText}
-              title="Strategy Rules"
-              description="Checklist and execution rules from the strategy blueprint."
-            >
-              <div className="grid gap-3 md:grid-cols-2">
-                <InfoBlock label="Checklist" value={strategy.checklist} />
-                <InfoBlock label="Entry Rules" value={strategy.entry_rules} />
-                <InfoBlock label="Exit Rules" value={strategy.exit_rules} />
-
-                <InfoBlock
-                  label="SL Management Rules"
-                  value={strategy.sl_management_rules}
-                />
-              </div>
-            </Section>
-            <Section
-              icon={ImageIcon}
-              title="Media, Notes & Discussion"
-              description="Images, journal notes, and community comments."
-            >
-              <div className="space-y-5">
-                <DetailTabs
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  imageCount={imageCount}
-                  hasNotes={hasNotes}
-                  commentCount={commentCount}
-                  showComments={showComments}
-                />
-
-                {activeTab === "images" ? (
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <ImageGrid
-                      title="Setup Images"
-                      images={journal.setupImageUrls || []}
-                      onOpen={openCarousel}
-                    />
-
-                    <ImageGrid
-                      title="Reference Images"
-                      images={journal.referenceImageUrls || []}
-                      onOpen={openCarousel}
-                    />
+                    <div
+                      className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${
+                        directionLabel === "SHORT"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-emerald-50 text-emerald-600"
+                      }`}
+                    >
+                      {directionLabel === "SHORT" ? (
+                        <TrendingDown className="h-3.5 w-3.5" />
+                      ) : (
+                        <TrendingUp className="h-3.5 w-3.5" />
+                      )}
+                      {directionLabel}
+                    </div>
                   </div>
-                ) : null}
 
-                {activeTab === "notes" ? (
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <Pill className={getStatusTone(journal.status)}>
+                    {journal.status || "No Status"}
+                  </Pill>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 text-sm font-bold text-slate-950">
+                  Trade Levels
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+                    <div className="text-xs font-bold uppercase text-blue-600">
+                      Entry Price
+                    </div>
+                    <div className="mt-2 text-2xl font-bold text-slate-950">
+                      {journal.entry_price || "—"}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
+                    <div className="text-xs font-bold uppercase text-orange-600">
+                      Stop Loss
+                    </div>
+                    <div className="mt-2 text-2xl font-bold text-slate-950">
+                      {journal.stop_loss || "—"}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <div className="text-xs font-bold uppercase text-emerald-600">
+                    Take Profit
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {Array.isArray(journal.take_profit) &&
+                    journal.take_profit.length ? (
+                      journal.take_profit.map((tp, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2 text-sm"
+                        >
+                          <span className="font-semibold text-slate-600">
+                            TP {i + 1}
+                          </span>
+                          <span className="font-bold text-slate-950">
+                            {tp}{" "}
+                            <span className="text-xs font-medium text-slate-500">
+                              ({journal.take_profit_qty?.[i] || "—"} lots)
+                            </span>
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-slate-500">—</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoBlock label="Quantity" value={journal.quantity} />
+                <InfoBlock
+                  label="Risk"
+                  value={
+                    journal.risk_per_trade
+                      ? `${journal.risk_per_trade} ${journal.risk_mode || ""}`
+                      : "—"
+                  }
+                />
+                <InfoBlock label="Symbol" value={symbol} />
+                <InfoBlock
+                  label="Account"
+                  value={journal.trading_accounts?.account_name || "—"}
+                />
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-4 text-sm font-bold text-slate-950">
+                  Reasoning
+                </div>
+
+                <div className="space-y-4">
+                  <ReasonBox
+                    label="Entry Reason"
+                    value={journal.entry_reason}
+                  />
+                  <ReasonBox label="Exit Reason" value={journal.exit_reason} />
+                </div>
+              </div>
+
+              {(journal.owner_note || journal.admin_note) && (
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4 text-sm font-bold text-slate-950">
+                    Notes
+                  </div>
+
+                  <div className="space-y-3">
                     <NoteBlock title="Trader Note" value={journal.owner_note} />
                     <NoteBlock title="Admin Note" value={journal.admin_note} />
                   </div>
-                ) : null}
+                </div>
+              )}
 
-                {activeTab === "comments" && showComments ? (
+              {journal.is_shared ? (
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <CommentsSection
                     journalId={journal.id}
                     onParentCountChange={setCommentCount}
                   />
-                ) : null}
-
-                {showComments && activeTab !== "comments" ? (
-                  <CommentsSection
-                    journalId={journal.id}
-                    onParentCountChange={setCommentCount}
-                    hidden
-                  />
-                ) : null}
-              </div>
-            </Section>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
 
-      {carousel ? (
+      {carousel.images.length ? (
         <ImageCarousel
           images={carousel.images}
           index={carousel.index}
           onClose={closeCarousel}
-          onPrev={prevImage}
-          onNext={nextImage}
+          onPrev={carouselPrev}
+          onNext={carouselNext}
         />
       ) : null}
     </>
