@@ -36,14 +36,46 @@ export default async function NewJournalPage({ searchParams }) {
   const strategyId = params?.strategyId;
   const sharedJournalId = params?.sharedJournalId;
 
-  if (!strategyId && !sharedJournalId) redirect("/app/strategies");
-
   const supabase = await createClient();
 
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user;
 
   if (!user) redirect("/login");
+
+  let liveStrategies = [];
+
+  if (!strategyId && !sharedJournalId) {
+    const { data } = await supabase
+      .from("strategies")
+      .select(
+        `
+        id,
+        strategy_name,
+        strategy_type,
+        preparation_status,
+        strategy_status,
+        trading_style,
+        setup_type,
+        bias_confluence,
+        htf,
+        intermediate_tf,
+        entry_tf,
+        checklist,
+        entry_rules,
+        exit_rules,
+        sl_management_rules,
+        risk_per_trade,
+        avg_planned_rr,
+        planned_r_year
+      `,
+      )
+      .eq("user_id", user.id)
+      .eq("strategy_status", "LIVE")
+      .order("updated_at", { ascending: false });
+
+    liveStrategies = data || [];
+  }
 
   let strategy = null;
   let prefillJournal = null;
@@ -164,10 +196,10 @@ export default async function NewJournalPage({ searchParams }) {
     strategy = fetchedStrategy;
   }
 
-  if (!strategy) {
+  if (!strategy && (strategyId || sharedJournalId)) {
     return (
       <div className="p-6">
-        <h1 className="text-xl font-semibold">Create Journal</h1>
+        <h1 className="text-xl font-semibold">Create Opportunity</h1>
         <p className="mt-3 text-sm text-destructive">
           Strategy data is missing.
         </p>
@@ -197,6 +229,52 @@ export default async function NewJournalPage({ searchParams }) {
 
     if (!user) {
       return { ok: false, message: "Unauthorized." };
+    }
+    const selected_strategy_id = String(
+      getFormValue(formData, "strategy_id") || strategy?.id || "",
+    ).trim();
+
+    if (!selected_strategy_id) {
+      return { ok: false, message: "Select a LIVE playbook first." };
+    }
+
+    let selectedStrategy = strategy;
+
+    if (!selectedStrategy || selectedStrategy.id !== selected_strategy_id) {
+      const { data: fetchedStrategy, error: strategyError } = await supabase
+        .from("strategies")
+        .select(
+          `
+      id,
+      strategy_name,
+      strategy_type,
+      preparation_status,
+      strategy_status,
+      trading_style,
+      setup_type,
+      bias_confluence,
+      htf,
+      intermediate_tf,
+      entry_tf,
+      checklist,
+      entry_rules,
+      exit_rules,
+      sl_management_rules,
+      risk_per_trade,
+      avg_planned_rr,
+      planned_r_year
+    `,
+        )
+        .eq("id", selected_strategy_id)
+        .eq("user_id", user.id)
+        .eq("strategy_status", "LIVE")
+        .single();
+
+      if (strategyError || !fetchedStrategy) {
+        return { ok: false, message: "Selected LIVE playbook not found." };
+      }
+
+      selectedStrategy = fetchedStrategy;
     }
 
     const PURPOSES = new Set([
@@ -316,7 +394,7 @@ export default async function NewJournalPage({ searchParams }) {
     let risk_per_trade = risk_per_trade_raw ? Number(risk_per_trade_raw) : NaN;
 
     if (purpose === "FOR OBSERVATION") {
-      risk_per_trade = Number(strategy.risk_per_trade || 0);
+      risk_per_trade = Number(selectedStrategy.risk_per_trade || 0);
     }
 
     const tpRaw = String(getFormValue(formData, "take_profit_json") || "[]");
@@ -439,6 +517,24 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
+    let existingSetupImages = [];
+    let existingReferenceImages = [];
+
+    try {
+      existingSetupImages = JSON.parse(
+        String(getFormValue(formData, "existing_setup_images") || "[]"),
+      );
+      existingReferenceImages = JSON.parse(
+        String(getFormValue(formData, "existing_reference_images") || "[]"),
+      );
+
+      if (!Array.isArray(existingSetupImages)) existingSetupImages = [];
+      if (!Array.isArray(existingReferenceImages)) existingReferenceImages = [];
+    } catch {
+      existingSetupImages = [];
+      existingReferenceImages = [];
+    }
+
     if (existingSetupImages.length > 2) {
       return {
         ok: false,
@@ -481,28 +577,28 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
-    let finalStrategyId = strategy.id;
+    let finalStrategyId = selectedStrategy.id;
     let copied_from_journal_id = null;
 
     const baseSnapshot = {
-      id: strategy.id,
-      strategy_name: strategy.strategy_name,
-      strategy_type: strategy.strategy_type,
-      preparation_status: strategy.preparation_status,
-      strategy_status: strategy.strategy_status,
-      trading_style: strategy.trading_style,
-      setup_type: strategy.setup_type,
-      bias_confluence: strategy.bias_confluence || [],
-      htf: strategy.htf || [],
-      intermediate_tf: strategy.intermediate_tf || [],
-      entry_tf: strategy.entry_tf || [],
-      checklist: strategy.checklist,
-      entry_rules: strategy.entry_rules,
-      exit_rules: strategy.exit_rules,
-      sl_management_rules: strategy.sl_management_rules,
-      risk_per_trade: strategy.risk_per_trade,
-      avg_planned_rr: strategy.avg_planned_rr,
-      planned_r_year: strategy.planned_r_year,
+      id: selectedStrategy.id,
+      strategy_name: selectedStrategy.strategy_name,
+      strategy_type: selectedStrategy.strategy_type,
+      preparation_status: selectedStrategy.preparation_status,
+      strategy_status: selectedStrategy.strategy_status,
+      trading_style: selectedStrategy.trading_style,
+      setup_type: selectedStrategy.setup_type,
+      bias_confluence: selectedStrategy.bias_confluence || [],
+      htf: selectedStrategy.htf || [],
+      intermediate_tf: selectedStrategy.intermediate_tf || [],
+      entry_tf: selectedStrategy.entry_tf || [],
+      checklist: selectedStrategy.checklist,
+      entry_rules: selectedStrategy.entry_rules,
+      exit_rules: selectedStrategy.exit_rules,
+      sl_management_rules: selectedStrategy.sl_management_rules,
+      risk_per_trade: selectedStrategy.risk_per_trade,
+      avg_planned_rr: selectedStrategy.avg_planned_rr,
+      planned_r_year: selectedStrategy.planned_r_year,
       snapshotted_at: new Date().toISOString(),
     };
 
@@ -514,27 +610,27 @@ export default async function NewJournalPage({ searchParams }) {
           .from("strategies")
           .insert({
             user_id: user.id,
-            strategy_name: strategy.strategy_name
-              ? `${strategy.strategy_name} (Copied)`
+            strategy_name: selectedStrategy.strategy_name
+              ? `${selectedStrategy.strategy_name} (Copied)`
               : "Copied Strategy",
-            strategy_type: strategy.strategy_type,
-            trading_style: strategy.trading_style,
-            setup_type: strategy.setup_type,
-            bias_confluence: strategy.bias_confluence || [],
-            htf: strategy.htf || [],
-            intermediate_tf: strategy.intermediate_tf || [],
-            entry_tf: strategy.entry_tf || [],
-            checklist: strategy.checklist,
-            entry_rules: strategy.entry_rules,
-            exit_rules: strategy.exit_rules,
-            sl_management_rules: strategy.sl_management_rules,
-            risk_per_trade: strategy.risk_per_trade,
-            avg_planned_rr: strategy.avg_planned_rr,
-            planned_r_year: strategy.planned_r_year,
-            preparation_status: strategy.preparation_status || "Active",
+            strategy_type: selectedStrategy.strategy_type,
+            trading_style: selectedStrategy.trading_style,
+            setup_type: selectedStrategy.setup_type,
+            bias_confluence: selectedStrategy.bias_confluence || [],
+            htf: selectedStrategy.htf || [],
+            intermediate_tf: selectedStrategy.intermediate_tf || [],
+            entry_tf: selectedStrategy.entry_tf || [],
+            checklist: selectedStrategy.checklist,
+            entry_rules: selectedStrategy.entry_rules,
+            exit_rules: selectedStrategy.exit_rules,
+            sl_management_rules: selectedStrategy.sl_management_rules,
+            risk_per_trade: selectedStrategy.risk_per_trade,
+            avg_planned_rr: selectedStrategy.avg_planned_rr,
+            planned_r_year: selectedStrategy.planned_r_year,
+            preparation_status: selectedStrategy.preparation_status || "Active",
             strategy_status:
-              strategy.preparation_status === "Active"
-                ? strategy.strategy_status || "LIVE"
+              selectedStrategy.preparation_status === "Active"
+                ? selectedStrategy.strategy_status || "LIVE"
                 : null,
             copied_from_strategy_id: prefillJournal.strategy_id || null,
             source_shared_journal_id: prefillJournal.id,
@@ -553,26 +649,9 @@ export default async function NewJournalPage({ searchParams }) {
         ...baseSnapshot,
         copied_at: new Date().toISOString(),
         copied_from_journal_id: prefillJournal.id,
-        copied_from_strategy_id: prefillJournal.strategy_id || strategy.id,
+        copied_from_strategy_id:
+          prefillJournal.strategy_id || selectedStrategy.id,
       };
-    }
-
-    let existingSetupImages = [];
-    let existingReferenceImages = [];
-
-    try {
-      existingSetupImages = JSON.parse(
-        String(getFormValue(formData, "existing_setup_images") || "[]"),
-      );
-      existingReferenceImages = JSON.parse(
-        String(getFormValue(formData, "existing_reference_images") || "[]"),
-      );
-
-      if (!Array.isArray(existingSetupImages)) existingSetupImages = [];
-      if (!Array.isArray(existingReferenceImages)) existingReferenceImages = [];
-    } catch {
-      existingSetupImages = [];
-      existingReferenceImages = [];
     }
 
     const { data: insertedJournal, error } = await supabase
@@ -634,6 +713,7 @@ export default async function NewJournalPage({ searchParams }) {
     <NewJournalForm
       action={createJournal}
       strategy={strategy}
+      strategies={liveStrategies}
       accounts={accounts || []}
       symbols={symbols || []}
       prefillJournal={prefillJournal}

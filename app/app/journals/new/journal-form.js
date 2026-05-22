@@ -32,6 +32,7 @@ import {
   Scale,
   SlidersHorizontal,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 
 function normPurpose(v) {
@@ -189,13 +190,10 @@ function FieldShell({ label, required, hint, children }) {
   return (
     <div className="space-y-2">
       <div className="flex items-end justify-between gap-3">
-        <Label className="text-sm font-medium">
-          {label}{" "}
-          {required ? <span className="text-destructive">*</span> : null}
+        <Label className="text-sm font-semibold text-slate-950">
+          {label} {required ? <span className="text-red-500">*</span> : null}
         </Label>
-        {hint ? (
-          <span className="text-xs text-muted-foreground">{hint}</span>
-        ) : null}
+        {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
       </div>
       {children}
     </div>
@@ -206,7 +204,7 @@ function NativeSelect({ children, ...props }) {
   return (
     <select
       {...props}
-      className="h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </select>
@@ -216,16 +214,18 @@ function NativeSelect({ children, ...props }) {
 function StepHeader({ icon: Icon, eyebrow, title, description }) {
   return (
     <div className="flex gap-3">
-      <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border bg-background shadow-sm">
-        <Icon className="h-5 w-5 text-muted-foreground" />
+      <div className="mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+        <Icon className="h-5 w-5" />
       </div>
 
       <div>
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="text-xs font-bold uppercase tracking-wide text-sky-600">
           {eyebrow}
         </div>
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+          {title}
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
     </div>
   );
@@ -233,45 +233,61 @@ function StepHeader({ icon: Icon, eyebrow, title, description }) {
 
 function Pill({ children }) {
   return (
-    <span className="inline-flex items-center rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground">
+    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
       {children}
     </span>
   );
 }
 
 function StrategyBlueprint({ s }) {
+  if (!s) return null;
+
+  const strategyType = String(s.strategy_type || "").toLowerCase();
+
+  const strategyTypeClasses =
+    strategyType === "conservative"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : strategyType === "aggressive"
+        ? "border-orange-200 bg-orange-50 text-orange-700"
+        : "border-slate-200 bg-slate-100 text-slate-700";
+
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+    <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-sm">
       <StepHeader
         icon={BadgeCheck}
-        eyebrow="Strategy"
+        eyebrow="Selected Playbook"
         title={s.strategy_name || "Strategy Blueprint"}
-        description="This blueprint will be snapshotted into the journal."
+        description="This playbook will be snapshotted into the opportunity."
       />
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <Pill>Prep: {s.preparation_status || "—"}</Pill>
-        <Pill>Status: {s.strategy_status || "—"}</Pill>
-        <Pill>Style: {s.trading_style || "—"}</Pill>
-        <Pill>Setup: {s.setup_type || "—"}</Pill>
+        <span
+          className={`rounded-full border px-3 py-1 text-xs font-semibold ${strategyTypeClasses}`}
+        >
+          {s.strategy_type || "—"}
+        </span>
+
+        <Pill>{s.trading_style || "—"}</Pill>
+
+        <Pill>{s.setup_type || "—"}</Pill>
       </div>
 
       {s.bias_confluence?.length ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-3">
           {s.bias_confluence.map((b) => (
-            <Badge key={b} variant="secondary" className="rounded-full">
-              {b}
-            </Badge>
+            <div
+              key={b}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm"
+            >
+              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                ✓
+              </div>
+
+              <span>{b}</span>
+            </div>
           ))}
         </div>
       ) : null}
-
-      <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <PreviewBox title="Checklist">{s.checklist}</PreviewBox>
-        <PreviewBox title="Entry Rules">{s.entry_rules}</PreviewBox>
-        <PreviewBox title="Exit Rules">{s.exit_rules}</PreviewBox>
-        <PreviewBox title="SL Management">{s.sl_management_rules}</PreviewBox>
-      </div>
     </section>
   );
 }
@@ -308,6 +324,25 @@ function sanitize2dp(raw) {
   if (firstDot !== -1) {
     const [a, b] = out.split(".");
     out = a + "." + (b || "").slice(0, 2);
+  }
+
+  return out;
+}
+
+function sanitize6dp(raw) {
+  const s = String(raw ?? "");
+  let out = s.replace(/[^\d.]/g, "");
+
+  const firstDot = out.indexOf(".");
+
+  if (firstDot !== -1) {
+    out =
+      out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
+  }
+
+  if (firstDot !== -1) {
+    const [a, b] = out.split(".");
+    out = a + "." + (b || "").slice(0, 6);
   }
 
   return out;
@@ -390,7 +425,7 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
     if (disabled) return;
 
     const next = [...items];
-    next[i] = { ...next[i], price: sanitize2dp(raw) };
+    next[i] = { ...next[i], price: sanitize6dp(raw) };
     setItems(next);
   }
 
@@ -504,35 +539,27 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
             return (
               <div
                 key={idx}
-                className="rounded-3xl border bg-background/70 p-4 shadow-sm"
+                className="rounded-2xl border bg-background/40 p-4"
               >
-                <div className="grid gap-4 md:grid-cols-[44px_100px_1fr_1fr_170px_90px] md:items-center">
-                  <div className="hidden text-muted-foreground md:block">
-                    <GripVertical className="h-5 w-5" />
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                <div className="grid gap-4 md:grid-cols-[90px_1fr_1fr_120px_70px] md:items-end">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                       {idx + 1}
                     </div>
-                    <div className="font-semibold">TP {idx + 1}</div>
+
+                    <div className="font-semibold text-sm">TP {idx + 1}</div>
                   </div>
 
                   <FieldShell label="Price" required>
-                    <div className="relative">
-                      <div className="pointer-events-none absolute left-0 top-0 flex h-11 w-12 items-center justify-center rounded-l-xl border-r bg-primary/10 text-primary">
-                        <BarChart3 className="h-4 w-4" />
-                      </div>
-                      <Input
-                        value={it.price}
-                        onChange={(e) => updatePrice(idx, e.target.value)}
-                        inputMode="decimal"
-                        placeholder="e.g. 250.50"
-                        disabled={disabled}
-                        required
-                        className="h-11 rounded-xl pl-14"
-                      />
-                    </div>
+                    <Input
+                      value={it.price}
+                      onChange={(e) => updatePrice(idx, e.target.value)}
+                      inputMode="decimal"
+                      placeholder="e.g. 1.123456"
+                      disabled={disabled}
+                      required
+                      className="h-11 rounded-xl"
+                    />
                   </FieldShell>
 
                   <FieldShell label="Qty / Lots" required>
@@ -540,56 +567,41 @@ function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
                       value={it.qty}
                       onChange={(e) => updateQty(idx, e.target.value)}
                       inputMode="decimal"
-                      placeholder={totalOk ? "e.g. 0.50" : "Enter lots first"}
+                      placeholder="0.50"
                       disabled={disabled}
                       required
                       className="h-11 rounded-xl"
                     />
                   </FieldShell>
 
-                  <div className="rounded-2xl border bg-card p-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="h-12 w-12 rounded-full"
-                        style={{
-                          background: `conic-gradient(hsl(var(--primary)) ${pct * 3.6}deg, hsl(var(--muted)) 0deg)`,
-                        }}
-                      >
-                        <div className="m-1.5 h-9 w-9 rounded-full bg-background" />
-                      </div>
+                  <div className="rounded-xl border bg-muted/30 px-3 py-2 text-center">
+                    <div className="text-base font-semibold">
+                      {round2(pct)}%
+                    </div>
 
-                      <div>
-                        <div className="text-lg font-semibold">
-                          {round2(pct)}%
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          of position
-                        </div>
-                      </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      Position
                     </div>
                   </div>
 
                   <Button
                     type="button"
                     variant="ghost"
+                    size="icon"
                     onClick={() => removeRow(idx)}
                     disabled={disabled}
-                    className="h-11 rounded-xl text-destructive hover:text-destructive"
+                    className="h-11 w-11 rounded-xl text-muted-foreground hover:text-destructive"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
 
                 <div className="mt-4">
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full bg-primary transition-all"
                       style={{ width: `${pct}%` }}
                     />
-                  </div>
-                  <div className="mt-2 text-center text-xs text-muted-foreground">
-                    {round2(pct)}% of position
                   </div>
                 </div>
               </div>
@@ -968,15 +980,32 @@ function JournalDetailsCommon({
         value={JSON.stringify(selectedEntryTf)}
       />
 
-      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+      <section
+        id="setup"
+        className="scroll-mt-24 rounded-3xl border bg-card p-5 shadow-sm md:p-6"
+      >
         <StepHeader
           icon={Target}
           eyebrow="Step 1"
-          title="Journal Setup"
+          title="Opportunity Setup"
           description="Choose purpose, account, symbol, status and timing."
         />
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <FieldShell label="Purpose" required>
+            <NativeSelect
+              name="purpose"
+              value={normPurpose(purpose)}
+              onChange={(e) => onPurposeChange(e.target.value)}
+              required
+            >
+              {PURPOSES.map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </NativeSelect>
+          </FieldShell>
           <FieldShell
             label="Trading Account"
             required={required.tradingAccount}
@@ -1004,22 +1033,6 @@ function JournalDetailsCommon({
               </p>
             ) : null}
           </FieldShell>
-
-          <FieldShell label="Purpose" required>
-            <NativeSelect
-              name="purpose"
-              value={normPurpose(purpose)}
-              onChange={(e) => onPurposeChange(e.target.value)}
-              required
-            >
-              {PURPOSES.map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </NativeSelect>
-          </FieldShell>
-
           <div className="md:col-span-2">
             <FieldShell label="Symbol" required={required.symbol}>
               <Input
@@ -1094,7 +1107,10 @@ function JournalDetailsCommon({
         </div>
       </section>
 
-      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+      <section
+        id="levels"
+        className="scroll-mt-24 rounded-3xl border bg-card p-5 shadow-sm md:p-6"
+      >
         <StepHeader
           icon={ChevronRight}
           eyebrow="Step 2"
@@ -1126,8 +1142,8 @@ function JournalDetailsCommon({
               onChange={(e) => setDirection(e.target.value)}
               required={!!required.direction}
             >
-              <option value="BUY">Buy</option>
-              <option value="SELL">Sell</option>
+              <option value="BUY">Long</option>
+              <option value="SELL">Short</option>
             </NativeSelect>
           </FieldShell>
 
@@ -1149,7 +1165,7 @@ function JournalDetailsCommon({
               inputMode="decimal"
               value={entryPrice}
               required={!!required.entry_price}
-              onChange={(e) => setEntryPrice(sanitize2dp(e.target.value))}
+              onChange={(e) => setEntryPrice(sanitize6dp(e.target.value))}
               className="h-11 rounded-xl"
             />
           </FieldShell>
@@ -1160,7 +1176,7 @@ function JournalDetailsCommon({
               inputMode="decimal"
               value={stopLoss}
               required={!!required.stop_loss}
-              onChange={(e) => setStopLoss(sanitize2dp(e.target.value))}
+              onChange={(e) => setStopLoss(sanitize6dp(e.target.value))}
               className="h-11 rounded-xl"
             />
 
@@ -1186,7 +1202,10 @@ function JournalDetailsCommon({
         ) : null}
       </section>
 
-      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+      <section
+        id="reasoning"
+        className="scroll-mt-24 rounded-3xl border bg-card p-5 shadow-sm md:p-6"
+      >
         <StepHeader
           icon={FileText}
           eyebrow="Step 3"
@@ -1234,7 +1253,10 @@ function JournalDetailsCommon({
         </div>
       </section>
 
-      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+      <section
+        id="images"
+        className="scroll-mt-24 rounded-3xl border bg-card p-5 shadow-sm md:p-6"
+      >
         <StepHeader
           icon={Camera}
           eyebrow="Step 4"
@@ -1287,7 +1309,10 @@ function JournalDetailsCommon({
         </div>
       </section>
 
-      <section className="rounded-3xl border bg-card p-5 shadow-sm md:p-6">
+      <section
+        id="risk"
+        className="scroll-mt-24 rounded-3xl border bg-card p-5 shadow-sm md:p-6"
+      >
         <StepHeader
           icon={ShieldCheck}
           eyebrow="Step 5"
@@ -1350,15 +1375,74 @@ function JournalDetailsCommon({
   );
 }
 
+function OpportunityStepper({ activeSection }) {
+  const steps = [
+    { id: "setup", label: "Setup", step: 1 },
+    { id: "levels", label: "Trade Levels", step: 2 },
+    { id: "reasoning", label: "Reasoning", step: 3 },
+    { id: "images", label: "Images", step: 4 },
+    { id: "risk", label: "Risk", step: 5 },
+  ];
+
+  function scrollToSection(id) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
+  return (
+    <aside className="sticky top-24 hidden h-fit rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:block">
+      <div className="space-y-7">
+        {steps.map((item, index) => {
+          const active = activeSection === item.id;
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => scrollToSection(item.id)}
+              className="relative flex w-full items-center gap-3 text-left"
+            >
+              {index !== steps.length - 1 ? (
+                <span className="absolute left-4 top-9 h-7 border-l border-dashed border-slate-300" />
+              ) : null}
+
+              <span
+                className={`z-10 flex h-8 w-8 items-center justify-center rounded-full border text-sm font-semibold ${
+                  active
+                    ? "border-sky-500 bg-sky-500 text-white"
+                    : "border-slate-300 bg-white text-slate-500"
+                }`}
+              >
+                {item.step}
+              </span>
+
+              <span
+                className={`text-sm font-semibold ${
+                  active ? "text-sky-600" : "text-slate-700"
+                }`}
+              >
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
 export default function NewJournalForm({
   action,
   strategy,
+  strategies = [],
   accounts,
   symbols,
   prefillJournal = null,
 }) {
   const router = useRouter();
-
+  const [selectedStrategy, setSelectedStrategy] = useState(strategy || null);
   const [setupImages, setSetupImages] = useState([]);
   const [referenceImages, setReferenceImages] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -1384,6 +1468,33 @@ export default function NewJournalForm({
     return [];
   });
 
+  const [activeSection, setActiveSection] = useState("playbook");
+
+  useEffect(() => {
+    const sections = ["setup", "levels", "reasoning", "images", "risk"];
+
+    function handleScroll() {
+      const scrollPosition = window.scrollY + 180;
+
+      for (const id of sections) {
+        const element = document.getElementById(id);
+        if (!element) continue;
+
+        if (
+          scrollPosition >= element.offsetTop &&
+          scrollPosition < element.offsetTop + element.offsetHeight
+        ) {
+          setActiveSection(id);
+          break;
+        }
+      }
+    }
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
   useEffect(() => {
     async function loadSignedUrls() {
       if (!prefillJournal) return;
@@ -1618,160 +1729,316 @@ export default function NewJournalForm({
   const setupImagesOk = setupImageCount >= 1 && setupImageCount <= 2;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="overflow-hidden rounded-3xl border bg-gradient-to-br from-card via-card to-muted/40 shadow-sm">
-        <div className="p-6 md:p-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
-                <Sparkles className="h-3.5 w-3.5" />
-                {prefillJournal ? "Incorporate Journal" : "Journal Builder"}
-              </div>
+    <div className="space-y-6 rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6">
+        <img
+          src="/playbook-bg.png"
+          alt=""
+          className="absolute right-0 top-0 h-full w-[65%] object-cover opacity-80"
+        />
 
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight">
-                {prefillJournal ? "Incorporate Journal" : "Create Journal"}
-              </h1>
-
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Record your setup, trade levels, reasoning, images, and risk in
-                a structured journal entry.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border bg-background p-4 text-sm shadow-sm">
-              <div className="text-xs text-muted-foreground">Mode</div>
-              <div className="mt-1 font-medium">
-                {prefillJournal ? "Review copied journal" : "New journal"}
-              </div>
-            </div>
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white/80 px-4 py-2 text-sm font-semibold text-sky-600">
+            <Sparkles className="h-4 w-4" />
+            OPPORTUNITY BUILDER
           </div>
+
+          <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">
+            Create <span className="text-sky-500">Opportunity</span>
+          </h1>
+
+          <p className="mt-4 max-w-2xl text-sm text-slate-500">
+            Select a live playbook and create a structured trading opportunity.
+          </p>
         </div>
       </div>
 
-      {!prefillJournal ? <StrategyBlueprint s={strategy} /> : null}
+      {!selectedStrategy && !prefillJournal ? (
+        <div className="grid gap-5 md:grid-cols-2">
+          {strategies.map((s) => {
+            const isConservative = s.strategy_type === "Conservative";
 
-      <form action={formAction} className="space-y-6">
-        <JournalDetailsCommon
-          cfg={cfg}
-          purpose={purposeKey}
-          setPurpose={setPurpose}
-          status={status}
-          setStatus={setStatus}
-          accounts={accounts}
-          symbols={symbols}
-          tpItems={tpItems}
-          setTpItems={setTpItems}
-          direction={direction}
-          setDirection={setDirection}
-          quantity={quantity}
-          setQuantity={setQuantity}
-          riskMode={riskMode}
-          setRiskMode={setRiskMode}
-          strategy={strategy}
-          entryPrice={entryPrice}
-          setEntryPrice={setEntryPrice}
-          stopLoss={stopLoss}
-          setStopLoss={setStopLoss}
-          setupImages={setupImages}
-          setSetupImages={setSetupImages}
-          referenceImages={referenceImages}
-          setReferenceImages={setReferenceImages}
-          setupImageError={setupImageError}
-          setSetupImageError={setSetupImageError}
-          referenceImageError={referenceImageError}
-          setReferenceImageError={setReferenceImageError}
-          prefillJournal={prefillJournal}
-          existingSetupImages={existingSetupImages}
-          setExistingSetupImages={setExistingSetupImages}
-          existingReferenceImages={existingReferenceImages}
-          setExistingReferenceImages={setExistingReferenceImages}
-          journalStartAt={journalStartAt}
-          setJournalStartAt={setJournalStartAt}
-          journalEndAt={journalEndAt}
-          setJournalEndAt={setJournalEndAt}
-          selectedHtf={selectedHtf}
-          setSelectedHtf={setSelectedHtf}
-          selectedEntryTf={selectedEntryTf}
-          setSelectedEntryTf={setSelectedEntryTf}
-        />
+            return (
+              <div
+                key={s.id}
+                className="
+    group relative overflow-hidden rounded-3xl border border-slate-200
+    bg-gradient-to-br from-white via-slate-50 to-sky-50/40
+    p-6 shadow-sm transition duration-300
+    hover:-translate-y-1 hover:border-sky-200 hover:shadow-xl
+  pointer"
+              >
+                <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-100/40 blur-3xl transition group-hover:bg-sky-200/50" />
 
-        {state?.message ? (
-          <div
-            className={`rounded-2xl border p-4 text-sm ${
-              state.ok
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-destructive/30 bg-destructive/10 text-destructive"
-            }`}
-          >
-            {state.message}
-          </div>
-        ) : null}
+                <div className="relative z-10">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <h3 className="text-2xl font-bold text-slate-950">
+                      {s.strategy_name}
+                    </h3>
 
-        {uploadError ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-            {uploadError}
-          </div>
-        ) : null}
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                      LIVE
+                    </div>
+                  </div>
 
-        <div className="sticky bottom-4 z-10 rounded-3xl border bg-background/85 p-3 shadow-lg backdrop-blur">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="hidden text-sm text-muted-foreground md:block">
-              Save this journal entry and review it from your dashboard.
-            </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {s.trading_style} • {s.setup_type}
+                  </p>
 
-            <Button
-              type="submit"
-              disabled={
-                pending ||
-                uploadingImages ||
-                tpItems.length === 0 ||
-                !sumOk ||
-                !slOk ||
-                selectedHtf.length === 0 ||
-                selectedEntryTf.length === 0 ||
-                !setupImagesOk ||
-                (cfg.required?.status && !status)
-              }
-              className="h-11 rounded-2xl px-5"
-            >
-              {pending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : uploadingImages ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading Images...
-                </>
-              ) : prefillJournal ? (
-                "Incorporate Journal"
-              ) : (
-                "Create Journal"
-              )}
-            </Button>
-          </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                        isConservative
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-orange-50 text-orange-700"
+                      }`}
+                    >
+                      {s.strategy_type}
+                    </span>
 
-          {!slOk ? (
-            <p className="mt-2 text-xs text-destructive">
-              Fix Stop Loss based on direction. BUY: SL &lt; Entry, SELL: SL
-              &gt; Entry.
-            </p>
-          ) : null}
+                    <Pill>
+                      Risk: {Number(s.risk_per_trade || 0).toFixed(3)}%
+                    </Pill>
+                  </div>
 
-          {cfg.required?.status && !status ? (
-            <p className="mt-2 text-xs text-destructive">
-              Please select a status.
-            </p>
-          ) : null}
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                        HTF
+                      </div>
 
-          {!setupImagesOk ? (
-            <p className="mt-2 text-xs text-destructive">
-              Please upload at least 1 setup image. Maximum allowed is 2.
-            </p>
-          ) : null}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(s.htf || []).map((tf) => (
+                          <span
+                            key={tf}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                          >
+                            {tf}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">
+                        ENTRY TF
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {(s.entry_tf || []).map((tf) => (
+                          <span
+                            key={tf}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                          >
+                            {tf}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-2xl border border-slate-200 bg-white/70 p-4">
+                    <div className="text-xs font-bold uppercase tracking-wide text-sky-600">
+                      Confluence
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(s.bias_confluence || []).map((b) => (
+                        <span
+                          key={b}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <FieldShell label="Checklist">
+                      <textarea
+                        readOnly
+                        rows={4}
+                        value={s.checklist || "—"}
+                        className="w-full resize-y rounded-xl border border-slate-200 bg-white/80 p-3 text-sm leading-6 text-slate-600 outline-none"
+                      />
+                    </FieldShell>
+
+                    <FieldShell label="Entry Criteria">
+                      <textarea
+                        readOnly
+                        rows={4}
+                        value={s.entry_rules || "—"}
+                        className="w-full resize-y rounded-xl border border-slate-200 bg-white/80 p-3 text-sm leading-6 text-slate-600 outline-none"
+                      />
+                    </FieldShell>
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStrategy(s);
+                        setSelectedHtf([]);
+                        setSelectedEntryTf([]);
+                      }}
+                      className="h-12 rounded-2xl bg-sky-600 px-5 text-white hover:bg-sky-700"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      New Opportunity
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </form>
+      ) : null}
+
+      {selectedStrategy || prefillJournal ? (
+        <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+          <OpportunityStepper activeSection={activeSection} />
+
+          <div className="space-y-6">
+            {!prefillJournal ? (
+              <StrategyBlueprint s={selectedStrategy} />
+            ) : null}
+
+            <form action={formAction} className="space-y-6">
+              <JournalDetailsCommon
+                cfg={cfg}
+                purpose={purposeKey}
+                setPurpose={setPurpose}
+                status={status}
+                setStatus={setStatus}
+                accounts={accounts}
+                symbols={symbols}
+                tpItems={tpItems}
+                setTpItems={setTpItems}
+                direction={direction}
+                setDirection={setDirection}
+                quantity={quantity}
+                setQuantity={setQuantity}
+                riskMode={riskMode}
+                setRiskMode={setRiskMode}
+                strategy={selectedStrategy || strategy}
+                entryPrice={entryPrice}
+                setEntryPrice={setEntryPrice}
+                stopLoss={stopLoss}
+                setStopLoss={setStopLoss}
+                setupImages={setupImages}
+                setSetupImages={setSetupImages}
+                referenceImages={referenceImages}
+                setReferenceImages={setReferenceImages}
+                setupImageError={setupImageError}
+                setSetupImageError={setSetupImageError}
+                referenceImageError={referenceImageError}
+                setReferenceImageError={setReferenceImageError}
+                prefillJournal={prefillJournal}
+                existingSetupImages={existingSetupImages}
+                setExistingSetupImages={setExistingSetupImages}
+                existingReferenceImages={existingReferenceImages}
+                setExistingReferenceImages={setExistingReferenceImages}
+                journalStartAt={journalStartAt}
+                setJournalStartAt={setJournalStartAt}
+                journalEndAt={journalEndAt}
+                setJournalEndAt={setJournalEndAt}
+                selectedHtf={selectedHtf}
+                setSelectedHtf={setSelectedHtf}
+                selectedEntryTf={selectedEntryTf}
+                setSelectedEntryTf={setSelectedEntryTf}
+              />
+              <input
+                type="hidden"
+                name="strategy_id"
+                value={selectedStrategy?.id || ""}
+              />
+              {state?.message ? (
+                <div
+                  className={`rounded-2xl border p-4 text-sm ${
+                    state.ok
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                      : "border-destructive/30 bg-destructive/10 text-destructive"
+                  }`}
+                >
+                  {state.message}
+                </div>
+              ) : null}
+
+              {uploadError ? (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                  {uploadError}
+                </div>
+              ) : null}
+
+              <div className="bottom-4 z-10 rounded-3xl border bg-background/85 p-4 shadow-lg backdrop-blur">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="max-w-xl">
+                    <p className="mt-1 text-sm">
+                      Save this trade plan for disciplined execution and
+                      post-trade review. You can edit details and add images
+                      after saving.
+                    </p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={
+                      pending ||
+                      uploadingImages ||
+                      tpItems.length === 0 ||
+                      !sumOk ||
+                      !slOk ||
+                      selectedHtf.length === 0 ||
+                      selectedEntryTf.length === 0 ||
+                      !setupImagesOk ||
+                      (cfg.required?.status && !status)
+                    }
+                    className="h-11 rounded-2xl px-5 md:ml-auto"
+                  >
+                    {pending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : uploadingImages ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Uploading Images...
+                      </>
+                    ) : prefillJournal ? (
+                      "Incorporate Opportunity"
+                    ) : (
+                      "Create Opportunity"
+                    )}
+                  </Button>
+                </div>
+
+                {!slOk ? (
+                  <p className="mt-3 text-xs text-destructive">
+                    Fix Stop Loss based on direction. BUY: SL &lt; Entry, SELL:
+                    SL &gt; Entry.
+                  </p>
+                ) : null}
+
+                {cfg.required?.status && !status ? (
+                  <p className="mt-3 text-xs text-destructive">
+                    Please select a status.
+                  </p>
+                ) : null}
+
+                {!setupImagesOk ? (
+                  <p className="mt-3 text-xs text-destructive">
+                    Please upload at least 1 setup image. Maximum allowed is 2.
+                  </p>
+                ) : null}
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
