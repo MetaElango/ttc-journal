@@ -1,5 +1,22 @@
+// app/app/strategies/page.js
+
 import { createClient } from "@/lib/supabase/server";
 import StrategiesClient from "./strategies-client";
+
+async function getSignedImageUrls(supabase, paths = []) {
+  if (!Array.isArray(paths) || paths.length === 0) return [];
+
+  const { data, error } = await supabase.storage
+    .from("strategy-images") // change bucket name if your strategy images use another bucket
+    .createSignedUrls(paths, 60 * 60);
+
+  if (error) {
+    console.log("STRATEGY IMAGE SIGNED URL ERROR:", error.message);
+    return [];
+  }
+
+  return data?.map((x) => x.signedUrl).filter(Boolean) || [];
+}
 
 export default async function StrategiesPage() {
   const supabase = await createClient();
@@ -25,17 +42,33 @@ export default async function StrategiesPage() {
       id,
       user_id,
       strategy_name,
+      strategy_type,
       preparation_status,
       strategy_status,
       trading_style,
       setup_type,
       bias_confluence,
+      htf,
+      intermediate_tf,
+      entry_tf,
       checklist,
       entry_rules,
       exit_rules,
+      sl_management_rules,
+      risk_per_trade,
+      avg_planned_rr,
+      planned_r_year,
       created_at,
+      updated_at,
       copied_from_strategy_id,
-      source_shared_journal_id
+      source_shared_journal_id,
+      strategy_type,
+      sl_management_rules,
+      risk_per_trade,
+      avg_planned_rr,
+      planned_r_year,
+      strategy_images,
+      updated_at
       `,
     )
     .eq("user_id", user.id)
@@ -51,6 +84,17 @@ export default async function StrategiesPage() {
       </div>
     );
   }
+  const strategiesWithImages = await Promise.all(
+    (strategies || []).map(async (strategy) => ({
+      ...strategy,
+      strategyImageUrls: await getSignedImageUrls(
+        supabase,
+        strategy.strategy_images || [],
+      ),
+    })),
+  );
+
+  return <StrategiesClient strategies={strategiesWithImages} />;
 
   return <StrategiesClient strategies={strategies || []} />;
 }

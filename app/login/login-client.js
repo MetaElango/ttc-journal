@@ -26,7 +26,7 @@ export default function LoginClient() {
     e.preventDefault();
     setMsg("");
 
-    if (!acceptedTerms) {
+    if (isSignup && !acceptedTerms) {
       setMsgType("error");
       setMsg("Please accept the Terms and Privacy Policy.");
       return;
@@ -63,7 +63,9 @@ export default function LoginClient() {
   }
 
   async function handleForgotPassword() {
-    if (!email) {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
       setMsgType("error");
       setMsg("Enter your email first, then click Forgot password.");
       return;
@@ -72,7 +74,7 @@ export default function LoginClient() {
     setLoading(true);
     setMsg("");
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
 
@@ -85,7 +87,7 @@ export default function LoginClient() {
     }
 
     setMsgType("success");
-    setMsg("Password reset link sent to your email.");
+    setMsg("Password reset link sent. Please check your email.");
   }
 
   return (
@@ -103,24 +105,12 @@ export default function LoginClient() {
           <img
             src="/logo.png"
             alt="EXCELLION TTC"
-            className="h-56 w-auto object-contain md:h-56"
+            className="h-24 w-auto object-contain md:h-28"
           />
         </header>
 
         <div className="grid flex-1 items-center gap-10 lg:grid-cols-2">
-          <section className="relative hidden lg:flex">
-            <div className="absolute bottom-10 left-0">
-              <div className="flex flex-wrap gap-5 text-[34px] font-semibold tracking-[0.08em]">
-                <span className="text-cyan-300">Process.</span>
-                <span className="text-blue-400">Precision.</span>
-                <span className="text-orange-400">Wizardry.</span>
-              </div>
-
-              <p className="mt-5 text-[32px] font-light text-white/90">
-                Discipline today, freedom tomorrow.
-              </p>
-            </div>
-          </section>
+          <section className="hidden lg:block" />
           <section className="flex items-center justify-center lg:justify-end">
             {" "}
             <div className="w-full max-w-xl rounded-3xl border border-cyan-400/45 bg-black/45 p-6 shadow-[0_0_65px_rgba(0,140,255,0.24)] backdrop-blur-xl md:p-10">
@@ -315,6 +305,17 @@ export default function LoginClient() {
             </div>
           </section>
         </div>
+      </div>
+      <div className="absolute bottom-30 left-14 z-20 hidden lg:block">
+        <div className="flex flex-wrap gap-5 text-[22px] font-semibold tracking-[0.08em]">
+          <span className="text-cyan-300">Process.</span>
+          <span className="text-blue-400">Precision.</span>
+          <span className="text-orange-400">Wizardry.</span>
+        </div>
+
+        <p className="mt-4 text-xl font-light text-white/90">
+          Discipline today, freedom tomorrow.
+        </p>
       </div>
     </main>
   );
