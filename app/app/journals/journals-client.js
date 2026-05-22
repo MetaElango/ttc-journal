@@ -20,6 +20,8 @@ import {
   Underline,
   Images,
   StickyNote,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 
 import JournalDetailsModal from "./journal-details-modal";
@@ -601,13 +603,55 @@ function JournalCard({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => toggleExpand(journal.id)}
-            className="inline-flex h-9 items-center rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent"
-          >
-            {expanded ? "Collapse" : "Expand"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={journal.is_shared}
+              onClick={shareJournal}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-medium text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              {journal.is_shared ? "Shared" : "Share"}
+            </button>
+
+            {canEditJournal(journal) ? (
+              <Link
+                href={`/app/journals/${journal.id}/edit`}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-indigo-300"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Link>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => setSelectedJournal(journal)}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-300"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Details
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleExpand(journal.id)}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  Collapse
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Expand
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {expanded ? (
@@ -631,38 +675,6 @@ function JournalCard({
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
               <div className="text-xs text-muted-foreground">
                 End: {formatDate(journal.journal_end_at)}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={journal.is_shared}
-                  onClick={shareJournal}
-                  className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Share2 className="h-3.5 w-3.5" />
-                  {journal.is_shared ? "Shared" : "Share"}
-                </button>
-
-                {canEditJournal(journal) ? (
-                  <Link
-                    href={`/app/journals/${journal.id}/edit`}
-                    className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium hover:bg-accent"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
-                  </Link>
-                ) : null}
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedJournal(journal)}
-                  className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  Details
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </button>
               </div>
             </div>
           </>
