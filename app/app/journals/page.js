@@ -14,7 +14,7 @@ const VIEWS = [
   { key: "incorporated", label: "Incorporated Opportunities" },
 ];
 
-const OPEN_STATUSES = ["ENTRY PLACED"];
+const OPEN_STATUSES = ["ENTRY PLACED", "ENTRY PLANNED"];
 const ACTIVE_STATUSES = ["ENTRY TRIGGERED"];
 
 function getJournalTab(journal) {

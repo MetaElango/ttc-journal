@@ -33,9 +33,10 @@ import TiptapUnderline from "@tiptap/extension-underline";
 import TiptapLink from "@tiptap/extension-link";
 
 const EDITABLE_ACTIVE_STATUSES = [
-  "RUNNING TRADE",
+  // "RUNNING TRADE",
   "ENTRY TRIGGERED",
   "ENTRY PLACED",
+  "ENTRY PLANNED",
 ];
 
 function norm(v) {
