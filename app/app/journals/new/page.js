@@ -278,14 +278,14 @@ export default async function NewJournalPage({ searchParams }) {
     }
 
     const PURPOSES = new Set([
-      "FOR OBSERVATION",
-      "ENTRY PLANNED",
+      "TRADE OBSERVATION",
+      "TRADE EXECUTION",
       "FORWARD TESTING",
     ]);
 
     const STATUS_OPTIONS_BY_PURPOSE = {
-      "FOR OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
-      "ENTRY PLANNED": [
+      "TRADE OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
+      "TRADE EXECUTION": [
         "ENTRY PLACED",
         "ENTRY TRIGGERED",
         "ENTRY CANCELLED",
@@ -321,7 +321,7 @@ export default async function NewJournalPage({ searchParams }) {
 
     const allowedStatuses =
       STATUS_OPTIONS_BY_PURPOSE[purpose] ||
-      STATUS_OPTIONS_BY_PURPOSE["FOR OBSERVATION"];
+      STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"];
 
     let status = null;
 
@@ -333,7 +333,7 @@ export default async function NewJournalPage({ searchParams }) {
       status = statusRaw;
     }
 
-    if (purpose !== "FOR OBSERVATION" && !status) {
+    if (purpose !== "TRADE OBSERVATION" && !status) {
       return { ok: false, message: "Select a status." };
     }
 
@@ -341,11 +341,11 @@ export default async function NewJournalPage({ searchParams }) {
       getFormValue(formData, "trading_account_id") || "",
     );
 
-    if (purpose === "FOR OBSERVATION") trading_account_id = "";
+    if (purpose === "TRADE OBSERVATION") trading_account_id = "";
 
     trading_account_id = trading_account_id ? trading_account_id : null;
 
-    if (purpose !== "FOR OBSERVATION" && !trading_account_id) {
+    if (purpose !== "TRADE OBSERVATION" && !trading_account_id) {
       return { ok: false, message: "Select a trading account." };
     }
 
@@ -385,7 +385,7 @@ export default async function NewJournalPage({ searchParams }) {
     const risk_mode =
       String(getFormValue(formData, "risk_mode") || "")
         .trim()
-        .toUpperCase() || (purpose === "FOR OBSERVATION" ? "PERCENT" : "");
+        .toUpperCase() || (purpose === "TRADE OBSERVATION" ? "PERCENT" : "");
 
     const risk_per_trade_raw = String(
       getFormValue(formData, "risk_per_trade") || "",
@@ -393,7 +393,7 @@ export default async function NewJournalPage({ searchParams }) {
 
     let risk_per_trade = risk_per_trade_raw ? Number(risk_per_trade_raw) : NaN;
 
-    if (purpose === "FOR OBSERVATION") {
+    if (purpose === "TRADE OBSERVATION") {
       risk_per_trade = Number(selectedStrategy.risk_per_trade || 0);
     }
 

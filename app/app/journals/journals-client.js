@@ -48,9 +48,9 @@ function canEditJournal(journal) {
   const purpose = norm(journal.purpose);
   const status = norm(journal.status);
 
-  if (purpose === "FOR OBSERVATION") return !status;
+  if (purpose === "TRADE OBSERVATION") return !status;
 
-  if (purpose === "ENTRY PLANNED" || purpose === "FORWARD TESTING") {
+  if (purpose === "TRADE EXECUTION" || purpose === "FORWARD TESTING") {
     return EDITABLE_ACTIVE_STATUSES.includes(status);
   }
 

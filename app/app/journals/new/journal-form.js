@@ -90,7 +90,7 @@ function toDatetimeLocal(value) {
 }
 
 const PURPOSE_CONFIG = {
-  "FOR OBSERVATION": {
+  "TRADE OBSERVATION": {
     showStatusDropdown: true,
     disable: { tradingAccount: true, risk: true },
     required: {
@@ -110,7 +110,7 @@ const PURPOSE_CONFIG = {
     },
     exitRule: "reason_required_price_optional",
   },
-  "ENTRY PLANNED": {
+  "TRADE EXECUTION": {
     showStatusDropdown: true,
     disable: { tradingAccount: false, risk: false },
     required: {
@@ -152,11 +152,11 @@ const PURPOSE_CONFIG = {
   },
 };
 
-const PURPOSES = ["FOR OBSERVATION", "ENTRY PLANNED", "FORWARD TESTING"];
+const PURPOSES = ["TRADE OBSERVATION", "TRADE EXECUTION", "FORWARD TESTING"];
 
 const STATUS_OPTIONS_BY_PURPOSE = {
-  "FOR OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
-  "ENTRY PLANNED": [
+  "TRADE OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
+  "TRADE EXECUTION": [
     "ENTRY PLACED",
     "ENTRY TRIGGERED",
     "ENTRY CANCELLED",
@@ -180,7 +180,7 @@ function getStatusOptions(purpose) {
   const key = normPurpose(purpose);
   return (
     STATUS_OPTIONS_BY_PURPOSE[key] ||
-    STATUS_OPTIONS_BY_PURPOSE["FOR OBSERVATION"]
+    STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"]
   );
 }
 
@@ -1534,11 +1534,11 @@ export default function NewJournalForm({
   });
 
   const [purpose, setPurpose] = useState(
-    prefillJournal?.purpose || "FOR OBSERVATION",
+    prefillJournal?.purpose || "TRADE OBSERVATION",
   );
 
   const purposeKey = normPurpose(purpose);
-  const cfg = PURPOSE_CONFIG[purposeKey] || PURPOSE_CONFIG["FOR OBSERVATION"];
+  const cfg = PURPOSE_CONFIG[purposeKey] || PURPOSE_CONFIG["TRADE OBSERVATION"];
 
   const [status, setStatus] = useState(prefillJournal?.status || "");
 

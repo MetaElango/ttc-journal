@@ -26,7 +26,7 @@ function getJournalTab(journal) {
   return null;
 }
 
-const PURPOSES = ["FOR OBSERVATION", "ENTRY PLANNED", "FORWARD TESTING"];
+const PURPOSES = ["TRADE OBSERVATION", "TRADE EXECUTION", "FORWARD TESTING"];
 
 function norm(v) {
   return String(v || "")

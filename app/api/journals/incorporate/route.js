@@ -184,7 +184,7 @@ export async function POST(request) {
         trading_account_id: null,
         symbol_id: sharedJournal.symbol_id,
 
-        purpose: "FOR OBSERVATION",
+        purpose: "TRADE OBSERVATION",
         status: null,
         direction: sharedJournal.direction,
 

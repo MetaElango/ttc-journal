@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import EditJournalForm from "./edit-form";
 
 const STATUS_OPTIONS_BY_PURPOSE = {
-  "FOR OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
-  "ENTRY PLANNED": [
+  "TRADE OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
+  "TRADE EXECUTION": [
     "ENTRY PLACED",
     "ENTRY TRIGGERED",
     "ENTRY CANCELLED",
@@ -47,12 +47,12 @@ function needsEndDate(status) {
 function canEditJournal(journal) {
   if (!journal) return false;
 
-  if (journal.purpose === "FOR OBSERVATION") {
+  if (journal.purpose === "TRADE OBSERVATION") {
     return journal.status == null || journal.status === "";
   }
 
   if (
-    journal.purpose === "ENTRY PLANNED" ||
+    journal.purpose === "TRADE EXECUTION" ||
     journal.purpose === "FORWARD TESTING"
   ) {
     return EDITABLE_ACTIVE_STATUSES.includes(journal.status || "");
@@ -157,7 +157,7 @@ export default async function EditJournalPage({ params, searchParams }) {
 
   const statusOptions =
     STATUS_OPTIONS_BY_PURPOSE[journal.purpose] ||
-    STATUS_OPTIONS_BY_PURPOSE["FOR OBSERVATION"];
+    STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"];
 
   async function updateJournal(formData) {
     "use server";
@@ -217,7 +217,7 @@ export default async function EditJournalPage({ params, searchParams }) {
 
     const allowedStatuses =
       STATUS_OPTIONS_BY_PURPOSE[existing.purpose] ||
-      STATUS_OPTIONS_BY_PURPOSE["FOR OBSERVATION"];
+      STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"];
 
     if (!allowedStatuses.includes(statusRaw)) {
       redirect(`/app/journals/${id}/edit?error=status`);
