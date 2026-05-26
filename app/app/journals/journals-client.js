@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -763,17 +763,28 @@ export default function JournalsClient({
   isAdmin,
 }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
+
+  function buildInitialExpanded(items = []) {
+    const next = {};
+
+    items.forEach((group) => {
+      if (group.data?.length) {
+        next[group.data[0].id] = true;
+      }
+    });
+
+    return next;
+  }
+
   const [groups, setGroups] = useState(journalsByPurpose);
+  const [expandedRows, setExpandedRows] = useState(() =>
+    buildInitialExpanded(journalsByPurpose),
+  );
 
-  const initialExpanded = {};
-
-  journalsByPurpose.forEach((group) => {
-    if (group.data?.length) {
-      initialExpanded[group.data[0].id] = true;
-    }
-  });
-
-  const [expandedRows, setExpandedRows] = useState(initialExpanded);
+  useEffect(() => {
+    setGroups(journalsByPurpose);
+    setExpandedRows(buildInitialExpanded(journalsByPurpose));
+  }, [journalsByPurpose]);
 
   function toggleExpand(id) {
     setExpandedRows((prev) => ({

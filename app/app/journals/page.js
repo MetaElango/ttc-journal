@@ -28,17 +28,6 @@ function getJournalTab(journal) {
 
 const PURPOSES = ["FOR OBSERVATION", "ENTRY PLANNED", "FORWARD TESTING"];
 
-// const OPEN_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
-
-const CLOSED_STATUSES = [
-  "TRADE SL HIT",
-  "TRADE CLOSE WITH PROFIT",
-  "TRADE EXIT IN MID",
-  "ENTRY CLOSED",
-];
-
-const CANCELLED_STATUSES = ["ENTRY CANCELLED", "ENTRY MISSED"];
-
 function norm(v) {
   return String(v || "")
     .trim()
@@ -71,6 +60,17 @@ export default async function JournalsPage({ searchParams }) {
   const { data: authData } = await supabase.auth.getUser();
   const user = authData?.user;
 
+  if (!user) {
+    return (
+      <div className="p-6">
+        <h1 className="text-xl font-semibold">Opportunities</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Please login to see your opportunities.
+        </p>
+      </div>
+    );
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
     .select("type")
@@ -78,17 +78,6 @@ export default async function JournalsPage({ searchParams }) {
     .single();
 
   const isAdmin = profile?.type === "admin";
-
-  if (!user) {
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Journals</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Please login to see your journals.
-        </p>
-      </div>
-    );
-  }
 
   const { data: journals, error } = await supabase
     .from("journals")
@@ -294,10 +283,11 @@ export default async function JournalsPage({ searchParams }) {
 
       {activeJournalsByPurpose.length === 0 ? (
         <div className="rounded-xl border p-8 text-center text-sm text-muted-foreground">
-          No journals in this tab.
+          No opportunities in this tab.
         </div>
       ) : (
         <JournalsClient
+          key={`${activeView}-${activeTab}`}
           journalsByPurpose={activeJournalsByPurpose}
           currentUserId={user.id}
           isAdmin={isAdmin}
