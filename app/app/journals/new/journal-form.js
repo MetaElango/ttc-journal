@@ -1744,11 +1744,21 @@ export default function NewJournalForm({
           </div>
 
           <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">
-            Create <span className="text-sky-500">Opportunity</span>
+            {prefillJournal ? (
+              <>
+                Edit <span className="text-sky-500">Opportunity</span>
+              </>
+            ) : (
+              <>
+                Create <span className="text-sky-500">Opportunity</span>
+              </>
+            )}
           </h1>
 
           <p className="mt-4 max-w-2xl text-sm text-slate-500">
-            Select a live playbook and create a structured trading opportunity.
+            {prefillJournal
+              ? "Modify your existing trading opportunity and update execution details."
+              : "Select a live playbook and create a structured trading opportunity."}
           </p>
         </div>
       </div>
@@ -1996,12 +2006,12 @@ export default function NewJournalForm({
                       !setupImagesOk ||
                       (cfg.required?.status && !status)
                     }
-                    className="h-11 rounded-2xl px-5 md:ml-auto"
+                    className="h-11 rounded-2xl bg-sky-600 px-5 text-white hover:bg-sky-700 md:ml-auto"
                   >
                     {pending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
+                        {prefillJournal ? "Updating..." : "Saving..."}
                       </>
                     ) : uploadingImages ? (
                       <>
@@ -2009,7 +2019,7 @@ export default function NewJournalForm({
                         Uploading Images...
                       </>
                     ) : prefillJournal ? (
-                      "Incorporate Opportunity"
+                      "Update Opportunity"
                     ) : (
                       "Create Opportunity"
                     )}

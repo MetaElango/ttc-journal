@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import EditJournalForm from "./edit-form";
+import NewJournalForm from "../../new/journal-form";
 
 const STATUS_OPTIONS_BY_PURPOSE = {
   "TRADE OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
@@ -44,6 +45,8 @@ const ACTIVE_STATUSES = [
   "ENTRY TRIGGERED",
   "RUNNING TRADE",
 ];
+
+const FULL_EDIT_STATUSES = ["ENTRY PLANNED", "ENTRY PLACED"];
 
 function needsEndDate(status) {
   const value = String(status || "")
@@ -112,24 +115,13 @@ export default async function EditJournalPage({ params, searchParams }) {
   const { data: journal, error } = await supabase
     .from("journals")
     .select(
-      `
-      id,
-      purpose,
-      status,
-      journal_start_at,
-      journal_end_at,
-      exit_price,
-      exit_reason,
-      direction,
-      entry_price,
-      stop_loss,
-      entry_reason,
-      symbols:symbol_id (
-        symbol_name,
-        category
-      ),
-      strategy_snapshot
-      `,
+      `*,
+  symbols:symbol_id (
+    id,
+    symbol_name,
+    category
+  )
+`,
     )
     .eq("id", id)
     .eq("user_id", user.id)
@@ -138,6 +130,7 @@ export default async function EditJournalPage({ params, searchParams }) {
   if (error || !journal) notFound();
 
   const canEdit = canEditJournal(journal);
+  const canFullEdit = FULL_EDIT_STATUSES.includes(journal.status);
 
   if (!canEdit) {
     return (
@@ -282,6 +275,132 @@ export default async function EditJournalPage({ params, searchParams }) {
     }
 
     redirect("/app/journals");
+  }
+  async function updateFullJournal(prevState, formData) {
+    "use server";
+
+    const supabase = await createClient();
+
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+
+    if (!user) redirect("/login");
+
+    const { data: existing, error: existingError } = await supabase
+      .from("journals")
+      .select("id, status")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (existingError || !existing) notFound();
+
+    if (!FULL_EDIT_STATUSES.includes(existing.status)) {
+      redirect("/app/journals");
+    }
+
+    const tpItems = JSON.parse(
+      getFormValue(formData, "take_profit_json") || "[]",
+    );
+    const existingSetupImages = JSON.parse(
+      getFormValue(formData, "existing_setup_images") || "[]",
+    );
+    const existingReferenceImages = JSON.parse(
+      getFormValue(formData, "existing_reference_images") || "[]",
+    );
+    const htf = JSON.parse(getFormValue(formData, "htf_json") || "[]");
+    const entry_tf = JSON.parse(
+      getFormValue(formData, "entry_tf_json") || "[]",
+    );
+
+    const statusRaw = String(getFormValue(formData, "status") || "")
+      .trim()
+      .toUpperCase();
+
+    const journalStartAtRaw = String(
+      getFormValue(formData, "journal_start_at") || "",
+    ).trim();
+
+    const journalEndAtRaw = String(
+      getFormValue(formData, "journal_end_at") || "",
+    ).trim();
+
+    const payload = {
+      purpose: String(getFormValue(formData, "purpose") || "").trim(),
+      trading_account_id: getFormValue(formData, "trading_account_id") || null,
+      symbol_id: getFormValue(formData, "symbol_id") || null,
+      status: statusRaw,
+      direction: String(getFormValue(formData, "direction") || "")
+        .trim()
+        .toUpperCase(),
+      quantity: getFormValue(formData, "quantity") || null,
+      entry_price: getFormValue(formData, "entry_price") || null,
+      stop_loss: getFormValue(formData, "stop_loss") || null,
+      take_profit: tpItems.map((x) => x.price).filter(Boolean),
+      take_profit_qty: tpItems.map((x) => x.qty).filter(Boolean),
+      risk_mode: String(getFormValue(formData, "risk_mode") || "").trim(),
+      risk_per_trade: getFormValue(formData, "risk_per_trade") || null,
+      entry_reason:
+        String(getFormValue(formData, "entry_reason") || "").trim() || null,
+      exit_reason:
+        String(getFormValue(formData, "exit_reason") || "").trim() || null,
+      exit_price: getFormValue(formData, "exit_price") || null,
+      journal_start_at: journalStartAtRaw
+        ? new Date(journalStartAtRaw).toISOString()
+        : null,
+      journal_end_at:
+        needsEndDate(statusRaw) && journalEndAtRaw
+          ? new Date(journalEndAtRaw).toISOString()
+          : null,
+      htf,
+      entry_tf,
+      setup_images: existingSetupImages,
+      reference_images: existingReferenceImages,
+    };
+
+    const { error: updateError } = await supabase
+      .from("journals")
+      .update(payload)
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (updateError) {
+      return {
+        ok: false,
+        message: updateError.message,
+      };
+    }
+
+    return {
+      ok: true,
+      message: "Opportunity updated successfully.",
+      journalId: id,
+      existingSetupImages,
+      existingReferenceImages,
+    };
+  }
+
+  const { data: accounts } = await supabase
+    .from("trading_accounts")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("account_name");
+
+  const { data: symbols } = await supabase
+    .from("symbols")
+    .select("*")
+    .order("symbol_name");
+
+  if (canFullEdit) {
+    return (
+      <NewJournalForm
+        action={updateFullJournal}
+        strategy={journal.strategy_snapshot}
+        accounts={accounts || []}
+        symbols={symbols || []}
+        prefillJournal={journal}
+      />
+    );
   }
 
   return (

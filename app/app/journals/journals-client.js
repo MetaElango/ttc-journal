@@ -32,12 +32,9 @@ import StarterKit from "@tiptap/starter-kit";
 import TiptapUnderline from "@tiptap/extension-underline";
 import TiptapLink from "@tiptap/extension-link";
 
-const EDITABLE_ACTIVE_STATUSES = [
-  // "RUNNING TRADE",
-  "ENTRY TRIGGERED",
-  "ENTRY PLACED",
-  "ENTRY PLANNED",
-];
+const FULL_EDIT_STATUSES = ["ENTRY PLANNED", "ENTRY PLACED"];
+
+const PARTIAL_EDIT_STATUSES = ["ENTRY TRIGGERED"];
 
 function norm(v) {
   return String(v || "")
@@ -49,10 +46,15 @@ function canEditJournal(journal) {
   const purpose = norm(journal.purpose);
   const status = norm(journal.status);
 
-  if (purpose === "TRADE OBSERVATION") return !status;
+  if (purpose === "TRADE OBSERVATION") {
+    return !status;
+  }
 
   if (purpose === "TRADE EXECUTION" || purpose === "FORWARD TESTING") {
-    return EDITABLE_ACTIVE_STATUSES.includes(status);
+    return (
+      FULL_EDIT_STATUSES.includes(status) ||
+      PARTIAL_EDIT_STATUSES.includes(status)
+    );
   }
 
   return false;
