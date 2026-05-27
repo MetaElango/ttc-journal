@@ -10,10 +10,27 @@ import {
   Loader2,
   Target,
   BadgeCheck,
+  Plus,
+  Trash2,
+  Scale,
+  Lightbulb,
+  SlidersHorizontal,
 } from "lucide-react";
 
-const EXIT_REQUIRED_STATUSES = ["TRADE CLOSE WITH PROFIT", "TRADE EXIT IN MID"];
 const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+const HIDDEN_EDIT_STATUSES = ["ENTRY PLANNED", "ENTRY PLACED", "RUNNING TRADE"];
+
+const PROFIT_CHECKPOINTS = [
+  { value: "ACTUAL_TP", label: "Actual TP Hit" },
+  { value: "MODIFIED_TP", label: "Modified TP Hit" },
+  { value: "TP_BREAKEVEN", label: "TP at Breakeven" },
+];
+
+const SL_CHECKPOINTS = [
+  { value: "ACTUAL_SL", label: "Actual SL Hit" },
+  { value: "MODIFIED_SL", label: "Modified SL Hit" },
+  { value: "SL_BREAKEVEN", label: "SL at Breakeven" },
+];
 
 function needsEndDate(status) {
   const value = String(status || "")
@@ -23,15 +40,29 @@ function needsEndDate(status) {
 }
 
 function toDatetimeLocal(value) {
-  if (!value) {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
-  }
-
+  if (!value) return "";
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
   return date.toISOString().slice(0, 16);
+}
+
+function sanitize6dp(raw) {
+  const s = String(raw ?? "");
+  let out = s.replace(/[^\d.]/g, "");
+  const firstDot = out.indexOf(".");
+
+  if (firstDot !== -1) {
+    out =
+      out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
+  }
+
+  if (out.includes(".")) {
+    const [a, b] = out.split(".");
+    out = a + "." + (b || "").slice(0, 6);
+  }
+
+  return out;
 }
 
 function sanitize2dp(raw) {
@@ -44,7 +75,7 @@ function sanitize2dp(raw) {
       out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
   }
 
-  if (firstDot !== -1) {
+  if (out.includes(".")) {
     const [a, b] = out.split(".");
     out = a + "." + (b || "").slice(0, 2);
   }
@@ -52,11 +83,24 @@ function sanitize2dp(raw) {
   return out;
 }
 
-function Pill({ children, className = "" }) {
+function round2(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+}
+
+function defaultSplitWeights(count) {
+  if (count <= 0) return [];
+  return Array.from({ length: count }, () => 1 / count);
+}
+
+function arrayValue(value) {
+  return Array.isArray(value) ? value.map((x) => String(x ?? "")) : [];
+}
+
+function Pill({ children }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 ${className}`}
-    >
+    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
       {children}
     </span>
   );
@@ -86,16 +130,12 @@ function SectionHeader({ icon: Icon, eyebrow, title, description }) {
       </div>
 
       <div>
-        {eyebrow ? (
-          <div className="text-xs font-bold uppercase tracking-wide text-sky-600">
-            {eyebrow}
-          </div>
-        ) : null}
-
+        <div className="text-xs font-bold uppercase tracking-wide text-sky-600">
+          {eyebrow}
+        </div>
         <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
           {title}
         </h2>
-
         <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
     </div>
@@ -103,11 +143,326 @@ function SectionHeader({ icon: Icon, eyebrow, title, description }) {
 }
 
 function inputClass() {
-  return "h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60";
+  return "h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100";
 }
 
 function textareaClass() {
   return "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100";
+}
+
+function ReadOnlyBox({ label, value, note }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-semibold uppercase text-slate-500">
+        {label}
+      </div>
+
+      <div className="mt-2 text-lg font-bold text-slate-900">
+        {value || "—"}{" "}
+        {note ? (
+          <span className="text-sm font-medium text-slate-500">{note}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TpSlView({ journal }) {
+  const tp = arrayValue(journal.take_profit);
+  const tpQty = arrayValue(journal.take_profit_qty);
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <ReadOnlyBox label="Stop Loss" value={journal.stop_loss} />
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="text-xs font-semibold uppercase text-slate-500">
+          Take Profit
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {tp.length ? (
+            tp.map((price, index) => (
+              <div
+                key={`${price}-${index}`}
+                className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              >
+                <span className="font-semibold text-slate-900">
+                  TP {index + 1}: {price}
+                </span>
+                <span className="text-slate-500">
+                  Qty: {tpQty[index] || "—"}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-slate-500">—</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TakeProfitEditor({ items, setItems, totalLots, disabled }) {
+  const total = round2(totalLots);
+  const totalOk = total > 0 ? total : 0;
+
+  const sumTpLots = useMemo(
+    () => items.reduce((acc, it) => acc + (Number(it.qty) || 0), 0),
+    [items],
+  );
+
+  const sumOk = totalOk > 0 ? Math.abs(sumTpLots - totalOk) <= 0.01 : false;
+
+  function applySplit(next) {
+    if (!totalOk || next.length === 0) return next;
+
+    const weights = defaultSplitWeights(next.length);
+
+    const applied = next.map((it, idx) => ({
+      ...it,
+      qty: round2(weights[idx] * totalOk),
+    }));
+
+    const s = applied.reduce((a, b) => a + (Number(b.qty) || 0), 0);
+    const diff = round2(totalOk - s);
+
+    if (applied.length > 0 && diff !== 0) {
+      applied[applied.length - 1] = {
+        ...applied[applied.length - 1],
+        qty: round2((Number(applied[applied.length - 1].qty) || 0) + diff),
+      };
+    }
+
+    return applied;
+  }
+
+  function autoSplitAll() {
+    if (disabled) return;
+    setItems(applySplit(items));
+  }
+
+  function addRow() {
+    if (disabled) return;
+    setItems(applySplit([...items, { price: "", qty: "" }]));
+  }
+
+  function removeRow(i) {
+    if (disabled) return;
+    setItems(applySplit(items.filter((_, idx) => idx !== i)));
+  }
+
+  function updatePrice(i, raw) {
+    if (disabled) return;
+    const next = [...items];
+    next[i] = { ...next[i], price: sanitize6dp(raw) };
+    setItems(next);
+  }
+
+  function updateQty(i, raw) {
+    if (disabled) return;
+
+    const vStr = sanitize2dp(raw);
+    const v = vStr === "" ? "" : round2(vStr);
+
+    const next = [...items];
+    next[i] = { ...next[i], qty: vStr === "" ? "" : v };
+
+    if (!totalOk) {
+      setItems(next);
+      return;
+    }
+
+    const lastIndex = next.length - 1;
+
+    if (i === lastIndex) {
+      setItems(next);
+      return;
+    }
+
+    let fixedSum = 0;
+    for (let k = 0; k <= i; k++) fixedSum += Number(next[k].qty) || 0;
+    fixedSum = round2(fixedSum);
+
+    let remaining = round2(totalOk - fixedSum);
+    if (remaining < 0) remaining = 0;
+
+    const tailCount = lastIndex - i;
+    const weights = defaultSplitWeights(tailCount);
+
+    for (let t = 0; t < tailCount; t++) {
+      const idx = i + 1 + t;
+      next[idx] = { ...next[idx], qty: round2(weights[t] * remaining) };
+    }
+
+    const sumNow = round2(
+      next.reduce((acc, it) => acc + (Number(it.qty) || 0), 0),
+    );
+
+    const diff = round2(totalOk - sumNow);
+
+    if (diff !== 0 && next.length > 0) {
+      next[lastIndex] = {
+        ...next[lastIndex],
+        qty: round2((Number(next[lastIndex].qty) || 0) + diff),
+      };
+    }
+
+    setItems(next);
+  }
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-5">
+        <div className="flex gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-sky-50 text-sky-600">
+            <Target className="h-5 w-5" />
+          </div>
+
+          <div>
+            <div className="text-lg font-semibold tracking-tight text-slate-950">
+              Modified Take Profit <span className="text-red-500">*</span>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Add one or more targets. Qty sum must equal total lots.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={autoSplitAll}
+            disabled={disabled || items.length === 0 || !totalOk}
+            className="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            Auto Split
+          </button>
+
+          <button
+            type="button"
+            onClick={addRow}
+            disabled={disabled}
+            className="inline-flex h-11 items-center rounded-2xl bg-sky-600 px-4 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add TP
+          </button>
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+          <p className="text-sm font-medium text-slate-900">
+            No take-profit targets yet
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            Click Add TP to create your first target.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-5 space-y-4">
+          {items.map((it, idx) => {
+            const tpLots = Number(it.qty) || 0;
+            const pct = totalOk ? Math.min((tpLots / totalOk) * 100, 100) : 0;
+
+            return (
+              <div
+                key={idx}
+                className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4"
+              >
+                <div className="grid gap-4 md:grid-cols-[90px_1fr_1fr_120px_70px] md:items-end">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-50 text-xs font-semibold text-sky-600">
+                      {idx + 1}
+                    </div>
+
+                    <div className="text-sm font-semibold text-slate-900">
+                      TP {idx + 1}
+                    </div>
+                  </div>
+
+                  <FieldShell label="Price" required>
+                    <input
+                      value={it.price}
+                      onChange={(e) => updatePrice(idx, e.target.value)}
+                      inputMode="decimal"
+                      placeholder="e.g. 1.123456"
+                      disabled={disabled}
+                      required
+                      className={inputClass()}
+                    />
+                  </FieldShell>
+
+                  <FieldShell label="Qty / Lots" required>
+                    <input
+                      value={it.qty}
+                      onChange={(e) => updateQty(idx, e.target.value)}
+                      inputMode="decimal"
+                      placeholder="0.50"
+                      disabled={disabled}
+                      required
+                      className={inputClass()}
+                    />
+                  </FieldShell>
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-center">
+                    <div className="text-base font-semibold text-slate-900">
+                      {round2(pct)}%
+                    </div>
+
+                    <div className="text-[11px] text-slate-500">Position</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    disabled={disabled}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-sky-600 transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+        <div
+          className={[
+            "inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm",
+            sumOk
+              ? "border-sky-200 bg-sky-50 text-slate-900"
+              : "border-red-200 bg-red-50 text-red-600",
+          ].join(" ")}
+        >
+          <Scale className="h-4 w-4" />
+          <span>
+            TP Qty sum: <strong>{round2(sumTpLots)}</strong> / Total lots:{" "}
+            <strong>{totalOk ? round2(totalOk) : "—"}</strong>
+          </span>
+        </div>
+
+        <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          <Lightbulb className="h-4 w-4 text-sky-600" />
+          Tip: edit any TP qty except last to auto-split the remainder.
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export default function EditJournalForm({
@@ -119,40 +474,137 @@ export default function EditJournalForm({
   errorType,
 }) {
   const [status, setStatus] = useState(journal.status || "");
-  const [journalStartAt, setJournalStartAt] = useState(
-    toDatetimeLocal(journal.journal_start_at),
+  const [exitCheckpoint, setExitCheckpoint] = useState(
+    journal.exit_checkpoint || "",
   );
-  const [journalEndAt, setJournalEndAt] = useState(
-    toDatetimeLocal(journal.journal_end_at),
-  );
+
+  const [journalEndAt, setJournalEndAt] = useState(() => {
+    return (
+      toDatetimeLocal(journal.journal_end_at) || toDatetimeLocal(new Date())
+    );
+  });
+
   const [exitPrice, setExitPrice] = useState(
     journal.exit_price != null ? String(journal.exit_price) : "",
   );
-  const [exitReason, setExitReason] = useState(journal.exit_reason || "");
-  const [submitting, setSubmitting] = useState(false);
 
-  const exitRequired = useMemo(
-    () => EXIT_REQUIRED_STATUSES.includes(status),
-    [status],
+  const [exitReason, setExitReason] = useState(journal.exit_reason || "");
+
+  const [modifiedSlPrice, setModifiedSlPrice] = useState(
+    journal.modified_sl_price != null
+      ? String(journal.modified_sl_price)
+      : journal.modified_sl != null
+        ? String(journal.modified_sl)
+        : "",
   );
 
+  const [modifiedTpRows, setModifiedTpRows] = useState(() => {
+    const existingPrice = arrayValue(journal.modified_tp_price);
+    const existingQty = arrayValue(journal.modified_tp_qty);
+
+    const originalPrice = arrayValue(journal.take_profit);
+    const originalQty = arrayValue(journal.take_profit_qty);
+
+    const priceSource = existingPrice.length ? existingPrice : originalPrice;
+    const qtySource = existingQty.length ? existingQty : originalQty;
+
+    return priceSource.length
+      ? priceSource.map((price, index) => ({
+          price,
+          qty: qtySource[index] || "",
+        }))
+      : [{ price: "", qty: "" }];
+  });
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const journalStartAt = toDatetimeLocal(journal.journal_start_at);
   const endDateRequired = useMemo(() => needsEndDate(status), [status]);
+
+  const filteredStatusOptions = useMemo(() => {
+    return statusOptions.filter((x) => !HIDDEN_EDIT_STATUSES.includes(x));
+  }, [statusOptions]);
+
+  const isEntryTriggered = status === "ENTRY TRIGGERED";
+  const isEntryCancelled = status === "ENTRY CANCELLED";
+  const isEntryMissed = status === "ENTRY MISSED";
+  const isSlStatus = status === "TRADE SL HIT";
+  const isProfitStatus = status === "TRADE CLOSE WITH PROFIT";
+  const isMidExit = status === "TRADE EXIT IN MID";
+
+  const isActualSl = exitCheckpoint === "ACTUAL_SL";
+  const isModifiedSl = exitCheckpoint === "MODIFIED_SL";
+  const isSlBreakeven = exitCheckpoint === "SL_BREAKEVEN";
+  const isActualTp = exitCheckpoint === "ACTUAL_TP";
+  const isModifiedTp = exitCheckpoint === "MODIFIED_TP";
+  const isTpBreakeven = exitCheckpoint === "TP_BREAKEVEN";
+
+  const needsExitReason =
+    isEntryCancelled ||
+    isEntryMissed ||
+    isSlStatus ||
+    isProfitStatus ||
+    isMidExit;
+
+  const needsManualExitPrice = isMidExit;
+
+  const autoExitPrice = isActualSl
+    ? String(journal.stop_loss ?? "")
+    : isSlBreakeven || isTpBreakeven
+      ? String(journal.entry_price ?? "")
+      : isModifiedSl
+        ? modifiedSlPrice
+        : "";
+
+  const disableUpdate = isEntryTriggered;
+
+  const modifiedTpQtySum = useMemo(() => {
+    return modifiedTpRows.reduce((acc, row) => acc + (Number(row.qty) || 0), 0);
+  }, [modifiedTpRows]);
+
+  const modifiedTpQtyOk =
+    !isModifiedTp ||
+    Math.abs(round2(modifiedTpQtySum) - round2(journal.quantity)) <= 0.01;
 
   const canSubmit = useMemo(() => {
     if (!status) return false;
-    if (!journalStartAt) return false;
+    if (disableUpdate) return false;
     if (endDateRequired && !journalEndAt) return false;
-    if (!exitRequired) return true;
 
-    return exitReason.trim() !== "" && exitPrice.trim() !== "";
+    if (isSlStatus && !exitCheckpoint) return false;
+    if (isProfitStatus && !exitCheckpoint) return false;
+
+    if (isModifiedSl && !modifiedSlPrice.trim()) return false;
+
+    if (isModifiedTp) {
+      const hasInvalidRow = modifiedTpRows.some(
+        (row) => !String(row.price).trim() || !String(row.qty).trim(),
+      );
+      if (hasInvalidRow) return false;
+      if (!modifiedTpQtyOk) return false;
+    }
+
+    if (needsManualExitPrice && !exitPrice.trim()) return false;
+    if (needsExitReason && !exitReason.trim()) return false;
+
+    return true;
   }, [
     status,
-    journalStartAt,
-    journalEndAt,
+    disableUpdate,
     endDateRequired,
-    exitRequired,
-    exitReason,
+    journalEndAt,
+    isSlStatus,
+    isProfitStatus,
+    exitCheckpoint,
+    isModifiedSl,
+    modifiedSlPrice,
+    isModifiedTp,
+    modifiedTpRows,
+    modifiedTpQtyOk,
+    needsManualExitPrice,
     exitPrice,
+    needsExitReason,
+    exitReason,
   ]);
 
   return (
@@ -176,8 +628,7 @@ export default function EditJournalForm({
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm text-slate-500">
-              Update status, timing, exit price, and exit reason for this
-              opportunity.
+              Update the status and final outcome for this opportunity.
             </p>
           </div>
 
@@ -206,6 +657,7 @@ export default function EditJournalForm({
           <Pill>Current Status: {journal.status || "—"}</Pill>
           <Pill>Entry: {journal.entry_price ?? "—"}</Pill>
           <Pill>SL: {journal.stop_loss ?? "—"}</Pill>
+          <Pill>Total Lots: {journal.quantity ?? "—"}</Pill>
         </div>
       </section>
 
@@ -214,6 +666,34 @@ export default function EditJournalForm({
         className="space-y-6"
         onSubmit={() => setSubmitting(true)}
       >
+        <input type="hidden" name="exit_checkpoint" value={exitCheckpoint} />
+        <input type="hidden" name="journal_start_at" value={journalStartAt} />
+
+        <input
+          type="hidden"
+          name="exit_price"
+          value={needsManualExitPrice ? exitPrice : autoExitPrice}
+        />
+
+        <input
+          type="hidden"
+          name="modified_sl_price"
+          value={isModifiedSl ? modifiedSlPrice : ""}
+        />
+
+        {isModifiedTp
+          ? modifiedTpRows.map((row, index) => (
+              <div key={`hidden-modified-tp-${index}`}>
+                <input
+                  type="hidden"
+                  name="modified_tp_price"
+                  value={row.price}
+                />
+                <input type="hidden" name="modified_tp_qty" value={row.qty} />
+              </div>
+            ))
+          : null}
+
         {errorType ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
             {decodeURIComponent(errorType)}
@@ -233,7 +713,10 @@ export default function EditJournalForm({
               <select
                 name="status"
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setExitCheckpoint("");
+                }}
                 className={inputClass()}
                 required
               >
@@ -241,7 +724,7 @@ export default function EditJournalForm({
                   Select status
                 </option>
 
-                {statusOptions.map((x) => (
+                {filteredStatusOptions.map((x) => (
                   <option key={x} value={x}>
                     {x}
                   </option>
@@ -250,14 +733,9 @@ export default function EditJournalForm({
             </FieldShell>
 
             <FieldShell label="Opportunity Start Date" required>
-              <input
-                name="journal_start_at"
-                type="datetime-local"
-                value={journalStartAt}
-                onChange={(e) => setJournalStartAt(e.target.value)}
-                className={inputClass()}
-                required
-              />
+              <div className="flex h-12 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700">
+                {journalStartAt ? journalStartAt.replace("T", " ") : "—"}
+              </div>
             </FieldShell>
 
             {endDateRequired ? (
@@ -282,48 +760,139 @@ export default function EditJournalForm({
             icon={CheckCircle2}
             eyebrow="Step 2"
             title="Exit Details"
-            description={
-              exitRequired
-                ? "Exit price and exit reason are required for this status."
-                : "Exit details are optional for this status."
-            }
+            description="Fields below change based on selected status."
           />
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <FieldShell
-              label="Exit Price"
-              required={exitRequired}
-              optional={!exitRequired}
-            >
-              <input
-                name="exit_price"
-                type="text"
-                inputMode="decimal"
-                value={exitPrice}
-                onChange={(e) => setExitPrice(sanitize2dp(e.target.value))}
-                className={inputClass()}
-                placeholder="e.g. 245.50"
-                required={exitRequired}
-              />
-            </FieldShell>
+          <div className="mt-6 space-y-6">
+            {isEntryTriggered ? (
+              <>
+                <TpSlView journal={journal} />
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
+                  Entry is triggered and still active, so no exit update is
+                  needed.
+                </div>
+              </>
+            ) : null}
 
-            <div className="md:col-span-2">
-              <FieldShell
-                label="Exit Reason"
-                required={exitRequired}
-                optional={!exitRequired}
-              >
+            {isEntryCancelled || isEntryMissed || isMidExit ? (
+              <TpSlView journal={journal} />
+            ) : null}
+
+            {isSlStatus ? (
+              <FieldShell label="SL Exit Type" required>
+                <select
+                  value={exitCheckpoint}
+                  onChange={(e) => setExitCheckpoint(e.target.value)}
+                  className={inputClass()}
+                  required
+                >
+                  <option value="" disabled>
+                    Select SL type
+                  </option>
+
+                  {SL_CHECKPOINTS.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </FieldShell>
+            ) : null}
+
+            {isProfitStatus ? (
+              <FieldShell label="Profit Exit Type" required>
+                <select
+                  value={exitCheckpoint}
+                  onChange={(e) => setExitCheckpoint(e.target.value)}
+                  className={inputClass()}
+                  required
+                >
+                  <option value="" disabled>
+                    Select profit type
+                  </option>
+
+                  {PROFIT_CHECKPOINTS.map((x) => (
+                    <option key={x.value} value={x.value}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </FieldShell>
+            ) : null}
+
+            {isActualSl ? (
+              <ReadOnlyBox
+                label="Exit Price"
+                value={journal.stop_loss}
+                note="from original SL"
+              />
+            ) : null}
+
+            {isSlBreakeven || isTpBreakeven ? (
+              <ReadOnlyBox
+                label="Exit Price"
+                value={journal.entry_price}
+                note="from entry price"
+              />
+            ) : null}
+
+            {isModifiedSl ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <ReadOnlyBox label="Original SL" value={journal.stop_loss} />
+
+                <FieldShell label="Modified SL Price" required>
+                  <input
+                    value={modifiedSlPrice}
+                    onChange={(e) =>
+                      setModifiedSlPrice(sanitize6dp(e.target.value))
+                    }
+                    className={inputClass()}
+                    inputMode="decimal"
+                    required
+                  />
+                </FieldShell>
+              </div>
+            ) : null}
+
+            {isActualTp ? <TpSlView journal={journal} /> : null}
+
+            {isModifiedTp ? (
+              <TakeProfitEditor
+                items={modifiedTpRows}
+                setItems={setModifiedTpRows}
+                totalLots={journal.quantity}
+                disabled={submitting}
+              />
+            ) : null}
+
+            {needsManualExitPrice ? (
+              <FieldShell label="Exit Price" required>
+                <input
+                  name="manual_exit_price"
+                  type="text"
+                  inputMode="decimal"
+                  value={exitPrice}
+                  onChange={(e) => setExitPrice(sanitize6dp(e.target.value))}
+                  className={inputClass()}
+                  placeholder="e.g. 245.500000"
+                  required
+                />
+              </FieldShell>
+            ) : null}
+
+            {needsExitReason ? (
+              <FieldShell label="Exit Reason" required>
                 <textarea
                   name="exit_reason"
                   rows={6}
                   value={exitReason}
                   onChange={(e) => setExitReason(e.target.value)}
                   className={textareaClass()}
-                  placeholder="Why did you close or update this opportunity?"
-                  required={exitRequired}
+                  placeholder="Why did you update or close this trade?"
+                  required
                 />
               </FieldShell>
-            </div>
+            ) : null}
           </div>
         </section>
 
@@ -345,7 +914,7 @@ export default function EditJournalForm({
 
         {!canSubmit ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
-            Fill the required status/date fields before updating.
+            Fill the required fields before updating.
           </div>
         ) : null}
 
@@ -365,7 +934,7 @@ export default function EditJournalForm({
 
               <button
                 type="submit"
-                disabled={!canSubmit || submitting}
+                disabled={!canSubmit || submitting || disableUpdate}
                 className="inline-flex h-11 items-center rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? (
@@ -373,6 +942,8 @@ export default function EditJournalForm({
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Updating...
                   </>
+                ) : disableUpdate ? (
+                  "No Update Needed"
                 ) : (
                   "Update Opportunity"
                 )}

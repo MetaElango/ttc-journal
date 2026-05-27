@@ -90,6 +90,25 @@ function sanitize2dp(raw) {
   return out;
 }
 
+function sanitize6dp(raw) {
+  const s = String(raw ?? "");
+  let out = s.replace(/[^\d.]/g, "");
+
+  const firstDot = out.indexOf(".");
+
+  if (firstDot !== -1) {
+    out =
+      out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
+  }
+
+  if (firstDot !== -1) {
+    const [a, b] = out.split(".");
+    out = a + "." + (b || "").slice(0, 6);
+  }
+
+  return out;
+}
+
 function getFormValue(formData, key) {
   for (const [k, value] of formData.entries()) {
     if (k === key || k.endsWith(`_${key}`)) {
@@ -172,16 +191,25 @@ export default async function EditJournalPage({ params, searchParams }) {
 
     const { data: existing, error: existingError } = await supabase
       .from("journals")
-      .select("id, purpose, status")
+      .select(
+        `
+      id,
+      purpose,
+      status,
+      quantity,
+      entry_price,
+      stop_loss,
+      take_profit,
+      take_profit_qty
+    `,
+      )
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
 
     if (existingError || !existing) notFound();
 
-    const stillEditable = canEditJournal(existing);
-
-    if (!stillEditable) {
+    if (!canEditJournal(existing)) {
       redirect("/app/journals");
     }
 
@@ -205,16 +233,36 @@ export default async function EditJournalPage({ params, searchParams }) {
       ? new Date(journalEndAtRaw).toISOString()
       : null;
 
-    const exitReasonRaw = String(
-      getFormValue(formData, "exit_reason") || "",
-    ).trim();
+    const exit_reason =
+      String(getFormValue(formData, "exit_reason") || "").trim() || null;
 
-    const exit_reason = exitReasonRaw || null;
+    const exit_checkpoint =
+      String(getFormValue(formData, "exit_checkpoint") || "")
+        .trim()
+        .toUpperCase() || null;
 
-    const exitPriceRaw = sanitize2dp(
+    const exitPriceRaw = sanitize6dp(
       getFormValue(formData, "exit_price") || "",
     );
     const exit_price = exitPriceRaw ? Number(exitPriceRaw) : null;
+
+    const modifiedSlRaw = sanitize6dp(
+      getFormValue(formData, "modified_sl_price") || "",
+    );
+
+    const modified_sl_price = modifiedSlRaw ? Number(modifiedSlRaw) : null;
+
+    const modified_tp_price = formData
+      .getAll("modified_tp_price")
+      .map((x) => sanitize6dp(x))
+      .filter(Boolean)
+      .map(Number);
+
+    const modified_tp_qty = formData
+      .getAll("modified_tp_qty")
+      .map((x) => sanitize2dp(x))
+      .filter(Boolean)
+      .map(Number);
 
     const allowedStatuses =
       STATUS_OPTIONS_BY_PURPOSE[existing.purpose] ||
@@ -240,18 +288,73 @@ export default async function EditJournalPage({ params, searchParams }) {
       );
     }
 
-    if (exitPriceRaw && Number.isNaN(exit_price)) {
-      redirect(`/app/journals/${id}/edit?error=exit_price`);
-    }
+    const needsExitReason = [
+      "ENTRY CANCELLED",
+      "ENTRY MISSED",
+      "TRADE SL HIT",
+      "TRADE CLOSE WITH PROFIT",
+      "TRADE EXIT IN MID",
+    ].includes(statusRaw);
 
-    const exitRequired = EXIT_REQUIRED_STATUSES.includes(statusRaw);
-
-    if (exitRequired && !exit_reason) {
+    if (needsExitReason && !exit_reason) {
       redirect(`/app/journals/${id}/edit?error=exit_reason_required`);
     }
 
-    if (exitRequired && (exit_price === null || Number.isNaN(exit_price))) {
+    if (
+      ["TRADE CLOSE WITH PROFIT", "TRADE SL HIT"].includes(statusRaw) &&
+      !exit_checkpoint
+    ) {
+      redirect(`/app/journals/${id}/edit?error=exit_checkpoint_required`);
+    }
+
+    if (exit_checkpoint === "MODIFIED_SL" && modified_sl_price === null) {
+      redirect(`/app/journals/${id}/edit?error=modified_sl_required`);
+    }
+
+    if (exit_checkpoint === "MODIFIED_TP") {
+      if (!modified_tp_price.length || !modified_tp_qty.length) {
+        redirect(`/app/journals/${id}/edit?error=modified_tp_required`);
+      }
+
+      if (modified_tp_price.length !== modified_tp_qty.length) {
+        redirect(`/app/journals/${id}/edit?error=modified_tp_qty_mismatch`);
+      }
+    }
+
+    if (statusRaw === "TRADE EXIT IN MID" && exit_price === null) {
       redirect(`/app/journals/${id}/edit?error=exit_price_required`);
+    }
+
+    let finalExitPrice = exit_price;
+
+    if (statusRaw === "TRADE CLOSE WITH PROFIT") {
+      if (exit_checkpoint === "ACTUAL_TP") {
+        finalExitPrice = Array.isArray(existing.take_profit)
+          ? Number(existing.take_profit[0])
+          : null;
+      }
+
+      if (exit_checkpoint === "MODIFIED_TP") {
+        finalExitPrice = modified_tp_price[0] ?? null;
+      }
+
+      if (exit_checkpoint === "TP_BREAKEVEN") {
+        finalExitPrice = Number(existing.entry_price);
+      }
+    }
+
+    if (statusRaw === "TRADE SL HIT") {
+      if (exit_checkpoint === "ACTUAL_SL") {
+        finalExitPrice = Number(existing.stop_loss);
+      }
+
+      if (exit_checkpoint === "MODIFIED_SL") {
+        finalExitPrice = modified_sl_price;
+      }
+
+      if (exit_checkpoint === "SL_BREAKEVEN") {
+        finalExitPrice = Number(existing.entry_price);
+      }
     }
 
     const { error: updateError } = await supabase
@@ -261,7 +364,17 @@ export default async function EditJournalPage({ params, searchParams }) {
         journal_start_at,
         journal_end_at: needsEndDate(statusRaw) ? journal_end_at : null,
         exit_reason,
-        exit_price,
+        exit_price: finalExitPrice,
+        exit_checkpoint,
+
+        modified_sl_price:
+          exit_checkpoint === "MODIFIED_SL" ? modified_sl_price : null,
+
+        modified_tp_price:
+          exit_checkpoint === "MODIFIED_TP" ? modified_tp_price : null,
+
+        modified_tp_qty:
+          exit_checkpoint === "MODIFIED_TP" ? modified_tp_qty : null,
       })
       .eq("id", id)
       .eq("user_id", user.id);
