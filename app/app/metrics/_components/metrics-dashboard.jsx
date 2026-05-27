@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Calendar,
@@ -58,58 +58,82 @@ function SelectBox({ label, value, onChange, children }) {
 
 function SmallPanel({ title, children }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-black text-slate-900">{title}</h3>
-      <div className="mt-4">{children}</div>
+      <div className="mt-4 min-w-0">{children}</div>
     </div>
   );
 }
 
+function ClientDate({ value }) {
+  const [text, setText] = useState("");
+
+  useEffect(() => {
+    if (!value) return;
+
+    setText(
+      new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+      }).format(new Date(value)),
+    );
+  }, [value]);
+
+  return <>{text}</>;
+}
+
 function TradeTable({ rows, type }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="text-slate-500">
-          <tr>
-            <th className="py-2">#</th>
-            <th>R</th>
-            <th>Symbol</th>
-            <th>Setup</th>
-            <th>Strategy</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((j, i) => {
-            const r = round2(calculateRMultiple(j));
-            return (
-              <tr key={j.id} className="border-t border-slate-100">
-                <td className="py-2">{i + 1}</td>
-                <td
+    <div className="space-y-3">
+      {rows.map((j, i) => {
+        const r = round2(calculateRMultiple(j));
+        const isLoss = type === "loss";
+
+        return (
+          <div
+            key={j.id}
+            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-sm font-black text-slate-600">
+                  {i + 1}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="text-base font-black text-slate-950">
+                    {j.symbols?.symbol_name || "—"}
+                  </div>
+
+                  <div className="mt-1 text-xs font-semibold text-slate-500">
+                    {getSetupType(j)}
+                  </div>
+
+                  <div className="mt-2 text-sm font-bold text-slate-700">
+                    {getStrategyName(j)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="shrink-0 text-right">
+                <div
                   className={
-                    type === "loss"
-                      ? "font-bold text-red-600"
-                      : "font-bold text-emerald-600"
+                    isLoss
+                      ? "text-lg font-black text-orange-500"
+                      : "text-lg font-black text-blue-600"
                   }
                 >
                   {formatR(r)}
-                </td>
-                <td>{j.symbols?.symbol_name || "—"}</td>
-                <td>{getSetupType(j)}</td>
-                <td>{getStrategyName(j)}</td>
-                <td>
-                  {new Date(
-                    j.journal_end_at || j.created_at,
-                  ).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                </div>
+
+                <div className="mt-1 text-xs font-bold text-slate-500">
+                  <ClientDate value={j.journal_end_at || j.created_at} />
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -158,6 +182,9 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
   const [strategyId, setStrategyId] = useState("all");
   const [setupType, setSetupType] = useState("all");
   const [expanded, setExpanded] = useState(true);
+  const [dateRange, setDateRange] = useState("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
 
   const setupTypes = useMemo(() => {
     return Array.from(
@@ -168,14 +195,60 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
   }, [journals]);
 
   const filtered = useMemo(() => {
+    const now = new Date();
+
     return journals.filter((j) => {
       if (accountId !== "all" && j.trading_account_id !== accountId)
         return false;
       if (strategyId !== "all" && j.strategy_id !== strategyId) return false;
       if (setupType !== "all" && getSetupType(j) !== setupType) return false;
+
+      const tradeDate = new Date(j.journal_end_at || j.created_at);
+
+      if (dateRange === "7d") {
+        const start = new Date(now);
+        start.setDate(start.getDate() - 7);
+        if (tradeDate < start) return false;
+      }
+
+      if (dateRange === "30d") {
+        const start = new Date(now);
+        start.setDate(start.getDate() - 30);
+        if (tradeDate < start) return false;
+      }
+
+      if (dateRange === "90d") {
+        const start = new Date(now);
+        start.setDate(start.getDate() - 90);
+        if (tradeDate < start) return false;
+      }
+
+      if (dateRange === "this_year") {
+        const start = new Date(now.getFullYear(), 0, 1);
+        if (tradeDate < start) return false;
+      }
+      if (dateRange === "custom") {
+        if (customStartDate) {
+          const start = new Date(`${customStartDate}T00:00:00`);
+          if (tradeDate < start) return false;
+        }
+
+        if (customEndDate) {
+          const end = new Date(`${customEndDate}T23:59:59`);
+          if (tradeDate > end) return false;
+        }
+      }
       return true;
     });
-  }, [journals, accountId, strategyId, setupType]);
+  }, [
+    journals,
+    accountId,
+    strategyId,
+    setupType,
+    dateRange,
+    customStartDate,
+    customEndDate,
+  ]);
 
   const curve = useMemo(() => buildEquityCurve(filtered), [filtered]);
   const stats = useMemo(() => getStats(filtered), [filtered]);
@@ -189,11 +262,11 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
 
   const topWins = [...stats.closed]
     .sort((a, b) => calculateRMultiple(b) - calculateRMultiple(a))
-    .slice(0, 5);
+    .slice(0, 10);
 
   const topLosses = [...stats.closed]
     .sort((a, b) => calculateRMultiple(a) - calculateRMultiple(b))
-    .slice(0, 5);
+    .slice(0, 10);
 
   const maxDrawdown = drawdowns.length ? drawdowns[0].drawdown : 0;
   const avgQuality =
@@ -215,7 +288,7 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
           </p>
         </div>
 
-        <div className="grid flex-1 gap-3 md:max-w-4xl md:grid-cols-4">
+        <div className="grid flex-1 gap-3 md:max-w-5xl md:grid-cols-5">
           <SelectBox label="Account" value={accountId} onChange={setAccountId}>
             <option value="all">All Accounts</option>
             {accounts.map((a) => (
@@ -247,9 +320,50 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
             ))}
           </SelectBox>
 
-          <button className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm">
+          <SelectBox
+            label="Date Range"
+            value={dateRange}
+            onChange={setDateRange}
+          >
+            <option value="all">All Time</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="this_year">This Year</option>
+            <option value="custom">Custom Range</option>
+          </SelectBox>
+          {dateRange === "custom" ? (
+            <>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm outline-none"
+              />
+
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm outline-none"
+              />
+            </>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => {
+              setAccountId("all");
+              setStrategyId("all");
+              setSetupType("all");
+              setDateRange("all");
+              setCustomStartDate("");
+              setCustomEndDate("");
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm"
+          >
             <Filter className="h-4 w-4" />
-            Filters
+            Reset
           </button>
         </div>
       </div>
@@ -340,139 +454,79 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
             <span className="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-black text-white">
               LEVEL 2
             </span>
+
             <span className="text-sm font-black text-slate-700">
               Expanded Intelligence
             </span>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-3">
-            <SmallPanel title="R Distribution Matrix">
-              <RDistributionChart data={distribution} />
+          <div className="grid min-w-0 gap-4 xl:grid-cols-3">
+            <SmallPanel>
+              <div className="grid gap-6">
+                <RDistributionChart data={distribution} />
+                <AvgWinLossBlock stats={stats} />
+
+                <DrawdownIntelligenceBlock
+                  maxDrawdown={maxDrawdown}
+                  drawdownSeries={drawdownSeries}
+                  drawdowns={drawdowns}
+                />
+
+                <TradeQualityBlock
+                  qualitySeries={qualitySeries}
+                  avgQuality={avgQuality}
+                />
+              </div>
             </SmallPanel>
 
-            <SmallPanel title="B. Top 5 R Collection (Biggest Wins)">
+            <SmallPanel title="Optimal Executions: Top 10 R Wins">
               <TradeTable rows={topWins} type="win" />
             </SmallPanel>
 
-            <SmallPanel title="C. Top 5 R Losses (Biggest Losses)">
+            <SmallPanel title="Suboptimal Executions: Top 10 R Losses">
               <TradeTable rows={topLosses} type="loss" />
             </SmallPanel>
           </div>
-
-          <div className="grid gap-4 xl:grid-cols-3">
-            <SmallPanel title="D. Avg Win R vs Avg Loss R">
-              <div className="grid grid-cols-3 items-center gap-3">
-                <div>
-                  <div className="text-xs font-bold text-slate-500">
-                    Avg Winning R
-                  </div>
-                  <div className="mt-2 text-2xl font-black text-emerald-600">
-                    {formatR(stats.avgWin)}
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <EfficiencyDonut value={stats.rEfficiency} />
-                  <div className="-mt-20 text-3xl font-black">
-                    {stats.rEfficiency}
-                  </div>
-                  <div className="mt-16 text-xs font-bold text-slate-500">
-                    R Efficiency
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs font-bold text-slate-500">
-                    Avg Losing R
-                  </div>
-                  <div className="mt-2 text-2xl font-black text-red-600">
-                    -{stats.avgLoss}R
-                  </div>
-                </div>
-              </div>
-            </SmallPanel>
-
-            <SmallPanel title="E. Drawdown Intelligence">
-              <div className="grid grid-cols-3 gap-3 text-center text-xs">
-                <div>
-                  <div className="font-bold text-slate-500">Max Drawdown</div>
-                  <div className="mt-1 text-lg font-black text-red-600">
-                    {formatR(maxDrawdown)}
-                  </div>
-                </div>
-                <div>
-                  <div className="font-bold text-slate-500">Avg Drawdown</div>
-                  <div className="mt-1 text-lg font-black text-red-600">
-                    {formatR(
-                      drawdownSeries.reduce((a, b) => a + b.drawdown, 0) /
-                        (drawdownSeries.length || 1),
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <div className="font-bold text-slate-500">DD Zones</div>
-                  <div className="mt-1 text-lg font-black">
-                    {drawdowns.length}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3">
-                <DrawdownChart data={drawdownSeries} />
-              </div>
-            </SmallPanel>
-
-            <SmallPanel title="F. Trade Quality Over Time">
-              <div className="grid gap-3 md:grid-cols-[1fr_120px]">
-                <QualityChart data={qualitySeries} />
-                <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="text-xs font-bold text-slate-500">
-                    Avg Quality Score
-                  </div>
-                  <div className="mt-3 text-4xl font-black">{avgQuality}</div>
-                  <div className="text-sm font-black text-emerald-600">
-                    Good
-                  </div>
-                </div>
-              </div>
-            </SmallPanel>
-          </div>
-
           <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-black">AI Behavioral Insights</h2>
-              <button className="text-sm font-black text-blue-600">
-                View Full AI Report →
-              </button>
+              <h2 className="text-lg font-black text-slate-950">
+                AI Behavioral Insights
+              </h2>
             </div>
 
             <div className="grid gap-4 md:grid-cols-5">
               <Insight
                 icon={TrendingUp}
-                title="Strong R Growth"
-                text="Your cumulative R is trending based on closed trades."
-                good
+                title="R Curve Direction"
+                text={`Your selected performance is ${stats.totalR >= 0 ? "positive" : "negative"} at ${formatR(stats.totalR)}.`}
+                good={stats.totalR >= 0}
+                danger={stats.totalR < 0}
               />
+
               <Insight
                 icon={AlertTriangle}
-                title="Drawdown Detected"
-                text={`${drawdowns.length} drawdown zone found in the selected period.`}
-                danger
+                title="Drawdown Pressure"
+                text={`${drawdowns.length} drawdown zone found. Max drawdown is ${formatR(maxDrawdown)}.`}
+                danger={maxDrawdown < 0}
               />
+
               <Insight
                 icon={ShieldCheck}
-                title="Risk Management"
-                text={`Profit factor is ${stats.profitFactor}.`}
+                title="Risk Quality"
+                text={`Profit factor is ${stats.profitFactor}. Expectancy is ${formatR(stats.expectancy)}.`}
               />
+
               <Insight
                 icon={Trophy}
-                title="Good Recovery"
-                text="Recovery is measured from R curve pullbacks."
+                title="Execution Edge"
+                text={`Avg win is ${formatR(stats.avgWin)} and avg loss is -${stats.avgLoss}R.`}
                 good
               />
+
               <Insight
                 icon={Target}
-                title="Execution Opportunity"
-                text={`Avg win ${formatR(stats.avgWin)}, avg loss -${stats.avgLoss}R.`}
+                title="Focus Area"
+                text={`Win rate is ${stats.winRate}%. Improve low-quality exits and protect high-R trades.`}
               />
             </div>
           </section>
@@ -500,6 +554,112 @@ function Insight({ icon: Icon, title, text, good, danger }) {
       <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
         {text}
       </p>
+    </div>
+  );
+}
+
+function AvgWinLossBlock({ stats }) {
+  return (
+    <div className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+      <h4 className="text-sm font-black text-slate-900">Execution Balance</h4>
+
+      <div className="mt-5 grid min-w-0 grid-cols-1 gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-xs font-bold text-slate-500">
+              Avg Winning R
+            </div>
+            <div className="mt-2 text-xl font-black text-blue-600">
+              {formatR(stats.avgWin)}
+            </div>
+          </div>
+
+          <div className="text-right">
+            <div className="text-xs font-bold text-slate-500">Avg Losing R</div>
+            <div className="mt-2 text-xl font-black text-orange-500">
+              -{stats.avgLoss}R
+            </div>
+          </div>
+        </div>
+
+        <div className="relative mx-auto flex h-[180px] w-full max-w-[220px] items-center justify-center">
+          <EfficiencyDonut value={stats.rEfficiency} />
+
+          <div className="absolute inset-0 flex flex-col items-center justify-center pt-5">
+            <div className="text-3xl font-black text-slate-950">
+              {stats.rEfficiency}
+            </div>
+            <div className="mt-10 text-xs font-bold text-slate-500">
+              R Efficiency
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DrawdownIntelligenceBlock({ maxDrawdown, drawdownSeries, drawdowns }) {
+  const avgDrawdown =
+    drawdownSeries.reduce((a, b) => a + b.drawdown, 0) /
+    (drawdownSeries.length || 1);
+
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+      <h4 className="text-sm font-black text-slate-900">
+        Drawdown Intelligence
+      </h4>
+
+      <div className="mt-4 grid grid-cols-3 gap-3 text-center text-xs">
+        <div>
+          <div className="font-bold text-slate-500">Max DD</div>
+          <div className="mt-1 text-lg font-black text-orange-500">
+            {formatR(maxDrawdown)}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold text-slate-500">Avg DD</div>
+          <div className="mt-1 text-lg font-black text-orange-500">
+            {formatR(avgDrawdown)}
+          </div>
+        </div>
+
+        <div>
+          <div className="font-bold text-slate-500">DD Zones</div>
+          <div className="mt-1 text-lg font-black text-slate-950">
+            {drawdowns.length}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <DrawdownChart data={drawdownSeries} />
+      </div>
+    </div>
+  );
+}
+
+function TradeQualityBlock({ qualitySeries, avgQuality }) {
+  return (
+    <div className="min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+      <h4 className="text-sm font-black text-slate-900">
+        Trade Quality Over Time
+      </h4>
+
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-3">
+        <div className="min-w-0">
+          <QualityChart data={qualitySeries} />
+        </div>
+
+        <div className="flex min-h-[120px] flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-4">
+          <div className="text-xs font-bold text-slate-500">Avg Quality</div>
+          <div className="mt-2 text-4xl font-black text-slate-950">
+            {avgQuality}
+          </div>
+          <div className="text-sm font-black text-blue-600">Good</div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -48,36 +48,47 @@ function TooltipBox({ active, payload, label }) {
 
 export function RDistributionChart({ data }) {
   return (
-    <ResponsiveContainer width="100%" height={180}>
-      <BarChart data={data}>
-        <CartesianGrid vertical={false} stroke={C.slate200} />
+    <div className="rounded-3xl border border-slate-200 bg-blue-50/40 p-4">
+      <h4 className="text-sm font-black text-slate-900">
+        R Distribution Matrix
+      </h4>
 
-        <XAxis
-          dataKey="bucket"
-          tick={{ fontSize: 11, fill: C.slate600 }}
-          stroke={C.slate400}
-        />
+      <div className="mt-4 h-[220px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid vertical={false} stroke={C.slate200} />
 
-        <YAxis tick={{ fontSize: 11, fill: C.slate600 }} stroke={C.slate400} />
-
-        <Tooltip content={<TooltipBox />} />
-
-        <Bar dataKey="count" radius={[10, 10, 0, 0]}>
-          {data.map((x) => (
-            <Cell
-              key={x.bucket}
-              fill={
-                x.tone === "bad"
-                  ? C.orange
-                  : x.tone === "mid"
-                    ? C.slate300
-                    : C.blue
-              }
+            <XAxis
+              dataKey="bucket"
+              tick={{ fontSize: 11, fill: C.slate600 }}
+              stroke={C.slate400}
             />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+
+            <YAxis
+              tick={{ fontSize: 11, fill: C.slate600 }}
+              stroke={C.slate400}
+            />
+
+            <Tooltip content={<TooltipBox />} />
+
+            <Bar dataKey="count" radius={[10, 10, 0, 0]}>
+              {data.map((x) => (
+                <Cell
+                  key={x.bucket}
+                  fill={
+                    x.tone === "bad"
+                      ? C.orange
+                      : x.tone === "mid"
+                        ? C.slate300
+                        : C.blue
+                  }
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 

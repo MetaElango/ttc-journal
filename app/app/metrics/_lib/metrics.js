@@ -97,25 +97,28 @@ export function calculateRMultiple(journal) {
   const direction = String(journal.direction || "").toUpperCase();
 
   const entry = Number(journal.entry_price);
-  const stop = Number(journal.stop_loss);
+
+  // use modified SL first
+  const stop = Number(journal.modified_sl_price ?? journal.stop_loss);
+
   const exit = Number(journal.exit_price);
 
   if (!CLOSED_STATUSES.includes(status)) return 0;
-  if (!(entry > 0) || !(stop > 0)) return 0;
-
-  if (status === "TRADE SL HIT") return -1;
-
-  if (!(exit > 0)) return 0;
+  if (!(entry > 0) || !(stop > 0) || !(exit > 0)) return 0;
 
   if (direction === "BUY") {
     const risk = entry - stop;
+
     if (risk <= 0) return 0;
+
     return (exit - entry) / risk;
   }
 
   if (direction === "SELL") {
     const risk = stop - entry;
+
     if (risk <= 0) return 0;
+
     return (entry - exit) / risk;
   }
 
