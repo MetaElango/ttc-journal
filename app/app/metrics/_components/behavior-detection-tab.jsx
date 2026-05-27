@@ -21,7 +21,25 @@ import {
   getSetupType,
   round2,
 } from "../_lib/metrics";
+function getNormalizedRisk(j) {
+  const risk = Number(j.risk_per_trade || 0);
+  const mode = String(j.risk_mode || "").toUpperCase();
 
+  if (!risk) return 0;
+
+  // already percentage
+  if (mode === "PERCENT") return risk;
+
+  // USD amount converted into account %
+  if (mode === "AMOUNT") {
+    const accountSize = Number(j.trading_accounts?.account_size || 0);
+    if (!accountSize) return 0;
+
+    return (risk / accountSize) * 100;
+  }
+
+  return risk;
+}
 function InfoTip({ title, text, best, normal, worst }) {
   return (
     <span className="group/tip relative z-[999] inline-flex shrink-0 align-middle">
@@ -47,7 +65,7 @@ function getSymbol(j) {
 }
 
 function getRiskValue(j) {
-  return Number(j?.risk_per_trade || 0);
+  return getNormalizedRisk(j);
 }
 
 function getClosedTrades(journals) {

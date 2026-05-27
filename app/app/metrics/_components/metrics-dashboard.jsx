@@ -17,6 +17,7 @@ import {
 import PerformanceTab from "./performance-tab";
 import BehaviorDetectionTab from "./behavior-detection-tab";
 import ExecutionIntegrityTab from "./execution-integrity-tab";
+import GrowthMirrorTab from "./growth-mirror-tab";
 
 function SelectBox({ label, value, onChange, children }) {
   return (
@@ -286,10 +287,10 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
 
                 label: "Execution Integrity",
               },
-              // {
-              //   id: "execution",
-              //   label: "Execution Analytics",
-              // },
+              {
+                id: "ascend",
+                label: "Ascend Intelligence",
+              },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -329,6 +330,7 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
       {activeTab === "execution" && (
         <ExecutionIntegrityTab journals={filtered} />
       )}
+      {activeTab === "ascend" && <GrowthMirrorTab journals={filtered} />}
     </div>
   );
 }
