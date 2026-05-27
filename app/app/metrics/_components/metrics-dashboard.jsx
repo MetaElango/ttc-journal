@@ -16,6 +16,7 @@ import {
 
 import PerformanceTab from "./performance-tab";
 import BehaviorDetectionTab from "./behavior-detection-tab";
+import ExecutionIntegrityTab from "./execution-integrity-tab";
 
 function SelectBox({ label, value, onChange, children }) {
   return (
@@ -280,10 +281,11 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
                 id: "behavior",
                 label: "Behavioral Intelligence",
               },
-              // {
-              //   id: "strategy",
-              //   label: "Strategy Analytics",
-              // },
+              {
+                id: "execution",
+
+                label: "Execution Integrity",
+              },
               // {
               //   id: "execution",
               //   label: "Execution Analytics",
@@ -323,26 +325,9 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
         />
       )}
       {activeTab === "behavior" && <BehaviorDetectionTab journals={filtered} />}
-      {activeTab === "strategy" && (
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-10 shadow-sm">
-          <h2 className="text-2xl font-black">Strategy Analytics</h2>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Compare strategy performance, setup efficiency, RR consistency, and
-            long-term profitability.
-          </p>
-        </section>
-      )}
 
       {activeTab === "execution" && (
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-10 shadow-sm">
-          <h2 className="text-2xl font-black">Execution Analytics</h2>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Entry precision, SL placement quality, TP efficiency, and execution
-            timing intelligence.
-          </p>
-        </section>
+        <ExecutionIntegrityTab journals={filtered} />
       )}
     </div>
   );
