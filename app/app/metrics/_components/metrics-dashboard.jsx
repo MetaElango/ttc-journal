@@ -18,6 +18,7 @@ import PerformanceTab from "./performance-tab";
 import BehaviorDetectionTab from "./behavior-detection-tab";
 import ExecutionIntegrityTab from "./execution-integrity-tab";
 import GrowthMirrorTab from "./growth-mirror-tab";
+import DurationExposureTab from "./duration-exposure-tab";
 
 function SelectBox({ label, value, onChange, children }) {
   return (
@@ -291,6 +292,10 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
                 id: "ascend",
                 label: "Ascend Intelligence",
               },
+              {
+                id: "duration",
+                label: "Duration & Exposure",
+              },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -331,6 +336,7 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
         <ExecutionIntegrityTab journals={filtered} />
       )}
       {activeTab === "ascend" && <GrowthMirrorTab journals={filtered} />}
+      {activeTab === "duration" && <DurationExposureTab journals={filtered} />}
     </div>
   );
 }
