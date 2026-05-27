@@ -431,7 +431,7 @@ function detectGrowth(journals) {
       : emotionalControl < 50
         ? "Fear-Contraction Trader"
         : recoveryPowerFromTrades(trades) > 3
-          ? "Aggressive Recoverer"
+          ? "Adaptive Recoverer"
           : executionIntegrity >= 75
             ? "Stable Executor"
             : "Controlled Opportunist";
@@ -1050,10 +1050,10 @@ export default function GrowthMirrorTab({ journals }) {
           subtitle="Trader personality classification."
           info={{
             title: "Behavioral Profile",
-            text: "Classification based on discipline, emotional control, recovery, and execution.",
+            text: "Classification based on discipline, emotional control, recovery behavior, risk consistency, and execution quality.",
             best: "Ascendant Trader / Stable Executor.",
-            normal: "Controlled Opportunist.",
-            worst: "Revenge Cycler or Fear-Contraction Trader.",
+            normal: "Adaptive Recoverer / Controlled Opportunist.",
+            worst: "Fear-Contraction Trader.",
           }}
         >
           <div className="rounded-3xl bg-blue-50 p-5">
