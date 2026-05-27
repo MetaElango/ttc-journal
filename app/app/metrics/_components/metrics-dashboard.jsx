@@ -15,6 +15,7 @@ import {
 } from "../_lib/metrics";
 
 import PerformanceTab from "./performance-tab";
+import BehaviorDetectionTab from "./behavior-detection-tab";
 
 function SelectBox({ label, value, onChange, children }) {
   return (
@@ -174,127 +175,135 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
 
   return (
     <div className="space-y-5 rounded-[2rem] bg-slate-50 p-4 text-slate-950">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight">
-            Trader's Mirror
-          </h1>
-          <p className="text-sm font-medium text-slate-500">
-            Reflect. Refine. Execute.
-          </p>
+      <div className="sticky top-0 z-50 -mx-4 border-b border-slate-200 bg-slate-50/90 px-4 py-4 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-black tracking-tight">
+              Trader's Mirror
+            </h1>
+            <p className="text-sm font-medium text-slate-500">
+              Reflect. Refine. Execute.
+            </p>
+          </div>
+
+          <div className="grid flex-1 gap-3 md:max-w-5xl md:grid-cols-5">
+            <SelectBox
+              label="Account"
+              value={accountId}
+              onChange={setAccountId}
+            >
+              <option value="all">All Accounts</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.account_name}
+                </option>
+              ))}
+            </SelectBox>
+
+            <SelectBox
+              label="Strategy"
+              value={strategyId}
+              onChange={setStrategyId}
+            >
+              <option value="all">All Strategies</option>
+              {strategies.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.strategy_name}
+                </option>
+              ))}
+            </SelectBox>
+
+            <SelectBox label="Setup" value={setupType} onChange={setSetupType}>
+              <option value="all">All Setups</option>
+              {setupTypes.map((x) => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </SelectBox>
+
+            <SelectBox
+              label="Date Range"
+              value={dateRange}
+              onChange={setDateRange}
+            >
+              <option value="all">All Time</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="90d">Last 90 Days</option>
+              <option value="this_year">This Year</option>
+              <option value="custom">Custom Range</option>
+            </SelectBox>
+            {dateRange === "custom" ? (
+              <>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm outline-none"
+                />
+
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm outline-none"
+                />
+              </>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => {
+                setAccountId("all");
+                setStrategyId("all");
+                setSetupType("all");
+                setDateRange("all");
+                setCustomStartDate("");
+                setCustomEndDate("");
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm"
+            >
+              <Filter className="h-4 w-4" />
+              Reset
+            </button>
+          </div>
         </div>
-
-        <div className="grid flex-1 gap-3 md:max-w-5xl md:grid-cols-5">
-          <SelectBox label="Account" value={accountId} onChange={setAccountId}>
-            <option value="all">All Accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.account_name}
-              </option>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3">
+            {[
+              {
+                id: "performance",
+                label: "Performance Overview",
+              },
+              {
+                id: "behavior",
+                label: "Behavioral Intelligence",
+              },
+              // {
+              //   id: "strategy",
+              //   label: "Strategy Analytics",
+              // },
+              // {
+              //   id: "execution",
+              //   label: "Execution Analytics",
+              // },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={[
+                  "rounded-2xl px-5 py-3 text-sm font-black transition-all",
+                  activeTab === tab.id
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100",
+                ].join(" ")}
+              >
+                {tab.label}
+              </button>
             ))}
-          </SelectBox>
-
-          <SelectBox
-            label="Strategy"
-            value={strategyId}
-            onChange={setStrategyId}
-          >
-            <option value="all">All Strategies</option>
-            {strategies.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.strategy_name}
-              </option>
-            ))}
-          </SelectBox>
-
-          <SelectBox label="Setup" value={setupType} onChange={setSetupType}>
-            <option value="all">All Setups</option>
-            {setupTypes.map((x) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </SelectBox>
-
-          <SelectBox
-            label="Date Range"
-            value={dateRange}
-            onChange={setDateRange}
-          >
-            <option value="all">All Time</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
-            <option value="this_year">This Year</option>
-            <option value="custom">Custom Range</option>
-          </SelectBox>
-          {dateRange === "custom" ? (
-            <>
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm outline-none"
-              />
-
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm outline-none"
-              />
-            </>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={() => {
-              setAccountId("all");
-              setStrategyId("all");
-              setSetupType("all");
-              setDateRange("all");
-              setCustomStartDate("");
-              setCustomEndDate("");
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold shadow-sm"
-          >
-            <Filter className="h-4 w-4" />
-            Reset
-          </button>
+          </div>
         </div>
-      </div>
-      <div className="flex flex-wrap gap-3">
-        {[
-          {
-            id: "performance",
-            label: "Performance Overview",
-          },
-          {
-            id: "behavior",
-            label: "Behavioral Intelligence",
-          },
-          {
-            id: "strategy",
-            label: "Strategy Analytics",
-          },
-          {
-            id: "execution",
-            label: "Execution Analytics",
-          },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={[
-              "rounded-2xl px-5 py-3 text-sm font-black transition-all",
-              activeTab === tab.id
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-200"
-                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100",
-            ].join(" ")}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {activeTab === "performance" && (
@@ -313,17 +322,7 @@ export default function MetricsDashboard({ journals, accounts, strategies }) {
           topLosses={topLosses}
         />
       )}
-      {activeTab === "behavior" && (
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-10 shadow-sm">
-          <h2 className="text-2xl font-black">Behavioral Intelligence</h2>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Revenge trading, overtrading, emotional bias, confidence cycles,
-            discipline tracking and psychological analytics.
-          </p>
-        </section>
-      )}
-
+      {activeTab === "behavior" && <BehaviorDetectionTab journals={filtered} />}
       {activeTab === "strategy" && (
         <section className="rounded-[2rem] border border-slate-200 bg-white p-10 shadow-sm">
           <h2 className="text-2xl font-black">Strategy Analytics</h2>
