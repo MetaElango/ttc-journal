@@ -5,16 +5,12 @@
 import { useMemo } from "react";
 import {
   Activity,
-  AlertTriangle,
   Brain,
   Flame,
-  Gauge,
   Info,
-  RotateCcw,
   ShieldCheck,
   Target,
   TrendingDown,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 
@@ -118,54 +114,197 @@ function detectBehavior(journals) {
 
   const recoveryPower = lastR > 0 && avgLossR > 0 ? lastR / avgLossR : 0;
 
-  const sameAssetCount = lastTrade
-    ? recent5.filter((j) => getSymbol(j) === getSymbol(lastTrade)).length
+  let lossClusters = 0;
+  let activeCluster = 0;
+
+  for (const trade of closed) {
+    const r = calculateRMultiple(trade);
+
+    if (r < 0) {
+      activeCluster++;
+    } else {
+      if (activeCluster >= 2) lossClusters++;
+      activeCluster = 0;
+    }
+  }
+
+  if (activeCluster >= 2) lossClusters++;
+
+  const cooldownThresholdMinutes = 15;
+  let noCooldownCount = 0;
+  const cooldownDurations = [];
+
+  for (let i = 1; i < closed.length; i++) {
+    const prev = closed[i - 1];
+    const curr = closed[i];
+
+    if (calculateRMultiple(prev) < 0) {
+      const diffMinutes =
+        (getTradeDate(curr).getTime() - getTradeDate(prev).getTime()) /
+        1000 /
+        60;
+
+      if (diffMinutes >= 0) {
+        cooldownDurations.push(diffMinutes);
+
+        if (diffMinutes <= cooldownThresholdMinutes) {
+          noCooldownCount++;
+        }
+      }
+    }
+  }
+
+  const avgCooldown = avg(cooldownDurations);
+
+  const symbolBehavior = {};
+
+  for (const trade of recent10) {
+    const symbol = getSymbol(trade);
+    const r = calculateRMultiple(trade);
+
+    if (!symbolBehavior[symbol]) {
+      symbolBehavior[symbol] = {
+        symbol,
+        trades: 0,
+        wins: 0,
+        losses: 0,
+        totalR: 0,
+      };
+    }
+
+    symbolBehavior[symbol].trades += 1;
+    symbolBehavior[symbol].totalR += r;
+
+    if (r > 0) symbolBehavior[symbol].wins += 1;
+    if (r < 0) symbolBehavior[symbol].losses += 1;
+  }
+
+  const sameAsset = Object.values(symbolBehavior).sort(
+    (a, b) => b.losses * b.trades - a.losses * a.trades,
+  )[0];
+
+  const sameAssetWinRate = sameAsset
+    ? Math.round((sameAsset.wins / sameAsset.trades) * 100)
     : 0;
 
-  const overtradingScore = Math.min(100, recent10.length * 8);
+  const sameAssetCount = sameAsset?.trades || 0;
 
-  let revengeProbability = 0;
-  if (consecutiveLosses >= 2) revengeProbability += 25;
-  if (riskSpike >= 1.5) revengeProbability += 25;
-  if (sameAssetCount >= 3) revengeProbability += 20;
-  if (recent5.length >= 5) revengeProbability += 15;
-  if (consumptionRatio >= 2) revengeProbability += 15;
+  const sameAssetFixation =
+    sameAsset && sameAsset.trades >= 3 && sameAsset.losses >= 2;
 
-  revengeProbability = Math.min(100, revengeProbability);
-
-  const behavioralStability = Math.max(
-    0,
-    100 - revengeProbability - Math.max(0, consecutiveLosses - 1) * 8,
+  const overtradingScore = Math.min(
+    100,
+    recent10.length * 8 + noCooldownCount * 5,
   );
 
+  const riskEscalationRows = [];
+
+  for (let streak = 2; streak <= 5; streak++) {
+    const beforeRisks = [];
+    const afterRisks = [];
+
+    for (let i = streak; i < closed.length; i++) {
+      const previousTrades = closed.slice(i - streak, i);
+
+      const allLosses = previousTrades.every((t) => calculateRMultiple(t) < 0);
+
+      if (!allLosses) continue;
+
+      const beforeRisk = avg(previousTrades.map(getRiskValue).filter(Boolean));
+      const nextTrade = closed[i];
+      const afterRisk = getRiskValue(nextTrade);
+
+      if (beforeRisk > 0 && afterRisk > 0) {
+        beforeRisks.push(beforeRisk);
+        afterRisks.push(afterRisk);
+      }
+    }
+
+    const avgBefore = avg(beforeRisks);
+    const maxAfter = afterRisks.length ? Math.max(...afterRisks) : 0;
+
+    riskEscalationRows.push({
+      situation: `After ${streak} losses`,
+      avgRiskBefore: round2(avgBefore),
+      maxRiskAfter: round2(maxAfter),
+      escalation: avgBefore > 0 ? round2(maxAfter / avgBefore) : 0,
+    });
+  }
+
+  let revengeProbability = 0;
+
+  revengeProbability += Math.min(25, consecutiveLosses * 8);
+  revengeProbability += Math.min(20, lossClusters * 5);
+  revengeProbability += Math.min(20, Math.max(0, riskSpike - 1) * 20);
+  revengeProbability += Math.min(15, noCooldownCount * 5);
+
+  if (sameAssetFixation) revengeProbability += 15;
+  if (consumptionRatio >= 2) revengeProbability += 10;
+  if (overtradingScore >= 80) revengeProbability += 10;
+
+  revengeProbability = Math.min(100, Math.round(revengeProbability));
+
+  let behavioralStability = 100;
+
+  behavioralStability -= revengeProbability * 0.5;
+  behavioralStability -= noCooldownCount * 4;
+  behavioralStability -= lossClusters * 5;
+
+  if (sameAssetFixation) behavioralStability -= 10;
+
+  behavioralStability = Math.max(0, round2(behavioralStability));
+
+  let recoveryQuality = "Neutral";
+
+  if (recoveryPower >= 4) {
+    recoveryQuality = "Aggressive Recovery";
+  } else if (recoveryPower >= 2 && riskSpike >= 1.5) {
+    recoveryQuality = "Emotional Recovery";
+  } else if (recoveryPower >= 1 && riskSpike < 1.3) {
+    recoveryQuality = "Stable Recovery";
+  }
+
+  const tradesAfter3Losses = recent10.filter((trade, index) => {
+    if (index < 3) return false;
+
+    const previousThree = recent10.slice(index - 3, index);
+
+    return previousThree.every((t) => calculateRMultiple(t) < 0);
+  }).length;
+
+  const maxRiskAfterLossStreak = recent10.reduce((max, trade, index) => {
+    if (index < 3) return max;
+
+    const previousThree = recent10.slice(index - 3, index);
+    const hadThreeLosses = previousThree.every(
+      (t) => calculateRMultiple(t) < 0,
+    );
+
+    if (!hadThreeLosses) return max;
+
+    return Math.max(max, getRiskValue(trade));
+  }, 0);
+
+  const avgTimeBetweenTradesAfterLoss =
+    avgCooldown > 0 ? `${round2(avgCooldown)} mins` : "—";
+
+  const cooldownTaken =
+    avgCooldown === 0
+      ? "No Data"
+      : avgCooldown <= 15
+        ? "No Cooldown"
+        : avgCooldown <= 60
+          ? "Short Cooldown"
+          : "Healthy Cooldown";
+
+  const recommendedAction =
+    revengeProbability >= 70
+      ? "Stop trading, reduce risk, take cooldown."
+      : revengeProbability >= 40
+        ? "Reduce size and avoid repeated symbols."
+        : "Continue monitoring risk discipline.";
+
   const events = [];
-
-  if (consumptionRatio > 2) {
-    events.push({
-      type: "critical",
-      title: "Destructive trade detected",
-      text: `Loss consumed ${round2(consumptionRatio)}x average winning efficiency.`,
-      trade: lastTrade,
-    });
-  }
-
-  if (recoveryPower > 2) {
-    events.push({
-      type: recoveryPower > 4 ? "warning" : "recovery",
-      title: "Recovery trade detected",
-      text: `Trade recovered ${round2(recoveryPower)}x average previous losses.`,
-      trade: lastTrade,
-    });
-  }
-
-  if (riskSpike >= 1.5) {
-    events.push({
-      type: riskSpike >= 2 ? "critical" : "warning",
-      title: "Risk spike detected",
-      text: `Risk increased ${round2(riskSpike)}x above baseline.`,
-      trade: lastTrade,
-    });
-  }
 
   if (consecutiveLosses >= 3) {
     events.push({
@@ -176,11 +315,47 @@ function detectBehavior(journals) {
     });
   }
 
-  if (sameAssetCount >= 3) {
+  if (consumptionRatio > 2) {
+    events.push({
+      type: "critical",
+      title: "Destructive trade detected",
+      text: `Loss consumed ${round2(consumptionRatio)}x average winning efficiency.`,
+      trade: lastTrade,
+    });
+  }
+
+  if (riskSpike >= 1.5) {
+    events.push({
+      type: riskSpike >= 2 ? "critical" : "warning",
+      title: "Risk escalation detected",
+      text: `Risk increased ${round2(riskSpike)}x above baseline.`,
+      trade: lastTrade,
+    });
+  }
+
+  if (sameAssetFixation) {
     events.push({
       type: "warning",
-      title: "Same asset obsession",
-      text: `${sameAssetCount} recent trades focused on ${getSymbol(lastTrade)}.`,
+      title: "Same asset fixation detected",
+      text: `${sameAsset.trades} recent trades on ${sameAsset.symbol}, with ${sameAsset.losses} losses.`,
+      trade: lastTrade,
+    });
+  }
+
+  if (noCooldownCount > 0) {
+    events.push({
+      type: noCooldownCount >= 2 ? "critical" : "warning",
+      title: "No-cooldown behavior detected",
+      text: `${noCooldownCount} trade(s) opened within ${cooldownThresholdMinutes} minutes after a loss.`,
+      trade: lastTrade,
+    });
+  }
+
+  if (recoveryPower > 2) {
+    events.push({
+      type: recoveryPower >= 4 ? "warning" : "recovery",
+      title: "Recovery trade detected",
+      text: `Trade recovered ${round2(recoveryPower)}x average previous losses. Classification: ${recoveryQuality}.`,
       trade: lastTrade,
     });
   }
@@ -206,6 +381,7 @@ function detectBehavior(journals) {
     avgLossR,
     consumptionRatio,
     recoveryPower,
+    recoveryQuality,
     riskSpike,
     baselineRisk,
     currentRisk,
@@ -215,7 +391,19 @@ function detectBehavior(journals) {
     overtradingScore,
     behavioralStability,
     sameAssetCount,
+    sameAssetFixation,
+    noCooldownCount,
+    avgCooldown,
     events,
+    lossClusters,
+    sameAsset,
+    sameAssetWinRate,
+    riskEscalationRows,
+    avgTimeBetweenTradesAfterLoss,
+    tradesAfter3Losses,
+    maxRiskAfterLossStreak,
+    cooldownTaken,
+    recommendedAction,
   };
 }
 
@@ -401,17 +589,17 @@ export default function BehaviorDetectionTab({ journals }) {
           value={`${engine.revengeProbability}%`}
           sub={
             engine.revengeProbability >= 70
-              ? "Critical"
+              ? "High Risk"
               : engine.revengeProbability >= 40
                 ? "Warning"
                 : "Stable"
           }
           info={{
             title: "Revenge Probability",
-            text: "Calculated from loss streaks, risk escalation, same-symbol repetition, overtrading, and destructive losses.",
-            best: "0% to 25% — controlled behavior.",
-            normal: "25% to 50% — watch behavior.",
-            worst: "70%+ — high revenge-trading risk.",
+            text: "Based on loss streaks, risk escalation, same-asset repetition, overtrading, and destructive losses.",
+            best: "Under 30%.",
+            normal: "30% to 50%.",
+            worst: "Above 70%.",
           }}
           danger={engine.revengeProbability >= 70}
           warning={engine.revengeProbability >= 40}
@@ -421,13 +609,13 @@ export default function BehaviorDetectionTab({ journals }) {
           icon={TrendingDown}
           label="Consecutive Losses"
           value={engine.consecutiveLosses}
-          sub="Current loss streak"
+          sub="Current streak"
           info={{
             title: "Consecutive Losses",
             text: "Current continuous losing streak from the latest closed trades.",
-            best: "0 to 1 loss.",
-            normal: "2 losses needs attention.",
-            worst: "3+ losses can trigger revenge behavior.",
+            best: "0 to 1.",
+            normal: "2 losses.",
+            worst: "3+ losses.",
           }}
           danger={engine.consecutiveLosses >= 3}
           warning={engine.consecutiveLosses === 2}
@@ -435,62 +623,63 @@ export default function BehaviorDetectionTab({ journals }) {
 
         <MetricCard
           icon={Flame}
-          label="Trade Consumption"
-          value={`${round2(engine.consumptionRatio)}x`}
-          sub="Loss vs avg win"
+          label="Loss Clusters"
+          value={engine.lossClusters}
+          sub="Detected"
           info={{
-            title: "Trade Consumption",
-            text: "Measures how much the latest loss consumed compared to your average winning R.",
-            best: "Below 1x.",
-            normal: "1x to 2x.",
-            worst: "Above 2x means one loss destroyed multiple wins.",
+            title: "Loss Clusters",
+            text: "Counts grouped losses in the filtered period.",
+            best: "Low clustered losses.",
+            normal: "Some grouped losses.",
+            worst: "Multiple losses grouped closely.",
           }}
-          danger={engine.consumptionRatio > 2}
-        />
-
-        <MetricCard
-          icon={TrendingUp}
-          label="Recovery Power"
-          value={`${round2(engine.recoveryPower)}x`}
-          sub="Win vs avg loss"
-          info={{
-            title: "Recovery Power",
-            text: "Measures how much the latest winning trade recovered compared to your average previous loss.",
-            best: "1x to 2.5x controlled recovery.",
-            normal: "2.5x to 4x strong recovery.",
-            worst: "4x+ may indicate emotional recovery attempt.",
-          }}
-          warning={engine.recoveryPower > 3}
+          danger={engine.lossClusters >= 5}
         />
 
         <MetricCard
           icon={Zap}
-          label="Risk Spike"
+          label="Risk Escalation"
           value={`${round2(engine.riskSpike)}x`}
-          sub="Current vs baseline"
+          sub="After losses"
           info={{
-            title: "Risk Spike",
-            text: "Current trade risk divided by your previous average risk.",
-            best: "Below 1.2x.",
-            normal: "1.2x to 1.5x.",
-            worst: "2x or higher.",
+            title: "Risk Escalation",
+            text: "Current risk compared with baseline risk.",
+            best: "Around 1x.",
+            normal: "Below 1.5x.",
+            worst: "Above 2x.",
           }}
           danger={engine.riskSpike >= 2}
           warning={engine.riskSpike >= 1.5}
         />
 
         <MetricCard
+          icon={Target}
+          label="Same Asset Obsession"
+          value={engine.sameAsset?.symbol || "—"}
+          sub={`${engine.sameAsset?.trades || 0} trades`}
+          info={{
+            title: "Same Asset Obsession",
+            text: "Detects repeated trading on one symbol during drawdown.",
+            best: "Diversified focus.",
+            normal: "2 trades on same symbol.",
+            worst: "3+ repeated trades.",
+          }}
+          warning={(engine.sameAsset?.trades || 0) >= 3}
+        />
+
+        <MetricCard
           icon={Activity}
           label="Overtrading Score"
-          value={engine.overtradingScore}
-          sub="Recent trade pressure"
+          value={`${engine.overtradingScore}/100`}
+          sub={engine.overtradingScore >= 80 ? "Extreme" : "Recent pressure"}
           info={{
             title: "Overtrading Score",
-            text: "Based on how many closed trades exist in the recent 10-trade window.",
-            best: "Below 40.",
+            text: "Measures recent trade pressure from the latest 10 trades.",
+            best: "Under 40.",
             normal: "40 to 60.",
-            worst: "60+ shows heavy trade pressure.",
+            worst: "Above 80.",
           }}
+          danger={engine.overtradingScore >= 80}
           warning={engine.overtradingScore >= 60}
         />
 
@@ -498,13 +687,13 @@ export default function BehaviorDetectionTab({ journals }) {
           icon={ShieldCheck}
           label="Behavioral Stability"
           value={`${round2(engine.behavioralStability)}%`}
-          sub="Emotional control score"
+          sub={engine.behavioralStability < 40 ? "Poor" : "Control score"}
           info={{
             title: "Behavioral Stability",
-            text: "Overall behavioral control score after deducting revenge probability and loss-streak pressure.",
-            best: "70%+ stable.",
-            normal: "40% to 70%.",
-            worst: "Below 40% unstable behavior.",
+            text: "Overall emotional control score.",
+            best: "Above 70%.",
+            normal: "50% to 70%.",
+            worst: "Below 40%.",
           }}
           danger={engine.behavioralStability < 40}
           warning={
@@ -792,7 +981,6 @@ export default function BehaviorDetectionTab({ journals }) {
           </div>
         </aside>
       </div>
-
       <Section
         title="Behavioral Intelligence Summary"
         subtitle="Institutional summary of current filtered trading behavior."
@@ -893,6 +1081,240 @@ export default function BehaviorDetectionTab({ journals }) {
           </p>
         </div>
       </Section>
+      <RevengeDetectionEngine engine={engine} />
+    </div>
+  );
+}
+
+function RevengeDetectionEngine({ engine }) {
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black text-blue-600">
+          <Brain className="h-4 w-4" />
+          REVENGE ENGINE
+        </div>
+
+        <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
+          Revenge Detection Engine
+        </h1>
+
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Pattern Recognition + Behavioral Quantification
+        </p>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-3">
+        <Section
+          title="Risk Escalation After Losses"
+          subtitle="Detects risk expansion after losing streaks."
+          info={{
+            title: "Risk Escalation After Losses",
+            text: "Measures how aggressively risk increases after consecutive losing streaks.",
+            best: "Risk remains near baseline after losses.",
+            normal: "Small increase in risk after drawdown.",
+            worst: "Large risk expansion after losses.",
+          }}
+        >
+          <div className="space-y-3">
+            <div className="grid grid-cols-4 gap-3 px-2 text-[11px] font-black uppercase tracking-wide text-slate-400">
+              <div>Situation</div>
+              <div>Avg Before</div>
+              <div>Max After</div>
+              <div>Escalation</div>
+            </div>
+
+            {engine.riskEscalationRows.map((row) => (
+              <div
+                key={row.situation}
+                className="grid grid-cols-4 gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-bold"
+              >
+                <div className="text-slate-700">{row.situation}</div>
+
+                <div className="text-slate-950">{row.avgRiskBefore}%</div>
+
+                <div className="text-blue-600">{row.maxRiskAfter}%</div>
+
+                <div
+                  className={
+                    row.escalation >= 2
+                      ? "text-orange-500"
+                      : row.escalation >= 1.5
+                        ? "text-cyan-600"
+                        : "text-blue-600"
+                  }
+                >
+                  {row.escalation}x
+                </div>
+              </div>
+            ))}
+
+            <div className="rounded-3xl bg-slate-950 p-4 text-white">
+              <div className="flex items-center gap-2 text-sm font-black">
+                <span>AI Insight</span>
+
+                <InfoTip
+                  title="Risk Escalation AI Insight"
+                  text="Behavioral interpretation of post-loss risk expansion."
+                  best="Risk remains controlled after losses."
+                  normal="Moderate emotional expansion."
+                  worst="Aggressive revenge-risk escalation."
+                />
+              </div>
+
+              <p className="mt-2 text-sm font-medium text-slate-300">
+                {engine.riskSpike >= 2
+                  ? "High escalation detected after losses. Maintain stable position sizing to avoid revenge behavior."
+                  : engine.riskSpike >= 1.5
+                    ? "Moderate risk escalation detected. Monitor emotional expansion after drawdowns."
+                    : "Risk behavior currently appears controlled after losses."}
+              </p>
+            </div>
+          </div>
+        </Section>
+
+        <Section
+          title="Same Asset Obsession"
+          subtitle="Detects repeated trading on the same symbol during drawdown."
+          info={{
+            title: "Same Asset Obsession",
+            text: "Detects emotional fixation on a single asset during losing periods.",
+            best: "Diversified trading behavior.",
+            normal: "Occasional repeated symbol focus.",
+            worst: "Repeated forced trades on same symbol during drawdown.",
+          }}
+        >
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="grid grid-cols-5 gap-3 text-xs font-black uppercase text-slate-500">
+              <div>Symbol</div>
+              <div>Trades</div>
+              <div>Win Rate</div>
+              <div>Total R</div>
+              <div>Behavior</div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-5 gap-3 text-sm font-black text-slate-900">
+              <div>{engine.sameAsset?.symbol || "—"}</div>
+
+              <div>{engine.sameAsset?.trades || 0}</div>
+
+              <div>{engine.sameAssetWinRate}%</div>
+
+              <div
+                className={
+                  (engine.sameAsset?.totalR || 0) < 0
+                    ? "text-orange-500"
+                    : "text-blue-600"
+                }
+              >
+                {formatR(engine.sameAsset?.totalR || 0)}
+              </div>
+
+              <div
+                className={
+                  engine.sameAssetFixation ? "text-orange-500" : "text-blue-600"
+                }
+              >
+                {engine.sameAssetFixation ? "Fixation" : "Normal"}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-3xl bg-slate-950 p-4 text-white">
+            <div className="flex items-center gap-2 text-sm font-black">
+              <span>AI Insight</span>
+
+              <InfoTip
+                title="Same Asset Obsession Insight"
+                text="Behavioral interpretation of repeated symbol focus."
+                best="Flexible symbol selection."
+                normal="Minor emotional attachment."
+                worst="Revenge fixation on same asset."
+              />
+            </div>
+
+            <p className="mt-2 text-sm font-medium text-slate-300">
+              {engine.sameAssetFixation
+                ? `You repeatedly traded ${engine.sameAsset?.symbol} during drawdown. Consider cooldown or switching focus.`
+                : "No major same-asset fixation behavior detected."}
+            </p>
+          </div>
+        </Section>
+
+        <Section
+          title="Bottom Quick Behavioral Metrics"
+          subtitle="Fast revenge-behavior summary."
+          info={{
+            title: "Quick Behavioral Metrics",
+            text: "Fast behavioral summary of cooldown, revenge pressure, and post-loss reactions.",
+            best: "Healthy cooldown and stable discipline.",
+            normal: "Minor emotional pressure detected.",
+            worst: "No cooldown with aggressive revenge behavior.",
+          }}
+        >
+          <div className="grid gap-3">
+            <SummaryItem
+              label="Avg Time After Loss"
+              value={engine.avgTimeBetweenTradesAfterLoss}
+              info={{
+                title: "Avg Time After Loss",
+                text: "Average cooldown duration after a losing trade.",
+                best: "30+ minute cooldown.",
+                normal: "15–30 minutes.",
+                worst: "Immediate re-entry after losses.",
+              }}
+            />
+
+            <SummaryItem
+              label="Trades After 3+ Losses"
+              value={engine.tradesAfter3Losses}
+              info={{
+                title: "Trades After 3+ Losses",
+                text: "Number of trades taken after a heavy losing streak.",
+                best: "Low or zero.",
+                normal: "Controlled continuation.",
+                worst: "Aggressive revenge continuation.",
+              }}
+            />
+
+            <SummaryItem
+              label="Max Risk After Streak"
+              value={`${round2(engine.maxRiskAfterLossStreak)}%`}
+              info={{
+                title: "Max Risk After Loss Streak",
+                text: "Highest risk used after multiple consecutive losses.",
+                best: "Risk unchanged.",
+                normal: "Slight increase.",
+                worst: "Large emotional risk expansion.",
+              }}
+            />
+
+            <SummaryItem
+              label="Cooldown Taken"
+              value={engine.cooldownTaken}
+              info={{
+                title: "Cooldown Taken",
+                text: "Behavioral cooldown quality after losses.",
+                best: "Healthy cooldown.",
+                normal: "Short cooldown.",
+                worst: "No cooldown behavior.",
+              }}
+            />
+
+            <SummaryItem
+              label="Recommended Action"
+              value={engine.recommendedAction}
+              info={{
+                title: "Recommended Action",
+                text: "Behavioral recommendation based on revenge detection signals.",
+                best: "Continue disciplined execution.",
+                normal: "Reduce emotional exposure.",
+                worst: "Pause trading and reset emotionally.",
+              }}
+            />
+          </div>
+        </Section>
+      </div>
     </div>
   );
 }
