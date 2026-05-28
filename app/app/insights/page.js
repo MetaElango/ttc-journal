@@ -1,4 +1,4 @@
-// app/app/metrics/page.js
+// app/app/insights/page.js
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";

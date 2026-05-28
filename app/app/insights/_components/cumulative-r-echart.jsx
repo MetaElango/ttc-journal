@@ -1,4 +1,4 @@
-// app/app/metrics/_components/cumulative-r-echart.jsx
+// app/app/insights/_components/cumulative-r-echart.jsx
 "use client";
 
 import dynamic from "next/dynamic";

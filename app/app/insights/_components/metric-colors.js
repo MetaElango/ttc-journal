@@ -1,4 +1,4 @@
-// app/app/metrics/_components/metric-colors.js
+// app/app/insights/_components/metric-colors.js
 
 export const METRIC_COLORS = {
   blue: "#2563eb",

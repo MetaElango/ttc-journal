@@ -80,7 +80,7 @@ export default async function Navbar() {
             </Link>
 
             <Link
-              href="/app/metrics"
+              href="/app/insights"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
             >
               <BarChart3 size={17} />

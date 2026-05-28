@@ -1,4 +1,4 @@
-// app/app/metrics/_components/duration-exposure-tab.jsx
+// app/app/insights/_components/duration-exposure-tab.jsx
 
 "use client";
 

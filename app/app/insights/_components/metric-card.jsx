@@ -1,4 +1,4 @@
-// app/app/metrics/_components/metric-card.jsx
+// app/app/insights/_components/metric-card.jsx
 
 import { METRIC_COLORS } from "./metric-colors";
 

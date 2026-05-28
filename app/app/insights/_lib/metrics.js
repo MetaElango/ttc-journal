@@ -1,4 +1,4 @@
-// app/app/metrics/_lib/metrics.js
+// app/app/insights/_lib/metrics.js
 
 export const CLOSED_STATUSES = [
   "TRADE CLOSE WITH PROFIT",

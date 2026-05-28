@@ -1,4 +1,4 @@
-// app/app/metrics/_components/metrics-dashboard.jsx
+// app/app/insights/_components/metrics-dashboard.jsx
 
 "use client";
 

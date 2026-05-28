@@ -1,4 +1,4 @@
-// app/app/metrics/_components/behavior-detection-tab.jsx
+// app/app/insights/_components/behavior-detection-tab.jsx
 
 "use client";
 
