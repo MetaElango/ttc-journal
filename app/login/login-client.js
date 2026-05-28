@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginClient() {
@@ -90,104 +90,85 @@ export default function LoginClient() {
     setMsg("Password reset link sent. Please check your email.");
   }
 
+  async function handleGoogleLogin() {
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
+      },
+    });
+  }
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#02040b] text-white">
+    <main className="relative min-h-screen overflow-hidden bg-[#eef7ff] text-slate-900">
       <div
-        className="absolute inset-0 bg-cover"
-        style={{ backgroundImage: "url('/login-bg.png')" }}
+        className="absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url('/login-bg.jpg')" }}
       />
 
-      <div className="absolute inset-0 bg-black/35" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_46%,rgba(0,140,255,0.16),transparent_32%)]" />
+      <div className="absolute inset-0 bg-white/35" />
+      <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-white via-white/80 to-transparent" />
 
-      <div className="relative z-10 flex min-h-screen flex-col px-8 py-8 md:px-14">
+      <div className="relative z-10 flex min-h-screen flex-col px-6 py-7 md:px-14">
         <header className="flex items-center">
           <img
             src="/logo.png"
             alt="EXCELLION TTC"
-            className="h-24 w-auto object-contain md:h-28"
+            className="h-20 w-auto object-contain md:h-24"
           />
         </header>
 
         <div className="grid flex-1 items-center gap-10 lg:grid-cols-2">
           <section className="hidden lg:block" />
-          <section className="flex items-center justify-center lg:justify-end">
-            {" "}
-            <div className="w-full max-w-xl rounded-3xl border border-cyan-400/45 bg-black/45 p-6 shadow-[0_0_65px_rgba(0,140,255,0.24)] backdrop-blur-xl md:p-10">
+
+          <section className="flex items-center justify-center lg:justify-end lg:pr-20">
+            <div className="w-full max-w-[530px] rounded-[28px] border border-white/60 bg-white/35 p-7 shadow-[0_24px_80px_rgba(21,54,91,0.22)] backdrop-blur-2xl md:p-10">
               <div className="text-center">
-                <h1 className="text-4xl font-bold tracking-tight">
+                <h1 className="text-4xl font-bold tracking-tight text-slate-900 md:text-5xl">
                   {isSignup ? (
                     <>
-                      Create <span className="text-cyan-400">Account</span>
+                      Create <span className="text-blue-600">Account</span>
                     </>
                   ) : (
                     <>
-                      Welcome <span className="text-cyan-400">Back</span>
+                      Welcome <span className="text-blue-600">Back</span>
                     </>
                   )}
                 </h1>
 
-                <p className="mt-3 text-base text-white/60">
+                <p className="mt-4 text-base font-medium text-slate-500">
                   {isSignup
                     ? "Create your EXCELLION account and start journaling."
                     : "Log in to continue your journey with EXCELLION."}
                 </p>
               </div>
 
-              <div className="mt-8 grid grid-cols-2 rounded-2xl border border-cyan-400/20 bg-black/30 p-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("signin");
-                    setMsg("");
-                  }}
-                  className={`rounded-xl px-3 py-3 text-sm font-medium transition ${
-                    !isSignup
-                      ? "bg-cyan-500 text-white shadow-[0_0_22px_rgba(0,180,255,0.45)]"
-                      : "text-white/55 hover:text-white"
-                  }`}
-                >
-                  Sign in
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("signup");
-                    setMsg("");
-                  }}
-                  className={`rounded-xl px-3 py-3 text-sm font-medium transition ${
-                    isSignup
-                      ? "bg-cyan-500 text-white shadow-[0_0_22px_rgba(0,180,255,0.45)]"
-                      : "text-white/55 hover:text-white"
-                  }`}
-                >
-                  Sign up
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-                <div className="space-y-2">
-                  <label className="text-sm text-white/80">Email</label>
+              <form onSubmit={handleSubmit} className="mt-9 space-y-6">
+                <div className="space-y-3">
+                  <label className="text-sm font-semibold text-slate-700">
+                    Email or Username
+                  </label>
 
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" />
+                    <Mail className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <input
                       type="email"
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      className="h-14 w-full rounded-2xl border border-blue-500/35 bg-black/35 px-12 text-base text-white outline-none placeholder:text-white/35 transition focus:border-cyan-400 focus:shadow-[0_0_24px_rgba(0,180,255,0.22)]"
+                      placeholder="Enter your email or username"
+                      className="h-16 w-full rounded-xl border border-white/60 bg-white/45 px-14 text-base text-slate-900 outline-none placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-blue-400 focus:bg-white/60 focus:ring-4 focus:ring-blue-100/70"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm text-white/80">Password</label>
+                <div className="space-y-3">
+                  <label className="text-sm font-semibold text-slate-700">
+                    Password
+                  </label>
 
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" />
+                    <Lock className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
 
                     <input
                       type={showPassword ? "text" : "password"}
@@ -196,13 +177,13 @@ export default function LoginClient() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className="h-14 w-full rounded-2xl border border-blue-500/35 bg-black/35 px-12 pr-14 text-base text-white outline-none placeholder:text-white/35 transition focus:border-cyan-400 focus:shadow-[0_0_24px_rgba(0,180,255,0.22)]"
+                      className="h-16 w-full rounded-xl border border-white/60 bg-white/45 px-14 pr-14 text-base text-slate-900 outline-none placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-blue-400 focus:bg-white/60 focus:ring-4 focus:ring-blue-100/70"
                     />
 
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/55 hover:text-white"
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5" />
@@ -215,27 +196,21 @@ export default function LoginClient() {
 
                 <div className="flex items-start justify-between gap-4">
                   {isSignup ? (
-                    <label className="flex cursor-pointer items-start gap-3 text-sm text-white/60">
+                    <label className="flex cursor-pointer items-start gap-3 text-sm text-slate-500">
                       <input
                         type="checkbox"
                         checked={acceptedTerms}
                         onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="mt-1 h-4 w-4 rounded border-white/20 bg-black accent-cyan-500"
+                        className="mt-1 h-4 w-4 rounded border-slate-300 accent-blue-600"
                       />
 
                       <span>
                         I agree to the{" "}
-                        <a
-                          href="/terms"
-                          className="text-cyan-400 hover:text-cyan-300"
-                        >
+                        <a href="/terms" className="text-blue-600">
                           Terms
                         </a>{" "}
                         and{" "}
-                        <a
-                          href="/privacy"
-                          className="text-cyan-400 hover:text-cyan-300"
-                        >
+                        <a href="/privacy" className="text-blue-600">
                           Privacy Policy
                         </a>
                         .
@@ -249,7 +224,7 @@ export default function LoginClient() {
                     <button
                       type="button"
                       onClick={handleForgotPassword}
-                      className="shrink-0 text-sm text-cyan-400 hover:text-cyan-300"
+                      className="shrink-0 text-sm font-semibold text-blue-600 hover:text-blue-700"
                     >
                       Forgot password?
                     </button>
@@ -258,10 +233,10 @@ export default function LoginClient() {
 
                 {msg ? (
                   <div
-                    className={`rounded-2xl border px-4 py-3 text-sm ${
+                    className={`rounded-xl border px-4 py-3 text-sm ${
                       msgType === "success"
-                        ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                        : "border-red-400/30 bg-red-400/10 text-red-200"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-red-200 bg-red-50 text-red-700"
                     }`}
                   >
                     {msg}
@@ -271,7 +246,7 @@ export default function LoginClient() {
                 <button
                   type="submit"
                   disabled={loading || (isSignup && !acceptedTerms)}
-                  className="group relative flex h-16 w-full items-center justify-center rounded-2xl border border-cyan-400/70 bg-black/30 text-xl font-semibold text-white shadow-[0_0_30px_rgba(0,180,255,0.35)] transition hover:border-orange-300 hover:shadow-[0_0_35px_rgba(249,115,22,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="group relative flex h-16 w-full items-center justify-center rounded-xl bg-gradient-to-r from-cyan-400 to-blue-700 text-lg font-semibold text-white shadow-[0_12px_28px_rgba(37,99,235,0.35)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span>
                     {loading
@@ -287,7 +262,28 @@ export default function LoginClient() {
                 </button>
               </form>
 
-              <p className="mt-8 text-center text-sm text-white/55">
+              {!isSignup ? (
+                <>
+                  <div className="my-8 flex items-center gap-5">
+                    <div className="h-px flex-1 bg-slate-200" />
+                    <span className="text-sm font-semibold text-slate-400">
+                      OR
+                    </span>
+                    <div className="h-px flex-1 bg-slate-200" />
+                  </div>
+
+                  {/* <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    className="flex h-16 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white/90 text-base font-semibold text-slate-700 shadow-sm transition hover:bg-white"
+                  >
+                    <span className="text-2xl font-bold text-blue-600">G</span>
+                    Continue with Google
+                  </button> */}
+                </>
+              ) : null}
+
+              <p className="mt-8 text-center text-sm font-medium text-slate-500">
                 {isSignup
                   ? "Already have an account?"
                   : "Don’t have an account?"}{" "}
@@ -297,7 +293,7 @@ export default function LoginClient() {
                     setMode(isSignup ? "signin" : "signup");
                     setMsg("");
                   }}
-                  className="font-medium text-cyan-400 hover:text-cyan-300"
+                  className="font-bold text-blue-600 hover:text-blue-700"
                 >
                   {isSignup ? "Sign in" : "Create Account"}
                 </button>
@@ -306,16 +302,34 @@ export default function LoginClient() {
           </section>
         </div>
       </div>
-      <div className="absolute bottom-30 left-14 z-20 hidden lg:block">
-        <div className="flex flex-wrap gap-5 text-[22px] font-semibold tracking-[0.08em]">
-          <span className="text-cyan-300">Process.</span>
-          <span className="text-blue-400">Precision.</span>
-          <span className="text-orange-400">Wizardry.</span>
+
+      <div className="absolute bottom-20 left-10 z-20 hidden lg:block md:left-16">
+        <div className="flex flex-wrap gap-5 text-[22px] font-bold">
+          <span className="text-slate-700">Process.</span>
+          <span className="text-blue-600">Precision.</span>
+          <span className="text-cyan-500">Wizardry.</span>
         </div>
 
-        <p className="mt-4 text-xl font-light text-white/90">
+        <p className="mt-4 text-xl font-medium text-slate-500">
           Discipline today, freedom tomorrow.
         </p>
+      </div>
+
+      <div className="absolute bottom-10 left-1/2 z-20 hidden -translate-x-1/2 items-center gap-8 text-sm font-medium text-slate-400 lg:flex">
+        <span className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-blue-500" />
+          Secure
+        </span>
+        <span className="h-5 w-px bg-slate-300" />
+        <span className="flex items-center gap-2">
+          <Lock className="h-5 w-5 text-blue-500" />
+          Encrypted
+        </span>
+        <span className="h-5 w-px bg-slate-300" />
+        <span className="flex items-center gap-2">
+          <ShieldCheck className="h-5 w-5 text-blue-500" />
+          Protected
+        </span>
       </div>
     </main>
   );
