@@ -208,7 +208,7 @@ export default async function EditStrategyPage({ params }) {
       ok: true,
       message: "Strategy updated.",
       strategyId: id,
-      redirectTo: "/app/strategies",
+      redirectTo: "/app/playbooks",
       existingStrategyImages: existing_strategy_images,
     };
   }

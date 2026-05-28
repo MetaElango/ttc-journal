@@ -1,4 +1,4 @@
-// app/app/strategies/page.js
+// app/app/playbooks/page.js
 
 import { createClient } from "@/lib/supabase/server";
 import StrategiesClient from "./strategies-client";

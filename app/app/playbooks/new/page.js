@@ -158,7 +158,7 @@ export default async function NewStrategyPage() {
       ok: true,
       message: "Strategy created.",
       strategyId: insertedStrategy.id,
-      redirectTo: "/app/strategies",
+      redirectTo: "/app/playbooks",
     };
   }
 

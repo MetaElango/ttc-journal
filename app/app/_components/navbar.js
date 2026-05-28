@@ -56,7 +56,7 @@ export default async function Navbar() {
 
           <nav className="hidden items-center gap-6 md:flex">
             <Link
-              href="/app/strategies"
+              href="/app/playbooks"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
             >
               <Target size={17} />

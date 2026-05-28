@@ -1,4 +1,4 @@
-// app/app/strategies/strategies-client.jsx
+// app/app/playbooks/strategies-client.jsx
 "use client";
 
 import Link from "next/link";
@@ -320,7 +320,7 @@ function StrategyCard({ s, mounted }) {
           </p>
 
           <Link
-            href={`/app/strategies/${s.id}/edit`}
+            href={`/app/playbooks/${s.id}/edit`}
             className="inline-flex h-12 items-center gap-2 rounded-2xl border border-sky-300 bg-white px-5 text-sm font-semibold text-sky-700 hover:bg-sky-50"
           >
             <Edit3 className="h-4 w-4" />
@@ -429,7 +429,7 @@ export default function StrategiesClient({ strategies }) {
             </div>
 
             <Link
-              href="/app/strategies/new"
+              href="/app/playbooks/new"
               className="inline-flex h-12 items-center gap-2 rounded-xl border border-sky-300 bg-white px-4 text-sm font-semibold text-sky-700 hover:bg-sky-50"
             >
               <Plus className="h-5 w-5" />
