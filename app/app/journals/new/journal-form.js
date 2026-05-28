@@ -1440,6 +1440,7 @@ export default function NewJournalForm({
   accounts,
   symbols,
   prefillJournal = null,
+  isIncorporate = false,
 }) {
   const router = useRouter();
   const [selectedStrategy, setSelectedStrategy] = useState(strategy || null);
@@ -1744,7 +1745,11 @@ export default function NewJournalForm({
           </div>
 
           <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">
-            {prefillJournal ? (
+            {isIncorporate ? (
+              <>
+                Incorporate <span className="text-sky-500">Opportunity</span>
+              </>
+            ) : prefillJournal ? (
               <>
                 Edit <span className="text-sky-500">Opportunity</span>
               </>
@@ -1756,9 +1761,11 @@ export default function NewJournalForm({
           </h1>
 
           <p className="mt-4 max-w-2xl text-sm text-slate-500">
-            {prefillJournal
-              ? "Modify your existing trading opportunity and update execution details."
-              : "Select a live playbook and create a structured trading opportunity."}
+            {isIncorporate
+              ? "Review this shared opportunity, adjust details if needed, and incorporate it into your own journal."
+              : prefillJournal
+                ? "Modify your existing trading opportunity and update execution details."
+                : "Select a live playbook and create a structured trading opportunity."}
           </p>
         </div>
       </div>
@@ -2011,13 +2018,19 @@ export default function NewJournalForm({
                     {pending ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {prefillJournal ? "Updating..." : "Saving..."}
+                        {isIncorporate
+                          ? "Incorporating..."
+                          : prefillJournal
+                            ? "Updating..."
+                            : "Saving..."}
                       </>
                     ) : uploadingImages ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Uploading Images...
                       </>
+                    ) : isIncorporate ? (
+                      "Incorporate Opportunity"
                     ) : prefillJournal ? (
                       "Update Opportunity"
                     ) : (

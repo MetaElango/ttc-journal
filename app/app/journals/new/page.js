@@ -698,6 +698,20 @@ export default async function NewJournalPage({ searchParams }) {
 
     if (error) return { ok: false, message: error.message };
 
+    if (sharedJournalId && copied_from_journal_id) {
+      const { error: copyLogError } = await supabase
+        .from("journal_copies")
+        .insert({
+          original_journal_id: copied_from_journal_id,
+          copied_journal_id: insertedJournal.id,
+          copied_by: user.id,
+        });
+
+      if (copyLogError) {
+        return { ok: false, message: copyLogError.message };
+      }
+    }
+
     return {
       ok: true,
       message: sharedJournalId
@@ -717,6 +731,7 @@ export default async function NewJournalPage({ searchParams }) {
       accounts={accounts || []}
       symbols={symbols || []}
       prefillJournal={prefillJournal}
+      isIncorporate={!!sharedJournalId}
     />
   );
 }
