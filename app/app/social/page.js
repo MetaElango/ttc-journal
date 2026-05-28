@@ -19,6 +19,38 @@ async function getSignedImageUrls(supabase, paths = []) {
   return data?.map((x) => x.signedUrl).filter(Boolean) || [];
 }
 
+function getJournalChanges(oldSnapshot, currentJournal) {
+  if (!oldSnapshot || !currentJournal) return [];
+
+  const fields = [
+    ["status", "Status"],
+    ["entry_price", "Entry Price"],
+    ["stop_loss", "Stop Loss"],
+    ["take_profit", "Take Profit"],
+    ["take_profit_qty", "TP Quantity"],
+    ["entry_reason", "Entry Reason"],
+    ["exit_reason", "Exit Reason"],
+    ["exit_price", "Exit Price"],
+    ["risk_per_trade", "Risk Per Trade"],
+    ["risk_mode", "Risk Mode"],
+    ["htf", "HTF"],
+    ["entry_tf", "Entry TF"],
+    ["quantity", "Quantity"],
+    ["direction", "Direction"],
+  ];
+
+  return fields
+    .map(([key, label]) => {
+      const oldValue = oldSnapshot?.[key] ?? null;
+      const newValue = currentJournal?.[key] ?? null;
+
+      if (JSON.stringify(oldValue) === JSON.stringify(newValue)) return null;
+
+      return { key, label, oldValue, newValue };
+    })
+    .filter(Boolean);
+}
+
 export default async function SocialPage() {
   const supabase = await createClient();
 
@@ -67,16 +99,19 @@ export default async function SocialPage() {
       admin_note_updated_at,
       htf,
       entry_tf,
+
       profiles:user_id (
         id,
         full_name,
         username
       ),
+
       symbols:symbol_id (
         id,
         symbol_name,
         category
       ),
+
       trading_accounts:trading_account_id (
         id,
         account_name,
@@ -109,15 +144,42 @@ export default async function SocialPage() {
   const journalIds = (journals || []).map((j) => j.id);
   const idsForQuery = journalIds.length ? journalIds : [SAFE_EMPTY_ID];
 
-  const { data: copies } = await supabase
+  const { data: allCopies, error: allCopiesError } = await supabase
     .from("journal_copies")
     .select("original_journal_id, copied_journal_id, copied_by, copied_at")
     .in("original_journal_id", idsForQuery);
 
-  const { data: fallbackCopiedJournals } = await supabase
+  if (allCopiesError) console.log("ALL COPIES ERROR:", allCopiesError.message);
+
+  const { data: myCopies, error: myCopiesError } = await supabase
+    .from("journal_copies")
+    .select(
+      `
+      original_journal_id,
+      copied_journal_id,
+      copied_by,
+      copied_at,
+      original_snapshot,
+      original_updated_at,
+      copied_journal_snapshot,
+      original_share_version,
+      copied_share_version
+      `,
+    )
+    .eq("copied_by", user.id)
+    .in("original_journal_id", idsForQuery);
+  console.log("MY COPIES:", myCopies);
+
+  if (myCopiesError) console.log("MY COPIES ERROR:", myCopiesError.message);
+
+  const { data: fallbackCopiedJournals, error: fallbackError } = await supabase
     .from("journals")
     .select("id, user_id, copied_from_journal_id, created_at")
     .in("copied_from_journal_id", idsForQuery);
+
+  if (fallbackError) {
+    console.log("FALLBACK COPIED JOURNALS ERROR:", fallbackError.message);
+  }
 
   const { data: myReactions, error: reactionsError } = await supabase
     .from("journal_reactions")
@@ -125,27 +187,32 @@ export default async function SocialPage() {
     .eq("user_id", user.id)
     .in("journal_id", idsForQuery);
 
-  if (reactionsError) {
-    console.log("REACTIONS ERROR:", reactionsError.message);
-  }
+  if (reactionsError) console.log("REACTIONS ERROR:", reactionsError.message);
 
   const reactionMap = new Map();
-
   (myReactions || []).forEach((r) => {
     reactionMap.set(r.journal_id, r.reaction);
   });
 
   const copyMap = new Map();
 
-  (copies || [])
-    .filter((copy) => copy.copied_by === user.id)
-    .forEach((copy) => {
-      copyMap.set(copy.original_journal_id, {
-        copiedJournalId: copy.copied_journal_id,
-        copiedAt: copy.copied_at,
-        source: "journal_copies",
-      });
+  (myCopies || []).forEach((copy) => {
+    const latestJournal = (journals || []).find(
+      (j) => j.id === copy.original_journal_id,
+    );
+
+    copyMap.set(copy.original_journal_id, {
+      copiedJournalId: copy.copied_journal_id,
+      copiedAt: copy.copied_at,
+      source: "journal_copies",
+      originalSnapshot: copy.original_snapshot,
+      originalUpdatedAt: copy.original_updated_at,
+      copiedJournalSnapshot: copy.copied_journal_snapshot,
+      originalShareVersion: copy.original_share_version || 1,
+      copiedShareVersion: copy.copied_share_version || 1,
+      updatedFields: getJournalChanges(copy.original_snapshot, latestJournal),
     });
+  });
 
   (fallbackCopiedJournals || [])
     .filter((journal) => journal.user_id === user.id)
@@ -153,25 +220,25 @@ export default async function SocialPage() {
       if (!journal.copied_from_journal_id) return;
 
       const existing = copyMap.get(journal.copied_from_journal_id);
-      const existingTime = existing?.copiedAt
-        ? new Date(existing.copiedAt).getTime()
-        : 0;
-      const currentTime = journal.created_at
-        ? new Date(journal.created_at).getTime()
-        : 0;
 
-      if (!existing || currentTime > existingTime) {
-        copyMap.set(journal.copied_from_journal_id, {
-          copiedJournalId: journal.id,
-          copiedAt: journal.created_at,
-          source: "journals_fallback",
-        });
-      }
+      if (existing?.source === "journal_copies") return;
+
+      copyMap.set(journal.copied_from_journal_id, {
+        copiedJournalId: journal.id,
+        copiedAt: journal.created_at,
+        source: "journals_fallback",
+        originalSnapshot: null,
+        originalUpdatedAt: null,
+        copiedJournalSnapshot: null,
+        originalShareVersion: 1,
+        copiedShareVersion: 1,
+        updatedFields: [],
+      });
     });
 
   const incorporatedUserMap = new Map();
 
-  (copies || []).forEach((copy) => {
+  (allCopies || []).forEach((copy) => {
     if (!copy.original_journal_id || !copy.copied_by) return;
 
     if (!incorporatedUserMap.has(copy.original_journal_id)) {
@@ -205,22 +272,33 @@ export default async function SocialPage() {
 
       return {
         ...journal,
+
         setupImageUrls: await getSignedImageUrls(
           supabase,
           journal.setup_images,
         ),
+
         referenceImageUrls: await getSignedImageUrls(
           supabase,
           journal.reference_images,
         ),
+
         myReaction: reactionMap.get(journal.id) || null,
+
         copyStatus: {
           incorporated: !!copy,
           copiedJournalId: copy?.copiedJournalId || null,
           copiedAt: copy?.copiedAt || null,
           authorUpdatedAfterCopy: !!copy && authorUpdatedAt > copiedAt,
           source: copy?.source || null,
+          originalSnapshot: copy?.originalSnapshot || null,
+          originalUpdatedAt: copy?.originalUpdatedAt || null,
+          copiedJournalSnapshot: copy?.copiedJournalSnapshot || null,
+          originalShareVersion: copy?.originalShareVersion || 1,
+          copiedShareVersion: copy?.copiedShareVersion || 1,
+          updatedFields: copy?.updatedFields || [],
         },
+
         incorporatedCount: incorporatedUserMap.get(journal.id)?.size || 0,
       };
     }),

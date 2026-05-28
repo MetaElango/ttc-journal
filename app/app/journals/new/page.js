@@ -30,6 +30,42 @@ async function getSignedImageUrls(supabase, paths = []) {
   return data?.map((x) => x.signedUrl).filter(Boolean) || [];
 }
 
+function buildJournalSnapshot(journal) {
+  if (!journal) return null;
+
+  return {
+    id: journal.id,
+    user_id: journal.user_id,
+    strategy_id: journal.strategy_id,
+    trading_account_id: journal.trading_account_id,
+    symbol_id: journal.symbol_id,
+    strategy_snapshot: journal.strategy_snapshot,
+    purpose: journal.purpose,
+    status: journal.status,
+    direction: journal.direction,
+    quantity: journal.quantity,
+    entry_price: journal.entry_price,
+    stop_loss: journal.stop_loss,
+    take_profit: journal.take_profit,
+    take_profit_qty: journal.take_profit_qty,
+    entry_reason: journal.entry_reason,
+    exit_reason: journal.exit_reason,
+    exit_price: journal.exit_price,
+    risk_mode: journal.risk_mode,
+    risk_per_trade: journal.risk_per_trade,
+    setup_images: journal.setup_images || [],
+    reference_images: journal.reference_images || [],
+    journal_start_at: journal.journal_start_at,
+    journal_end_at: journal.journal_end_at,
+    htf: journal.htf || [],
+    entry_tf: journal.entry_tf || [],
+    is_shared: journal.is_shared,
+    shared_at: journal.shared_at,
+    updated_at: journal.updated_at || null,
+    snapshotted_at: new Date().toISOString(),
+  };
+}
+
 export default async function NewJournalPage({ searchParams }) {
   const params = await searchParams;
 
@@ -112,6 +148,7 @@ export default async function NewJournalPage({ searchParams }) {
         entry_tf,
         is_shared,
         shared_at,
+        updated_at,
         symbols:symbol_id (
           id,
           symbol_name,
@@ -150,6 +187,7 @@ export default async function NewJournalPage({ searchParams }) {
       setupImageUrls,
       referenceImageUrls,
     };
+
     strategy = sharedJournal.strategy_snapshot || null;
   }
 
@@ -230,6 +268,7 @@ export default async function NewJournalPage({ searchParams }) {
     if (!user) {
       return { ok: false, message: "Unauthorized." };
     }
+
     const selected_strategy_id = String(
       getFormValue(formData, "strategy_id") || strategy?.id || "",
     ).trim();
@@ -245,25 +284,25 @@ export default async function NewJournalPage({ searchParams }) {
         .from("strategies")
         .select(
           `
-      id,
-      strategy_name,
-      strategy_type,
-      preparation_status,
-      strategy_status,
-      trading_style,
-      setup_type,
-      bias_confluence,
-      htf,
-      intermediate_tf,
-      entry_tf,
-      checklist,
-      entry_rules,
-      exit_rules,
-      sl_management_rules,
-      risk_per_trade,
-      avg_planned_rr,
-      planned_r_year
-    `,
+          id,
+          strategy_name,
+          strategy_type,
+          preparation_status,
+          strategy_status,
+          trading_style,
+          setup_type,
+          bias_confluence,
+          htf,
+          intermediate_tf,
+          entry_tf,
+          checklist,
+          entry_rules,
+          exit_rules,
+          sl_management_rules,
+          risk_per_trade,
+          avg_planned_rr,
+          planned_r_year
+          `,
         )
         .eq("id", selected_strategy_id)
         .eq("user_id", user.id)
@@ -654,46 +693,71 @@ export default async function NewJournalPage({ searchParams }) {
       };
     }
 
+    const insertPayload = {
+      user_id: user.id,
+      strategy_id: finalStrategyId,
+      trading_account_id,
+      symbol_id,
+      purpose,
+      status,
+      direction,
+      strategy_snapshot,
+      htf,
+      entry_tf,
+      quantity,
+      entry_price,
+      stop_loss,
+      take_profit,
+      take_profit_qty,
+      entry_reason,
+      exit_reason,
+      exit_price,
+      risk_mode,
+      risk_per_trade,
+      setup_images: [],
+      reference_images: [],
+      journal_start_at,
+      journal_end_at: needsEndDate(status) ? journal_end_at : null,
+      copied_from_journal_id,
+      is_shared: false,
+    };
+
     const { data: insertedJournal, error } = await supabase
       .from("journals")
-      .insert({
-        user_id: user.id,
-        strategy_id: finalStrategyId,
+      .insert(insertPayload)
+      .select(
+        `
+        id,
+        user_id,
+        strategy_id,
         trading_account_id,
         symbol_id,
-
+        strategy_snapshot,
         purpose,
         status,
         direction,
-
-        strategy_snapshot,
-        htf,
-        entry_tf,
-
         quantity,
         entry_price,
         stop_loss,
-
         take_profit,
         take_profit_qty,
-
         entry_reason,
         exit_reason,
         exit_price,
-
         risk_mode,
         risk_per_trade,
-
-        setup_images: [],
-        reference_images: [],
-
+        setup_images,
+        reference_images,
         journal_start_at,
-        journal_end_at: needsEndDate(status) ? journal_end_at : null,
-
-        copied_from_journal_id,
-        is_shared: false,
-      })
-      .select("id")
+        journal_end_at,
+        htf,
+        entry_tf,
+        is_shared,
+        shared_at,
+        updated_at,
+        copied_from_journal_id
+        `,
+      )
       .single();
 
     if (error) return { ok: false, message: error.message };
@@ -705,6 +769,11 @@ export default async function NewJournalPage({ searchParams }) {
           original_journal_id: copied_from_journal_id,
           copied_journal_id: insertedJournal.id,
           copied_by: user.id,
+          original_snapshot: buildJournalSnapshot(prefillJournal),
+          original_updated_at: prefillJournal.updated_at || null,
+          copied_journal_snapshot: buildJournalSnapshot(insertedJournal),
+          original_share_version: prefillJournal.share_version || 1,
+          copied_share_version: prefillJournal.share_version || 1,
         });
 
       if (copyLogError) {

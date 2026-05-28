@@ -316,51 +316,45 @@ function ReactionButton({ active, children, onClick }) {
   );
 }
 
+function formatChangeValue(value) {
+  if (Array.isArray(value)) return value.join(", ");
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
 function ConfirmIncorporateModal({ journal, onClose }) {
   if (!journal) return null;
 
   const alreadyCopied = journal.copyStatus?.incorporated;
   const statusWarning = needsStatusConfirm(journal.status);
+  const updatedFields = journal.copyStatus?.updatedFields || [];
   const href = `/app/journals/new?sharedJournalId=${journal.id}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="w-full max-w-lg rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-xs font-black uppercase text-orange-700">
               <AlertTriangle className="h-4 w-4" />
               Confirm Incorporation
             </div>
 
-            <h2 className="mt-4 text-2xl font-black text-slate-950">
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
               Continue with this opportunity?
             </h2>
 
-            <div className="mt-3 space-y-3 text-sm font-semibold leading-6 text-slate-600">
-              {alreadyCopied ? (
-                <p>
-                  You already incorporated this journal before. You can still
-                  continue and create another copy.
-                </p>
-              ) : null}
+            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+              {alreadyCopied
+                ? "You already incorporated this journal before. Review the author’s latest changes before creating another copy."
+                : "This will create a new opportunity from this shared journal."}
+            </p>
 
-              {statusWarning ? (
-                <p>
-                  This opportunity status is{" "}
-                  <span className="font-black text-orange-700">
-                    {journal.status}
-                  </span>
-                  . Confirm before adding it to your journal.
-                </p>
-              ) : null}
-
-              {!alreadyCopied && !statusWarning ? (
-                <p>
-                  This will create a new opportunity from this shared journal.
-                </p>
-              ) : null}
-            </div>
+            {statusWarning ? (
+              <p className="mt-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
+                Current status: {journal.status}
+              </p>
+            ) : null}
           </div>
 
           <button
@@ -372,18 +366,75 @@ function ConfirmIncorporateModal({ journal, onClose }) {
           </button>
         </div>
 
-        <div className="mt-6 flex flex-wrap justify-end gap-3">
+        {updatedFields.length > 0 ? (
+          <div className="max-h-[52vh] overflow-y-auto p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black text-slate-950">
+                  Author updated these values
+                </h3>
+                <p className="mt-1 text-sm font-semibold text-slate-500">
+                  Old value is what you copied. New value is the latest shared
+                  version.
+                </p>
+              </div>
+
+              <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black uppercase text-orange-700">
+                {updatedFields.length} changes
+              </span>
+            </div>
+
+            <div className="grid gap-3">
+              {updatedFields.map((change) => (
+                <div
+                  key={change.key}
+                  className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="mb-3 text-sm font-black uppercase tracking-wide text-slate-600">
+                    {change.label}
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-red-200 bg-white p-4">
+                      <div className="mb-2 text-xs font-black uppercase text-red-600">
+                        Old
+                      </div>
+                      <div className="whitespace-pre-wrap break-words text-sm font-bold leading-6 text-slate-800">
+                        {formatChangeValue(change.oldValue)}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+                      <div className="mb-2 text-xs font-black uppercase text-emerald-600">
+                        New
+                      </div>
+                      <div className="whitespace-pre-wrap break-words text-sm font-bold leading-6 text-slate-800">
+                        {formatChangeValue(change.newValue)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 text-sm font-semibold text-slate-500">
+            No updated values found.
+          </div>
+        )}
+
+        <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
             Cancel
           </button>
 
           <a
             href={href}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-sky-600 px-4 text-sm font-bold text-white hover:bg-sky-700"
+            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-sky-600 px-5 text-sm font-bold text-white hover:bg-sky-700"
           >
             <PlusCircle className="h-4 w-4" />
             Continue
