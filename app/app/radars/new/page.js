@@ -86,28 +86,29 @@ export default async function NewJournalPage({ searchParams }) {
       .from("strategies")
       .select(
         `
-        id,
-        strategy_name,
-        strategy_type,
-        preparation_status,
-        strategy_status,
-        trading_style,
-        setup_type,
-        bias_confluence,
-        htf,
-        intermediate_tf,
-        entry_tf,
-        checklist,
-        entry_rules,
-        exit_rules,
-        sl_management_rules,
-        risk_per_trade,
-        avg_planned_rr,
-        planned_r_year
-      `,
+      id,
+      strategy_name,
+      strategy_type,
+      preparation_status,
+      strategy_status,
+      trading_style,
+      setup_type,
+      bias_confluence,
+      htf,
+      intermediate_tf,
+      entry_tf,
+      checklist,
+      entry_rules,
+      exit_rules,
+      sl_management_rules,
+      risk_per_trade,
+      avg_planned_rr,
+      planned_r_year
+    `,
       )
       .eq("user_id", user.id)
       .eq("strategy_status", "LIVE")
+      .is("copied_from_strategy_id", null)
       .order("updated_at", { ascending: false });
 
     liveStrategies = data || [];
@@ -196,28 +197,30 @@ export default async function NewJournalPage({ searchParams }) {
       .from("strategies")
       .select(
         `
-        id,
-        strategy_name,
-        strategy_type,
-        preparation_status,
-        strategy_status,
-        trading_style,
-        setup_type,
-        bias_confluence,
-        htf,
-        intermediate_tf,
-        entry_tf,
-        checklist,
-        entry_rules,
-        exit_rules,
-        sl_management_rules,
-        risk_per_trade,
-        avg_planned_rr,
-        planned_r_year
-        `,
+    id,
+    strategy_name,
+    strategy_type,
+    preparation_status,
+    strategy_status,
+    trading_style,
+    setup_type,
+    bias_confluence,
+    htf,
+    intermediate_tf,
+    entry_tf,
+    checklist,
+    entry_rules,
+    exit_rules,
+    sl_management_rules,
+    risk_per_trade,
+    avg_planned_rr,
+    planned_r_year
+    `,
       )
       .eq("id", strategyId)
       .eq("user_id", user.id)
+      .eq("strategy_status", "LIVE")
+      .is("copied_from_strategy_id", null)
       .single();
 
     if (sErr || !fetchedStrategy) {
@@ -284,29 +287,30 @@ export default async function NewJournalPage({ searchParams }) {
         .from("strategies")
         .select(
           `
-          id,
-          strategy_name,
-          strategy_type,
-          preparation_status,
-          strategy_status,
-          trading_style,
-          setup_type,
-          bias_confluence,
-          htf,
-          intermediate_tf,
-          entry_tf,
-          checklist,
-          entry_rules,
-          exit_rules,
-          sl_management_rules,
-          risk_per_trade,
-          avg_planned_rr,
-          planned_r_year
-          `,
+    id,
+    strategy_name,
+    strategy_type,
+    preparation_status,
+    strategy_status,
+    trading_style,
+    setup_type,
+    bias_confluence,
+    htf,
+    intermediate_tf,
+    entry_tf,
+    checklist,
+    entry_rules,
+    exit_rules,
+    sl_management_rules,
+    risk_per_trade,
+    avg_planned_rr,
+    planned_r_year
+    `,
         )
         .eq("id", selected_strategy_id)
         .eq("user_id", user.id)
         .eq("strategy_status", "LIVE")
+        .is("copied_from_strategy_id", null)
         .single();
 
       if (strategyError || !fetchedStrategy) {
