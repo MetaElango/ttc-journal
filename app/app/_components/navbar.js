@@ -64,7 +64,7 @@ export default async function Navbar() {
             </Link>
 
             <Link
-              href="/app/journals"
+              href="/app/radars"
               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
             >
               <BookOpen size={17} />

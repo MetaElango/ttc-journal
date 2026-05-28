@@ -96,7 +96,7 @@ function JournalCard({ journal, badge, showIncorporate = false }) {
 
         {showIncorporate ? (
           <Link
-            href={`/app/journals/new?sharedJournalId=${journal.id}`}
+            href={`/app/radars/new?sharedJournalId=${journal.id}`}
             className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
           >
             Incorporate

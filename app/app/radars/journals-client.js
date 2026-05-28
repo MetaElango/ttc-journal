@@ -623,7 +623,7 @@ function JournalCard({
 
             {canEditJournal(journal) ? (
               <Link
-                href={`/app/journals/${journal.id}/edit`}
+                href={`/app/radars/${journal.id}/edit`}
                 className="inline-flex h-9 items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-medium text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-indigo-300"
               >
                 <Pencil className="h-3.5 w-3.5" />

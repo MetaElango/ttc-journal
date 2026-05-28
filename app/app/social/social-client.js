@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 
-import JournalDetailsModal from "../journals/journal-details-modal";
+import JournalDetailsModal from "../radars/journal-details-modal";
 import CommentsSection from "./comments-section";
 
 function norm(v) {
@@ -328,7 +328,7 @@ function ConfirmIncorporateModal({ journal, onClose }) {
   const alreadyCopied = journal.copyStatus?.incorporated;
   const statusWarning = needsStatusConfirm(journal.status);
   const updatedFields = journal.copyStatus?.updatedFields || [];
-  const href = `/app/journals/new?sharedJournalId=${journal.id}`;
+  const href = `/app/radars/new?sharedJournalId=${journal.id}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
@@ -682,7 +682,7 @@ export default function SocialClient({ journals }) {
       return;
     }
 
-    window.location.href = `/app/journals/new?sharedJournalId=${journal.id}`;
+    window.location.href = `/app/radars/new?sharedJournalId=${journal.id}`;
   }
 
   console.log("FILTERED JOURNALS:", filteredJournals);

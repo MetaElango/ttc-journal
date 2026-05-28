@@ -160,7 +160,7 @@ export default async function EditJournalPage({ params, searchParams }) {
         </p>
 
         <Link
-          href="/app/journals"
+          href="/app/radars"
           className="inline-flex rounded-md border px-4 py-2 text-sm hover:bg-accent"
         >
           Back to Journals
@@ -210,7 +210,7 @@ export default async function EditJournalPage({ params, searchParams }) {
     if (existingError || !existing) notFound();
 
     if (!canEditJournal(existing)) {
-      redirect("/app/journals");
+      redirect("/app/radars");
     }
 
     const statusRaw = String(getFormValue(formData, "status") || "")
@@ -269,12 +269,12 @@ export default async function EditJournalPage({ params, searchParams }) {
       STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"];
 
     if (!allowedStatuses.includes(statusRaw)) {
-      redirect(`/app/journals/${id}/edit?error=status`);
+      redirect(`/app/radars/${id}/edit?error=status`);
     }
 
     if (!journal_start_at) {
       redirect(
-        `/app/journals/${id}/edit?error=${encodeURIComponent(
+        `/app/radars/${id}/edit?error=${encodeURIComponent(
           "Journal start date is required.",
         )}`,
       );
@@ -282,7 +282,7 @@ export default async function EditJournalPage({ params, searchParams }) {
 
     if (needsEndDate(statusRaw) && !journal_end_at) {
       redirect(
-        `/app/journals/${id}/edit?error=${encodeURIComponent(
+        `/app/radars/${id}/edit?error=${encodeURIComponent(
           "Journal end date is required for this status.",
         )}`,
       );
@@ -297,32 +297,32 @@ export default async function EditJournalPage({ params, searchParams }) {
     ].includes(statusRaw);
 
     if (needsExitReason && !exit_reason) {
-      redirect(`/app/journals/${id}/edit?error=exit_reason_required`);
+      redirect(`/app/radars/${id}/edit?error=exit_reason_required`);
     }
 
     if (
       ["TRADE CLOSE WITH PROFIT", "TRADE SL HIT"].includes(statusRaw) &&
       !exit_checkpoint
     ) {
-      redirect(`/app/journals/${id}/edit?error=exit_checkpoint_required`);
+      redirect(`/app/radars/${id}/edit?error=exit_checkpoint_required`);
     }
 
     if (exit_checkpoint === "MODIFIED_SL" && modified_sl_price === null) {
-      redirect(`/app/journals/${id}/edit?error=modified_sl_required`);
+      redirect(`/app/radars/${id}/edit?error=modified_sl_required`);
     }
 
     if (exit_checkpoint === "MODIFIED_TP") {
       if (!modified_tp_price.length || !modified_tp_qty.length) {
-        redirect(`/app/journals/${id}/edit?error=modified_tp_required`);
+        redirect(`/app/radars/${id}/edit?error=modified_tp_required`);
       }
 
       if (modified_tp_price.length !== modified_tp_qty.length) {
-        redirect(`/app/journals/${id}/edit?error=modified_tp_qty_mismatch`);
+        redirect(`/app/radars/${id}/edit?error=modified_tp_qty_mismatch`);
       }
     }
 
     if (statusRaw === "TRADE EXIT IN MID" && exit_price === null) {
-      redirect(`/app/journals/${id}/edit?error=exit_price_required`);
+      redirect(`/app/radars/${id}/edit?error=exit_price_required`);
     }
 
     let finalExitPrice = exit_price;
@@ -381,13 +381,13 @@ export default async function EditJournalPage({ params, searchParams }) {
 
     if (updateError) {
       redirect(
-        `/app/journals/${id}/edit?error=${encodeURIComponent(
+        `/app/radars/${id}/edit?error=${encodeURIComponent(
           updateError.message,
         )}`,
       );
     }
 
-    redirect("/app/journals");
+    redirect("/app/radars");
   }
   async function updateFullJournal(prevState, formData) {
     "use server";
@@ -409,7 +409,7 @@ export default async function EditJournalPage({ params, searchParams }) {
     if (existingError || !existing) notFound();
 
     if (!FULL_EDIT_STATUSES.includes(existing.status)) {
-      redirect("/app/journals");
+      redirect("/app/radars");
     }
 
     const tpItems = JSON.parse(

@@ -1,4 +1,4 @@
-// app/app/journals/page.js
+// app/app/radars/page.js
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -233,7 +233,7 @@ export default async function JournalsPage({ searchParams }) {
           </div>
 
           <Link
-            href="/app/journals/new"
+            href="/app/radars/new"
             className="inline-flex h-12 items-center rounded-2xl bg-sky-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700"
           >
             + New Opportunity
@@ -252,7 +252,7 @@ export default async function JournalsPage({ searchParams }) {
           return (
             <Link
               key={view.key}
-              href={`/app/journals?view=${view.key}&tab=${activeTab}`}
+              href={`/app/radars?view=${view.key}&tab=${activeTab}`}
               className={`rounded-2xl px-4 py-3 text-center text-sm font-semibold transition ${
                 active
                   ? "bg-sky-600 text-white shadow-sm"
@@ -273,7 +273,7 @@ export default async function JournalsPage({ searchParams }) {
           return (
             <Link
               key={tab.key}
-              href={`/app/journals?view=${activeView}&tab=${tab.key}`}
+              href={`/app/radars?view=${activeView}&tab=${tab.key}`}
               className={`rounded-2xl px-5 py-3 text-sm font-semibold transition ${
                 active
                   ? "bg-slate-950 text-white"

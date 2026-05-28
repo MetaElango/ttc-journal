@@ -1,4 +1,4 @@
-// app/app/journals/new/journal-form.js
+// app/app/radars/new/journal-form.js
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -1714,7 +1714,7 @@ export default function NewJournalForm({
 
         if (updateError) throw new Error(updateError.message);
 
-        router.push("/app/journals");
+        router.push("/app/radars");
       } catch (err) {
         setUploadError(err.message || "Image upload failed.");
       } finally {
