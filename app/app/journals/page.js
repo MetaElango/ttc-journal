@@ -17,6 +17,14 @@ const VIEWS = [
 const OPEN_STATUSES = ["ENTRY PLACED", "ENTRY PLANNED"];
 const ACTIVE_STATUSES = ["ENTRY TRIGGERED"];
 
+const PURPOSES = ["TRADE OBSERVATION", "TRADE EXECUTION", "FORWARD TESTING"];
+
+function norm(v) {
+  return String(v || "")
+    .trim()
+    .toUpperCase();
+}
+
 function getJournalTab(journal) {
   const status = norm(journal.status);
 
@@ -26,23 +34,9 @@ function getJournalTab(journal) {
   return null;
 }
 
-const PURPOSES = ["TRADE OBSERVATION", "TRADE EXECUTION", "FORWARD TESTING"];
-
-function norm(v) {
-  return String(v || "")
-    .trim()
-    .toUpperCase();
+function isOpenOrActiveJournal(journal) {
+  return getJournalTab(journal) !== null;
 }
-
-// function getJournalTab(journal) {
-//   const status = norm(journal.status);
-
-//   if (OPEN_STATUSES.includes(status)) return "open";
-//   if (CLOSED_STATUSES.includes(status)) return "closed";
-//   if (CANCELLED_STATUSES.includes(status)) return "cancelled";
-
-//   return null;
-// }
 
 export default async function JournalsPage({ searchParams }) {
   const params = await searchParams;
@@ -50,10 +44,6 @@ export default async function JournalsPage({ searchParams }) {
   const activeTab = TABS.some((t) => t.key === params?.tab)
     ? params.tab
     : "open";
-
-  const activeView = VIEWS.some((v) => v.key === params?.view)
-    ? params.view
-    : "my";
 
   const supabase = await createClient();
 
@@ -168,6 +158,21 @@ export default async function JournalsPage({ searchParams }) {
     (j) => j.copied_from_journal_id,
   );
 
+  const ownEligibleCount = ownJournalsAll.filter(isOpenOrActiveJournal).length;
+
+  const incorporatedEligibleCount = incorporatedJournalsAll.filter(
+    isOpenOrActiveJournal,
+  ).length;
+
+  const defaultView =
+    ownEligibleCount === 0 && incorporatedEligibleCount > 0
+      ? "incorporated"
+      : "my";
+
+  const activeView = VIEWS.some((v) => v.key === params?.view)
+    ? params.view
+    : defaultView;
+
   const activeSource =
     activeView === "incorporated" ? incorporatedJournalsAll : ownJournalsAll;
 
@@ -197,8 +202,8 @@ export default async function JournalsPage({ searchParams }) {
 
   const totalCurrentView =
     activeView === "incorporated"
-      ? incorporatedJournalsAll.length
-      : ownJournalsAll.length;
+      ? incorporatedJournalsAll.filter(isOpenOrActiveJournal).length
+      : ownJournalsAll.filter(isOpenOrActiveJournal).length;
 
   return (
     <div className="space-y-6 rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm">
@@ -241,8 +246,8 @@ export default async function JournalsPage({ searchParams }) {
           const active = activeView === view.key;
           const total =
             view.key === "incorporated"
-              ? incorporatedJournalsAll.length
-              : ownJournalsAll.length;
+              ? incorporatedJournalsAll.filter(isOpenOrActiveJournal).length
+              : ownJournalsAll.filter(isOpenOrActiveJournal).length;
 
           return (
             <Link
@@ -291,6 +296,7 @@ export default async function JournalsPage({ searchParams }) {
           journalsByPurpose={activeJournalsByPurpose}
           currentUserId={user.id}
           isAdmin={isAdmin}
+          activeView={activeView}
         />
       )}
     </div>
