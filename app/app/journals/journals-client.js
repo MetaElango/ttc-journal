@@ -41,7 +41,9 @@ function norm(v) {
     .trim()
     .toUpperCase();
 }
-
+function isIncorporatedOpportunity(journal) {
+  return Boolean(journal.copied_from_journal_id);
+}
 function canEditJournal(journal) {
   const purpose = norm(journal.purpose);
   const status = norm(journal.status);
@@ -607,15 +609,17 @@ function JournalCard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={journal.is_shared}
-              onClick={shareJournal}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-medium text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300"
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              {journal.is_shared ? "Shared" : "Share"}
-            </button>
+            {!isIncorporatedOpportunity(journal) ? (
+              <button
+                type="button"
+                disabled={journal.is_shared}
+                onClick={shareJournal}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-medium text-sky-700 transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-300"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                {journal.is_shared ? "Shared" : "Share"}
+              </button>
+            ) : null}
 
             {canEditJournal(journal) ? (
               <Link
