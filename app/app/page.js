@@ -87,7 +87,7 @@ function JournalCard({ journal, badge, showIncorporate = false }) {
 
       <div className="mt-5 flex flex-wrap gap-2">
         <Link
-          href="/app/social"
+          href="/app/circle"
           className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium hover:bg-accent"
         >
           View

@@ -10,7 +10,7 @@ import {
   TrendingDown,
 } from "lucide-react";
 
-import CommentsSection from "../social/comments-section";
+import CommentsSection from "../circle/comments-section";
 
 function norm(v) {
   return String(v || "")
