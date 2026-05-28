@@ -141,7 +141,11 @@ function ImageCarousel({ images, index, onClose, onPrev, onNext }) {
   );
 }
 
-export default function JournalDetailsModal({ journal, onClose }) {
+export default function JournalDetailsModal({
+  journal,
+  onClose,
+  afterContent,
+}) {
   const [carousel, setCarousel] = useState({ images: [], index: 0 });
   const [activeIndex, setActiveIndex] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
@@ -442,6 +446,22 @@ export default function JournalDetailsModal({ journal, onClose }) {
                   </div>
                 </div>
               )}
+              {(journal.owner_note || journal.admin_note) && (
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  ...
+                </div>
+              )}
+
+              {afterContent}
+
+              {journal.is_shared ? (
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <CommentsSection
+                    journalId={journal.id}
+                    onParentCountChange={setCommentCount}
+                  />
+                </div>
+              ) : null}
 
               {journal.is_shared ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
