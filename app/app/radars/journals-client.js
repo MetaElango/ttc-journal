@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 
 import JournalDetailsModal from "./journal-details-modal";
-import CommentsSection from "../social/comments-section";
+import CommentsSection from "../circle/comments-section";
 
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
