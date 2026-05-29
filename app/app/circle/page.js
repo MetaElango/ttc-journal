@@ -304,5 +304,11 @@ export default async function SocialPage() {
     }),
   );
 
-  return <SocialClient journals={sharedJournals} />;
+  return (
+    <SocialClient
+      journals={sharedJournals}
+      title="Community Picks"
+      description="Explore shared trade ideas, review other traders’ setups, and incorporate useful opportunities into your own journal."
+    />
+  );
 }

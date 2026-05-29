@@ -445,7 +445,7 @@ function ConfirmIncorporateModal({ journal, onClose }) {
   );
 }
 
-export default function SocialClient({ journals }) {
+export default function SocialClient({ journals, title, description }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [confirmJournal, setConfirmJournal] = useState(null);
 
@@ -701,12 +701,11 @@ export default function SocialClient({ journals }) {
               </div>
 
               <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950">
-                Community Picks
+                {title}
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-500">
-                Explore shared trade ideas, review other traders’ setups, and
-                incorporate useful opportunities into your own journal.
+                {description}
               </p>
             </div>
 
