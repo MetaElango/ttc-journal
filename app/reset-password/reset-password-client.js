@@ -68,7 +68,7 @@ export default function ResetPasswordClient() {
       <div className="relative z-10 flex min-h-screen items-center justify-center px-6">
         <div className="w-full max-w-lg rounded-3xl border border-cyan-400/45 bg-black/50 p-8 shadow-[0_0_65px_rgba(0,140,255,0.24)] backdrop-blur-xl">
           <img
-            src="/logo.png"
+            src="/logo.PNG"
             alt="EXCELLION TTC"
             className="mx-auto mb-8 h-20 w-auto object-contain"
           />

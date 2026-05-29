@@ -26,7 +26,7 @@ export default async function HomePage() {
         <div className="mx-auto flex h-32 max-w-7xl items-center justify-between px-8">
           <Link href="/" className="flex items-center">
             <img
-              src="/logo.png"
+              src="/logo.PNG"
               alt="EXCELLION TTC"
               className="h-20 w-auto object-contain"
             />

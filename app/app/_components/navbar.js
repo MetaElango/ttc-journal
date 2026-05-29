@@ -84,7 +84,7 @@ export default async function Navbar() {
         <div className="flex items-center gap-10">
           <Link href="/app" className="flex items-center">
             <img
-              src="/logo.png"
+              src="/logo.PNG"
               alt="EXCELLION TTC"
               className="h-18 w-auto object-contain md:h-18"
             />

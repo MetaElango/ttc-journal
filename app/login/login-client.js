@@ -124,7 +124,7 @@ export default function LoginClient() {
       <div className="relative z-10 flex min-h-screen flex-col px-6 py-7 md:px-14">
         <header className="flex items-center">
           <img
-            src="/logo.png"
+            src="/logo.PNG"
             alt="EXCELLION TTC"
             className="h-20 w-auto object-contain md:h-24"
           />
