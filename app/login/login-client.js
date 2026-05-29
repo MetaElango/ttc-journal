@@ -26,6 +26,8 @@ export default function LoginClient() {
     e.preventDefault();
     setMsg("");
 
+    const cleanEmail = email.trim();
+
     if (isSignup && !acceptedTerms) {
       setMsgType("error");
       setMsg("Please accept the Terms and Privacy Policy.");
@@ -36,16 +38,26 @@ export default function LoginClient() {
 
     try {
       if (isSignup) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+        });
+
         if (error) throw error;
 
+        if (data?.user?.identities?.length === 0) {
+          setMsgType("error");
+          setMsg("An account with this email already exists.");
+          return;
+        }
+
         setMsgType("success");
-        setMsg("Account created. You can now sign in.");
+        setMsg("Account created successfully. You can now sign in.");
         setMode("signin");
         setPassword("");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: cleanEmail,
           password,
         });
 
@@ -102,8 +114,8 @@ export default function LoginClient() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#eef7ff] text-slate-900">
       <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/login-bg.jpg')" }}
+        className="absolute inset-0 bg-cover bg-right"
+        style={{ backgroundImage: "url('/login-bg.jpeg')" }}
       />
 
       <div className="absolute inset-0 bg-white/35" />
@@ -156,7 +168,7 @@ export default function LoginClient() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email or username"
+                      placeholder="Enter your email"
                       className="h-16 w-full rounded-xl border border-white/60 bg-white/45 px-14 text-base text-slate-900 outline-none placeholder:text-slate-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] transition focus:border-blue-400 focus:bg-white/60 focus:ring-4 focus:ring-blue-100/70"
                     />
                   </div>
@@ -271,15 +283,6 @@ export default function LoginClient() {
                     </span>
                     <div className="h-px flex-1 bg-slate-200" />
                   </div>
-
-                  {/* <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    className="flex h-16 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white/90 text-base font-semibold text-slate-700 shadow-sm transition hover:bg-white"
-                  >
-                    <span className="text-2xl font-bold text-blue-600">G</span>
-                    Continue with Google
-                  </button> */}
                 </>
               ) : null}
 
