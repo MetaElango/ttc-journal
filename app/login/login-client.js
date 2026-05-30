@@ -52,7 +52,9 @@ export default function LoginClient() {
         }
 
         setMsgType("success");
-        setMsg("Account created successfully. You can now sign in.");
+        setMsg(
+          "Account created successfully. Please check your inbox to confirm your email. If you don't see it, check Spam, Updates, or Promotions.",
+        );
         setMode("signin");
         setPassword("");
       } else {

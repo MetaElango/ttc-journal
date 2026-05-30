@@ -526,7 +526,7 @@ export default function ProfileClient({
                     </div>
                   </div>
 
-                  <form action={deleteTradingAccount}>
+                  {/* <form action={deleteTradingAccount}>
                     <input type="hidden" name="account_id" value={account.id} />
 
                     <button
@@ -536,7 +536,7 @@ export default function ProfileClient({
                       <Trash2 className="mr-2 h-4 w-4" />
                       Remove
                     </button>
-                  </form>
+                  </form> */}
                 </div>
               </div>
             ))

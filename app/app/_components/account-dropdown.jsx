@@ -59,7 +59,7 @@ export default function AccountDropdown({ initial, displayName, email }) {
               Profile
             </Link>
 
-            <div
+            {/* <div
               className="flex items-center justify-between rounded-xl border p-2"
               onClick={(e) => e.stopPropagation()}
             >
@@ -68,7 +68,7 @@ export default function AccountDropdown({ initial, displayName, email }) {
                 Theme
               </span>
               <ModeToggle />
-            </div>
+            </div> */}
 
             <form action="/logout" method="post">
               <button className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border text-sm font-medium hover:bg-accent">
