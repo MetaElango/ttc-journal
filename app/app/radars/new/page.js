@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import NewJournalForm from "./journal-form";
 
-const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
+const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "ENTRY PLANNED"];
 
 function needsEndDate(status) {
   const value = String(status || "")
@@ -329,21 +329,21 @@ export default async function NewJournalPage({ searchParams }) {
     const STATUS_OPTIONS_BY_PURPOSE = {
       "TRADE OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
       "TRADE EXECUTION": [
+        "ENTRY PLANNED",
         "ENTRY PLACED",
         "ENTRY TRIGGERED",
         "ENTRY CANCELLED",
         "ENTRY MISSED",
-        "RUNNING TRADE",
         "TRADE SL HIT",
         "TRADE CLOSE WITH PROFIT",
         "TRADE EXIT IN MID",
       ],
       "FORWARD TESTING": [
+        "ENTRY PLANNED",
         "ENTRY PLACED",
         "ENTRY TRIGGERED",
         "ENTRY CANCELLED",
         "ENTRY MISSED",
-        "RUNNING TRADE",
         "TRADE SL HIT",
         "TRADE CLOSE WITH PROFIT",
         "TRADE EXIT IN MID",
