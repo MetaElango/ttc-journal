@@ -26,11 +26,47 @@ const journalSelect = `
   htf,
   entry_tf,
   strategy_snapshot,
+  setup_images,
+  reference_images,
+  owner_note,
+  admin_note,
   symbols:symbol_id (
     id,
     symbol_name
   )
 `;
+
+async function withSignedImageUrls(supabase, journals = []) {
+  return Promise.all(
+    journals.map(async (journal) => {
+      const setupImageUrls = await Promise.all(
+        (journal.setup_images || []).map(async (path) => {
+          const { data } = await supabase.storage
+            .from("journal-images")
+            .createSignedUrl(path, 60 * 60);
+
+          return data?.signedUrl || null;
+        }),
+      );
+
+      const referenceImageUrls = await Promise.all(
+        (journal.reference_images || []).map(async (path) => {
+          const { data } = await supabase.storage
+            .from("journal-images")
+            .createSignedUrl(path, 60 * 60);
+
+          return data?.signedUrl || null;
+        }),
+      );
+
+      return {
+        ...journal,
+        setupImageUrls: setupImageUrls.filter(Boolean),
+        referenceImageUrls: referenceImageUrls.filter(Boolean),
+      };
+    }),
+  );
+}
 
 export default async function PreferableOpportunitiesPage() {
   const supabase = await createClient();
@@ -62,7 +98,15 @@ export default async function PreferableOpportunitiesPage() {
     console.error(error);
   }
 
+  const journalsWithImages = await withSignedImageUrls(
+    supabase,
+    journals || [],
+  );
+
   return (
-    <SocialClient journals={journals || []} title="Preferable Opportunities" />
+    <SocialClient
+      journals={journalsWithImages}
+      title="Preferable Opportunities"
+    />
   );
 }

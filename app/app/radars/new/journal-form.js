@@ -64,7 +64,21 @@ const TF = [
   "1M",
 ];
 
-const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED"];
+const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "ENTRY PLANNED"];
+const CLOSED_STATUSES = [
+  "TRADE SL HIT",
+  "TRADE CLOSE WITH PROFIT",
+  "TRADE EXIT IN MID",
+  "ENTRY CLOSED",
+];
+
+function isClosedStatus(status) {
+  return CLOSED_STATUSES.includes(
+    String(status || "")
+      .trim()
+      .toUpperCase(),
+  );
+}
 
 function needsEndDate(status) {
   const value = String(status || "")
@@ -933,8 +947,8 @@ function JournalDetailsCommon({
     }
   }
 
-  const exitReasonRequired = !!required.exit_reason;
-  const exitPriceRequired = !!required.exit_price;
+  const exitReasonRequired = !!required.exit_reason || isClosedStatus(status);
+  const exitPriceRequired = !!required.exit_price || isClosedStatus(status);
   const statusOptions = getStatusOptions(purpose);
   const statusRequired = !!required.status;
 

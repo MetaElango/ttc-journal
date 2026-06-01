@@ -36,6 +36,38 @@ const journalSelect = `
   )
 `;
 
+async function withSignedImageUrls(supabase, journals = []) {
+  return Promise.all(
+    journals.map(async (journal) => {
+      const setupImageUrls = await Promise.all(
+        (journal.setup_images || []).map(async (path) => {
+          const { data } = await supabase.storage
+            .from("journal-images")
+            .createSignedUrl(path, 60 * 60);
+
+          return data?.signedUrl || null;
+        }),
+      );
+
+      const referenceImageUrls = await Promise.all(
+        (journal.reference_images || []).map(async (path) => {
+          const { data } = await supabase.storage
+            .from("journal-images")
+            .createSignedUrl(path, 60 * 60);
+
+          return data?.signedUrl || null;
+        }),
+      );
+
+      return {
+        ...journal,
+        setupImageUrls: setupImageUrls.filter(Boolean),
+        referenceImageUrls: referenceImageUrls.filter(Boolean),
+      };
+    }),
+  );
+}
+
 export default async function MostDiscussedPage() {
   const supabase = await createClient();
 
@@ -43,9 +75,7 @@ export default async function MostDiscussedPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) redirect("/login");
 
   const { data: journals, error } = await supabase
     .from("journals")
@@ -86,7 +116,12 @@ export default async function MostDiscussedPage() {
       );
     });
 
+  const journalsWithImages = await withSignedImageUrls(
+    supabase,
+    sortedJournals,
+  );
+
   return (
-    <SocialClient journals={sortedJournals} title="Most Discussed Setups" />
+    <SocialClient journals={journalsWithImages} title="Most Discussed Setups" />
   );
 }
