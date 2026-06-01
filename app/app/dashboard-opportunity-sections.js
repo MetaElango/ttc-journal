@@ -137,24 +137,18 @@ function PanelHeader({ icon: Icon, title, href }) {
   );
 }
 
-function EyeButton({ onClick, loading }) {
+function EyeButton({ onClick, loading, className = "" }) {
   return (
     <button
       type="button"
-      disabled={loading}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onClick();
-      }}
-      className="shrink-0 rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 disabled:cursor-wait disabled:opacity-60"
+      onClick={onClick}
+      className={`cursor-pointer shrink-0 rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 ${className}`}
       title="View details"
     >
       <Eye className="h-4 w-4" />
     </button>
   );
 }
-
 function HariPick({ hariPicks, onOpenJournal, loadingId }) {
   return (
     <Panel className="p-5">
@@ -167,10 +161,9 @@ function HariPick({ hariPicks, onOpenJournal, loadingId }) {
       ) : (
         <div className="space-y-3">
           {hariPicks.map((pick) => (
-            <Link
+            <div
               key={pick.id}
-              href={`/app/journals/${pick.id}`}
-              className="block rounded-[18px] border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/40"
+              className="rounded-[18px] border border-slate-200 bg-white p-4 transition hover:border-blue-200 hover:bg-blue-50/40"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -197,6 +190,7 @@ function HariPick({ hariPicks, onOpenJournal, loadingId }) {
                   <EyeButton
                     loading={loadingId === pick.id}
                     onClick={() => onOpenJournal(pick)}
+                    className="cursor-pointer shrink-0 rounded-full border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
                   />
                 </div>
               </div>
@@ -227,7 +221,7 @@ function HariPick({ hariPicks, onOpenJournal, loadingId }) {
               <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">
                 {getDescription(pick)}
               </p>
-            </Link>
+            </div>
           ))}
         </div>
       )}
