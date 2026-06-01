@@ -146,6 +146,7 @@ export default function JournalDetailsModal({
   onClose,
   afterContent,
 }) {
+  console.log("JournalDetailsModal render", journal);
   const [carousel, setCarousel] = useState({ images: [], index: 0 });
   const [activeIndex, setActiveIndex] = useState(0);
   const [commentCount, setCommentCount] = useState(0);
@@ -446,22 +447,8 @@ export default function JournalDetailsModal({
                   </div>
                 </div>
               )}
-              {(journal.owner_note || journal.admin_note) && (
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  ...
-                </div>
-              )}
 
               {afterContent}
-
-              {journal.is_shared ? (
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <CommentsSection
-                    journalId={journal.id}
-                    onParentCountChange={setCommentCount}
-                  />
-                </div>
-              ) : null}
 
               {journal.is_shared ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">

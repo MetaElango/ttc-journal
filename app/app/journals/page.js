@@ -194,7 +194,7 @@ export default async function JournalsPage({ searchParams }) {
 
   return (
     <main className="min-h-screen bg-[#f6f9fd] px-4 py-6 md:px-6">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto max-w-8xl space-y-6">
         <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white/85 p-6 shadow-sm backdrop-blur-xl">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>

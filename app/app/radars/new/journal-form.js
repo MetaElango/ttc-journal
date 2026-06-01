@@ -1245,7 +1245,7 @@ function JournalDetailsCommon({
               defaultValue={prefillJournal?.exit_price ?? ""}
               required={exitPriceRequired}
               onChange={(e) => {
-                e.target.value = sanitize2dp(e.target.value);
+                e.target.value = sanitize6dp(e.target.value);
               }}
               className="h-11 rounded-xl"
             />

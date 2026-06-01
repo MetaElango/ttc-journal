@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import PerformanceOverview from "./performance-overview";
+import DashboardOpportunitySections from "./dashboard-opportunity-sections";
 
 const CLOSED_STATUSES = [
   "TRADE CLOSE WITH PROFIT",
@@ -557,33 +558,42 @@ export default async function AppPage() {
     .single();
 
   const journalSelect = `
+  id,
+  user_id,
+  purpose,
+  status,
+  direction,
+  quantity,
+  entry_price,
+  stop_loss,
+  take_profit,
+  take_profit_qty,
+  entry_reason,
+  exit_reason,
+  exit_price,
+  risk_mode,
+  risk_per_trade,
+  created_at,
+  updated_at,
+  shared_at,
+  is_shared,
+  mentor_pick_priority,
+  htf,
+  entry_tf,
+  strategy_snapshot,
+  setup_images,
+  reference_images,
+  owner_note,
+  admin_note,
+  trading_accounts:trading_account_id (
+    account_name
+  ),
+  symbols:symbol_id (
     id,
-    user_id,
-    purpose,
-    status,
-    direction,
-    quantity,
-    entry_price,
-    stop_loss,
-    take_profit,
-    take_profit_qty,
-    entry_reason,
-    exit_reason,
-    exit_price,
-    risk_mode,
-    risk_per_trade,
-    created_at,
-    updated_at,
-    shared_at,
-    is_shared,
-    mentor_pick_priority,
-    htf,
-    entry_tf,
-    strategy_snapshot,
-    symbols:symbol_id (
-      symbol_name
-    )
-  `;
+    symbol_name,
+    category
+  )
+`;
 
   const [
     journalsRes,
@@ -701,7 +711,7 @@ export default async function AppPage() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
-      <div className="mx-auto max-w-[1520px] space-y-4 px-4 py-4">
+      <div className="mx-auto max-w-8xl space-y-4 px-4 py-4">
         <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
           <div className="space-y-4">
             <div className="relative h-[185px] overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_8px_28px_rgba(15,23,42,0.05)]">
@@ -770,10 +780,10 @@ export default async function AppPage() {
             <PerformanceOverview journals={journals} />
           </div>
 
-          <div className="space-y-4">
-            <HariPick hariPicks={hariPicks} />
-            <PreferableOpportunities topSuggestions={topSuggestions} />
-          </div>
+          <DashboardOpportunitySections
+            hariPicks={hariPicks}
+            topSuggestions={topSuggestions}
+          />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-3">
