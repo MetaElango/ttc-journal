@@ -334,6 +334,12 @@ export default function JournalsTableClient({ journals, activeTab }) {
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [editingJournal, setEditingJournal] = useState(null);
 
+  useEffect(() => {
+    setItems(journals);
+    setSelectedJournal(null);
+    setEditingJournal(null);
+  }, [journals]);
+
   function handleSaved(journalId, updated) {
     setItems((prev) =>
       prev.map((item) =>
@@ -483,15 +489,13 @@ export default function JournalsTableClient({ journals, activeTab }) {
                           <Eye className="h-4 w-4" />
                         </button>
 
-                        {activeTab === "closed" ? (
-                          <button
-                            type="button"
-                            onClick={() => setEditingJournal(journal)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100"
-                          >
-                            <FilePenLine className="h-4 w-4" />
-                          </button>
-                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setEditingJournal(journal)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-600 shadow-sm hover:bg-sky-100"
+                        >
+                          <FilePenLine className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>

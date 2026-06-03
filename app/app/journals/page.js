@@ -1,5 +1,3 @@
-// app/app/journals/page.js
-
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +12,7 @@ const VIEWS = [
 
 const TABS = [
   { key: "closed", label: "Closed" },
+  { key: "missed", label: "Missed" },
   { key: "cancelled", label: "Cancelled" },
 ];
 
@@ -21,10 +20,11 @@ const CLOSED_STATUSES = [
   "TRADE SL HIT",
   "TRADE CLOSE WITH PROFIT",
   "TRADE EXIT IN MID",
-  "ENTRY CLOSED",
 ];
 
-const CANCELLED_STATUSES = ["ENTRY MISSED", "ENTRY CANCELLED"];
+const MISSED_STATUSES = ["ENTRY MISSED"];
+
+const CANCELLED_STATUSES = ["ENTRY CANCELLED"];
 
 function norm(value) {
   return String(value || "")
@@ -36,6 +36,7 @@ function getJournalTab(journal) {
   const status = norm(journal.status);
 
   if (CLOSED_STATUSES.includes(status)) return "closed";
+  if (MISSED_STATUSES.includes(status)) return "missed";
   if (CANCELLED_STATUSES.includes(status)) return "cancelled";
 
   return null;
@@ -160,6 +161,11 @@ export default async function JournalsPage({ searchParams }) {
           journal.copied_from_journal_id === null &&
           getJournalTab(journal) === "closed",
       ).length,
+      missed: allJournals.filter(
+        (journal) =>
+          journal.copied_from_journal_id === null &&
+          getJournalTab(journal) === "missed",
+      ).length,
       cancelled: allJournals.filter(
         (journal) =>
           journal.copied_from_journal_id === null &&
@@ -171,6 +177,11 @@ export default async function JournalsPage({ searchParams }) {
         (journal) =>
           journal.copied_from_journal_id !== null &&
           getJournalTab(journal) === "closed",
+      ).length,
+      missed: allJournals.filter(
+        (journal) =>
+          journal.copied_from_journal_id !== null &&
+          getJournalTab(journal) === "missed",
       ).length,
       cancelled: allJournals.filter(
         (journal) =>
@@ -226,6 +237,11 @@ export default async function JournalsPage({ searchParams }) {
             {VIEWS.map((item) => {
               const active = activeView === item.key;
 
+              const totalCount =
+                counts[item.key].closed +
+                counts[item.key].missed +
+                counts[item.key].cancelled;
+
               return (
                 <Link
                   key={item.key}
@@ -237,6 +253,15 @@ export default async function JournalsPage({ searchParams }) {
                   }`}
                 >
                   {item.label}
+                  <span
+                    className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+                      active
+                        ? "bg-white/20 text-white"
+                        : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {totalCount}
+                  </span>
                 </Link>
               );
             })}
@@ -272,7 +297,11 @@ export default async function JournalsPage({ searchParams }) {
           })}
         </div>
 
-        <JournalsTableClient journals={journals} activeTab={activeTab} />
+        <JournalsTableClient
+          key={`${activeView}-${activeTab}`}
+          journals={journals}
+          activeTab={activeTab}
+        />
         <JournalIntelligencePanel journals={journals} />
       </div>
     </main>
