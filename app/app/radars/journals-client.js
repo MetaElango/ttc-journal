@@ -22,6 +22,7 @@ import {
   StickyNote,
   ChevronUp,
   ChevronDown,
+  Copy,
 } from "lucide-react";
 
 import JournalDetailsModal from "./journal-details-modal";
@@ -36,6 +37,12 @@ const FULL_EDIT_STATUSES = ["ENTRY PLANNED", "ENTRY PLACED"];
 
 const PARTIAL_EDIT_STATUSES = ["ENTRY TRIGGERED"];
 
+function getDirectionLabel(direction) {
+  const value = norm(direction);
+  if (value === "BUY") return "LONG";
+  if (value === "SELL") return "SHORT";
+  return direction || "—";
+}
 function norm(v) {
   return String(v || "")
     .trim()
@@ -529,6 +536,7 @@ function JournalCard({
   const tradingStyle = journal?.strategy_snapshot?.trading_style || "—";
   const setup = journal?.strategy_snapshot?.setup_type || "—";
   const symbol = journal?.symbols?.symbol_name || "—";
+  const directionLabel = getDirectionLabel(journal.direction);
   const rr = calculatePlannedRR(journal);
   const statusStyle = getStatusStyle(journal.status);
   const isBuy = norm(journal.direction) === "BUY";
@@ -560,55 +568,107 @@ function JournalCard({
     >
       <div className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 space-y-3">
+          <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-lg font-semibold tracking-tight">
-                  {strategyName}
-                </h3>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div
+                    className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xl font-bold tracking-tight ${
+                      isBuy
+                        ? "border-emerald-500  text-emerald-500"
+                        : "border-orange-200 text-orange-400"
+                    }`}
+                  >
+                    {isBuy ? (
+                      <TrendingUp className="h-4 w-4" />
+                    ) : (
+                      <TrendingDown className="h-4 w-4" />
+                    )}
+                    {symbol}
+                    {/* <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold">
+                      {directionLabel}
+                    </span> */}
+                  </div>
 
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyle.badge}`}
-                >
-                  {statusStyle.label}
-                </span>
-              </div>
+                  <h3 className="truncate text-lg font-semibold tracking-tight text-muted-foreground">
+                    {strategyName}
+                  </h3>
+                </div>
 
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{journal.purpose || "—"}</span>
-                <span>•</span>
-                <span>{tradingStyle}</span>
-                <span>•</span>
-                <span>{setup}</span>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="inline-flex flex-wrap overflow-hidden rounded-2xl border bg-muted/30">
+                    <div className="border-r px-3 py-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Style
+                      </p>
+                      <p className="text-xs font-bold uppercase text-foreground">
+                        {tradingStyle}
+                      </p>
+                    </div>
+
+                    <div className="border-r px-3 py-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Setup
+                      </p>
+                      <p className="text-xs font-bold uppercase text-foreground">
+                        {setup}
+                      </p>
+                    </div>
+
+                    <div className="border-r px-3 py-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        RR
+                      </p>
+                      <p className="text-xs font-bold uppercase text-foreground">
+                        {rr > 0 ? `1:${round2(rr)}` : "—"}
+                      </p>
+                    </div>
+
+                    <div className="border-r px-3 py-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Status
+                      </p>
+                      <p className="text-xs font-bold uppercase text-foreground">
+                        {statusStyle.label}
+                      </p>
+                    </div>
+
+                    <div className="px-3 py-2">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Created
+                      </p>
+                      <p className="text-xs font-bold uppercase text-foreground">
+                        {formatDate(
+                          journal.journal_start_at || journal.created_at,
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs font-medium">
-                {isBuy ? (
-                  <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                ) : (
-                  <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                )}
-                {journal.direction || "—"}
+            {/* <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyle.badge}`}
+              >
+                {statusStyle.label}
               </span>
-
-              <span className="rounded-full border bg-background px-2.5 py-1 text-xs font-medium">
-                {symbol}
-              </span>
-
-              <span className="rounded-full border bg-background px-2.5 py-1 text-xs font-medium">
-                RR: {rr > 0 ? `1:${round2(rr)}` : "—"}
-              </span>
-
               <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5" />
                 {formatDate(journal.journal_start_at || journal.created_at)}
               </span>
-            </div>
+            </div> */}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
+            <Link
+              href={`/app/radars/new?duplicateJournalId=${journal.id}`}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 text-xs font-medium text-orange-700 transition hover:bg-orange-100 dark:border-orange-900/40 dark:bg-orange-950/20 dark:text-orange-300"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              Clone
+            </Link>
             {!isIncorporatedOpportunity(journal) ? (
               <button
                 type="button"
@@ -663,9 +723,10 @@ function JournalCard({
 
         {expanded ? (
           <>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
               <MiniStat label="Entry" value={journal.entry_price} />
               <MiniStat label="SL" value={journal.stop_loss} />
+
               <MiniStat
                 label="TP"
                 value={

@@ -71,6 +71,7 @@ export default async function NewJournalPage({ searchParams }) {
 
   const strategyId = params?.strategyId;
   const sharedJournalId = params?.sharedJournalId;
+  const duplicateJournalId = params?.duplicateJournalId;
 
   const supabase = await createClient();
 
@@ -81,7 +82,7 @@ export default async function NewJournalPage({ searchParams }) {
 
   let liveStrategies = [];
 
-  if (!strategyId && !sharedJournalId) {
+  if (!strategyId && !sharedJournalId && !duplicateJournalId) {
     const { data } = await supabase
       .from("strategies")
       .select(
@@ -116,6 +117,76 @@ export default async function NewJournalPage({ searchParams }) {
 
   let strategy = null;
   let prefillJournal = null;
+
+  if (duplicateJournalId) {
+    const { data: duplicateJournal, error: duplicateError } = await supabase
+      .from("journals")
+      .select(
+        `
+      id,
+      user_id,
+      strategy_id,
+      trading_account_id,
+      symbol_id,
+      strategy_snapshot,
+      purpose,
+      status,
+      direction,
+      quantity,
+      entry_price,
+      stop_loss,
+      take_profit,
+      take_profit_qty,
+      entry_reason,
+      exit_reason,
+      exit_price,
+      risk_mode,
+      risk_per_trade,
+      setup_images,
+      reference_images,
+      journal_start_at,
+      journal_end_at,
+      htf,
+      entry_tf,
+      updated_at,
+      symbols:symbol_id (
+        id,
+        symbol_name,
+        category
+      )
+      `,
+      )
+      .eq("id", duplicateJournalId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (duplicateError || !duplicateJournal) {
+      return (
+        <div className="p-6">
+          <h1 className="text-xl font-semibold">Duplicate Opportunity</h1>
+          <p className="mt-3 text-sm text-destructive">
+            Journal not found or you don’t have access.
+          </p>
+        </div>
+      );
+    }
+
+    prefillJournal = {
+      ...duplicateJournal,
+      setupImageUrls: [],
+      referenceImageUrls: [],
+      journal_start_at: new Date().toISOString(),
+      journal_end_at: null,
+      status:
+        duplicateJournal.purpose === "TRADE OBSERVATION"
+          ? duplicateJournal.status
+          : "ENTRY PLANNED",
+      exit_reason: "",
+      exit_price: null,
+    };
+
+    strategy = duplicateJournal.strategy_snapshot || null;
+  }
 
   if (sharedJournalId) {
     const { data: sharedJournal, error: sharedError } = await supabase
@@ -237,7 +308,7 @@ export default async function NewJournalPage({ searchParams }) {
     strategy = fetchedStrategy;
   }
 
-  if (!strategy && (strategyId || sharedJournalId)) {
+  if (!strategy && (strategyId || sharedJournalId || duplicateJournalId)) {
     return (
       <div className="p-6">
         <h1 className="text-xl font-semibold">Create Opportunity</h1>
@@ -805,6 +876,7 @@ export default async function NewJournalPage({ searchParams }) {
       symbols={symbols || []}
       prefillJournal={prefillJournal}
       isIncorporate={!!sharedJournalId}
+      isDuplicate={!!duplicateJournalId}
     />
   );
 }
