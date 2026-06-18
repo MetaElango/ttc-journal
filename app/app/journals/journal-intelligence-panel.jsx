@@ -12,7 +12,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-
+import { calculateRMultiple } from "../insights/_lib/metrics";
 function norm(v) {
   return String(v || "")
     .trim()
@@ -23,21 +23,6 @@ function makeLocalDate(value) {
   if (!value) return null;
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getR(journal) {
-  const status = norm(journal.status);
-
-  if (journal.r_result != null) return Number(journal.r_result) || 0;
-  if (journal.total_r != null) return Number(journal.total_r) || 0;
-  if (journal.profit_r != null) return Number(journal.profit_r) || 0;
-
-  if (status === "TRADE CLOSE WITH PROFIT") return 1;
-  if (status === "TRADE SL HIT") return -1;
-  if (status === "TRADE EXIT IN MID") return 0.25;
-  if (status === "ENTRY CLOSED") return 0;
-
-  return 0;
 }
 
 function fmtDate(value, options = {}) {
@@ -366,7 +351,7 @@ export default function JournalIntelligencePanel({ journals = [] }) {
       if (Number.isNaN(d.getTime())) return;
 
       const key = dateKey(d);
-      const r = getR(journal);
+      const r = calculateRMultiple(journal);
 
       const prev = daily.get(key) || {
         date: d,
@@ -392,8 +377,12 @@ export default function JournalIntelligencePanel({ journals = [] }) {
     const days = Array.from(daily.values());
     const totalTrades = filteredJournals.length;
     const totalR = days.reduce((a, b) => a + b.totalR, 0);
-    const wins = filteredJournals.filter((j) => getR(j) > 0).length;
-    const losses = filteredJournals.filter((j) => getR(j) < 0).length;
+    const wins = filteredJournals.filter(
+      (j) => calculateRMultiple(j) > 0,
+    ).length;
+    const losses = filteredJournals.filter(
+      (j) => calculateRMultiple(j) < 0,
+    ).length;
 
     const winningDays = days.filter((d) => d.totalR > 0).length;
     const losingDays = days.filter((d) => d.totalR < 0).length;
@@ -808,7 +797,8 @@ export default function JournalIntelligencePanel({ journals = [] }) {
                     >
                       <div className="font-black text-slate-900">
                         {journal.symbols?.symbol_name || "—"} •{" "}
-                        {journal.direction || "—"} • {getR(journal).toFixed(2)}R
+                        {journal.direction || "—"} •{" "}
+                        {calculateRMultiple(journal).toFixed(2)}R
                       </div>
 
                       <div className="mt-1 text-xs font-bold text-slate-500">
