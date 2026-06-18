@@ -97,6 +97,36 @@ function defaultSplitWeights(count) {
 function arrayValue(value) {
   return Array.isArray(value) ? value.map((x) => String(x ?? "")) : [];
 }
+function TakeProfitView({ journal }) {
+  const tp = arrayValue(journal.take_profit);
+  const tpQty = arrayValue(journal.take_profit_qty);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-semibold uppercase text-slate-500">
+        Actual Take Profit
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {tp.length ? (
+          tp.map((price, index) => (
+            <div
+              key={`${price}-${index}`}
+              className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <span className="font-semibold text-slate-900">
+                TP {index + 1}: {price}
+              </span>
+              <span className="text-slate-500">Qty: {tpQty[index] || "—"}</span>
+            </div>
+          ))
+        ) : (
+          <div className="text-sm text-slate-500">—</div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Pill({ children }) {
   return (
@@ -489,6 +519,8 @@ export default function EditJournalForm({
   );
 
   const [exitReason, setExitReason] = useState(journal.exit_reason || "");
+  const [modifySlEnabled, setModifySlEnabled] = useState(false);
+  const [modifyTpEnabled, setModifyTpEnabled] = useState(false);
 
   const [modifiedSlPrice, setModifiedSlPrice] = useState(
     journal.modified_sl_price != null
@@ -497,7 +529,18 @@ export default function EditJournalForm({
         ? String(journal.modified_sl)
         : "",
   );
+  const savedModifiedSlPrice =
+    journal.modified_sl_price != null ? String(journal.modified_sl_price) : "";
 
+  const savedModifiedTpRows = useMemo(() => {
+    const savedPrice = arrayValue(journal.modified_tp_price);
+    const savedQty = arrayValue(journal.modified_tp_qty);
+
+    return savedPrice.map((price, index) => ({
+      price,
+      qty: savedQty[index] || "",
+    }));
+  }, [journal.modified_tp_price, journal.modified_tp_qty]);
   const [modifiedTpRows, setModifiedTpRows] = useState(() => {
     const existingPrice = arrayValue(journal.modified_tp_price);
     const existingQty = arrayValue(journal.modified_tp_qty);
@@ -556,14 +599,15 @@ export default function EditJournalForm({
         ? modifiedSlPrice
         : "";
 
-  const disableUpdate = isEntryTriggered;
+  const hasModifiedOnlyUpdate = modifySlEnabled || modifyTpEnabled;
 
+  const disableUpdate = isEntryTriggered && !hasModifiedOnlyUpdate;
   const modifiedTpQtySum = useMemo(() => {
     return modifiedTpRows.reduce((acc, row) => acc + (Number(row.qty) || 0), 0);
   }, [modifiedTpRows]);
 
   const modifiedTpQtyOk =
-    !isModifiedTp ||
+    !modifyTpEnabled ||
     Math.abs(round2(modifiedTpQtySum) - round2(journal.quantity)) <= 0.01;
 
   const canSubmit = useMemo(() => {
@@ -574,9 +618,9 @@ export default function EditJournalForm({
     if (isSlStatus && !exitCheckpoint) return false;
     if (isProfitStatus && !exitCheckpoint) return false;
 
-    if (isModifiedSl && !modifiedSlPrice.trim()) return false;
-
-    if (isModifiedTp) {
+    if (isModifiedSl && modifySlEnabled && !modifiedSlPrice.trim())
+      return false;
+    if (isModifiedTp && modifyTpEnabled) {
       const hasInvalidRow = modifiedTpRows.some(
         (row) => !String(row.price).trim() || !String(row.qty).trim(),
       );
@@ -601,6 +645,8 @@ export default function EditJournalForm({
     isModifiedTp,
     modifiedTpRows,
     modifiedTpQtyOk,
+    modifySlEnabled,
+    modifyTpEnabled,
     needsManualExitPrice,
     exitPrice,
     needsExitReason,
@@ -675,13 +721,15 @@ export default function EditJournalForm({
           value={needsManualExitPrice ? exitPrice : autoExitPrice}
         />
 
-        <input
-          type="hidden"
-          name="modified_sl_price"
-          value={isModifiedSl ? modifiedSlPrice : ""}
-        />
+        {modifySlEnabled ? (
+          <input
+            type="hidden"
+            name="modified_sl_price"
+            value={modifiedSlPrice}
+          />
+        ) : null}
 
-        {isModifiedTp
+        {modifyTpEnabled
           ? modifiedTpRows.map((row, index) => (
               <div key={`hidden-modified-tp-${index}`}>
                 <input
@@ -763,15 +811,132 @@ export default function EditJournalForm({
             description="Fields below change based on selected status."
           />
 
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-950">
+                  Modified SL / TP
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Enable only when you want to modify SL or TP.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={modifySlEnabled}
+                    onChange={(e) => setModifySlEnabled(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Modify SL
+                </label>
+
+                <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={modifyTpEnabled}
+                    onChange={(e) => setModifyTpEnabled(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  Modify TP
+                </label>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-semibold uppercase text-slate-500">
+                  Stop Loss
+                </div>
+
+                <div className="mt-4 grid gap-3">
+                  <ReadOnlyBox
+                    label="Actual Stop Loss"
+                    value={journal.stop_loss}
+                  />
+
+                  <ReadOnlyBox
+                    label="Modified Stop Loss"
+                    value={
+                      journal.modified_sl_price != null
+                        ? journal.modified_sl_price
+                        : ""
+                    }
+                  />
+                </div>
+
+                {modifySlEnabled ? (
+                  <div className="mt-4">
+                    <FieldShell label="Modified SL" optional={!modifySlEnabled}>
+                      <input
+                        value={modifiedSlPrice}
+                        onChange={(e) =>
+                          setModifiedSlPrice(sanitize6dp(e.target.value))
+                        }
+                        className={inputClass()}
+                        inputMode="decimal"
+                        placeholder="modified SL"
+                      />
+                    </FieldShell>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-semibold uppercase text-slate-500">
+                  Take Profit
+                </div>
+
+                <div className="mt-4 grid gap-3">
+                  <TakeProfitView journal={journal} />
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase text-slate-500">
+                      Modified Take Profit
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {savedModifiedTpRows.length ? (
+                        savedModifiedTpRows.map((row, index) => (
+                          <div
+                            key={`modified-preview-${index}`}
+                            className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                          >
+                            <span className="font-semibold text-slate-900">
+                              TP {index + 1}: {row.price || "—"}
+                            </span>
+                            <span className="text-slate-500">
+                              Qty: {row.qty || "—"}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-slate-500">—</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {modifyTpEnabled ? (
+              <div className="mt-5">
+                <TakeProfitEditor
+                  items={modifiedTpRows}
+                  setItems={setModifiedTpRows}
+                  totalLots={journal.quantity}
+                  disabled={submitting}
+                />
+              </div>
+            ) : null}
+          </div>
           <div className="mt-6 space-y-6">
             {isEntryTriggered ? (
-              <>
-                <TpSlView journal={journal} />
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
-                  Entry is triggered and still active, so no exit update is
-                  needed.
-                </div>
-              </>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-700">
+                Entry is triggered and still active, so no exit update is
+                needed.
+              </div>
             ) : null}
 
             {isEntryCancelled || isEntryMissed || isMidExit ? (
@@ -789,7 +954,6 @@ export default function EditJournalForm({
                   <option value="" disabled>
                     Select SL type
                   </option>
-
                   {SL_CHECKPOINTS.map((x) => (
                     <option key={x.value} value={x.value}>
                       {x.label}
@@ -810,7 +974,6 @@ export default function EditJournalForm({
                   <option value="" disabled>
                     Select profit type
                   </option>
-
                   {PROFIT_CHECKPOINTS.map((x) => (
                     <option key={x.value} value={x.value}>
                       {x.label}
@@ -818,51 +981,6 @@ export default function EditJournalForm({
                   ))}
                 </select>
               </FieldShell>
-            ) : null}
-
-            {isActualSl ? (
-              <ReadOnlyBox
-                label="Exit Price"
-                value={journal.stop_loss}
-                note="from original SL"
-              />
-            ) : null}
-
-            {isSlBreakeven || isTpBreakeven ? (
-              <ReadOnlyBox
-                label="Exit Price"
-                value={journal.entry_price}
-                note="from entry price"
-              />
-            ) : null}
-
-            {isModifiedSl ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <ReadOnlyBox label="Original SL" value={journal.stop_loss} />
-
-                <FieldShell label="Modified SL Price" required>
-                  <input
-                    value={modifiedSlPrice}
-                    onChange={(e) =>
-                      setModifiedSlPrice(sanitize6dp(e.target.value))
-                    }
-                    className={inputClass()}
-                    inputMode="decimal"
-                    required
-                  />
-                </FieldShell>
-              </div>
-            ) : null}
-
-            {isActualTp ? <TpSlView journal={journal} /> : null}
-
-            {isModifiedTp ? (
-              <TakeProfitEditor
-                items={modifiedTpRows}
-                setItems={setModifiedTpRows}
-                totalLots={journal.quantity}
-                disabled={submitting}
-              />
             ) : null}
 
             {needsManualExitPrice ? (

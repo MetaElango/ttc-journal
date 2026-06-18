@@ -200,7 +200,10 @@ export default async function EditJournalPage({ params, searchParams }) {
       entry_price,
       stop_loss,
       take_profit,
-      take_profit_qty
+take_profit_qty,
+modified_sl_price,
+modified_tp_price,
+modified_tp_qty
     `,
       )
       .eq("id", id)
@@ -335,7 +338,8 @@ export default async function EditJournalPage({ params, searchParams }) {
       }
 
       if (exit_checkpoint === "MODIFIED_TP") {
-        finalExitPrice = modified_tp_price[0] ?? null;
+        finalExitPrice =
+          modified_tp_price[0] ?? Number(existing.take_profit?.[0] || null);
       }
 
       if (exit_checkpoint === "TP_BREAKEVEN") {
@@ -366,15 +370,18 @@ export default async function EditJournalPage({ params, searchParams }) {
         exit_reason,
         exit_price: finalExitPrice,
         exit_checkpoint,
-
         modified_sl_price:
-          exit_checkpoint === "MODIFIED_SL" ? modified_sl_price : null,
+          getFormValue(formData, "modified_sl_price") !== null
+            ? modified_sl_price
+            : existing.modified_sl_price,
 
-        modified_tp_price:
-          exit_checkpoint === "MODIFIED_TP" ? modified_tp_price : null,
+        modified_tp_price: formData.getAll("modified_tp_price").length
+          ? modified_tp_price
+          : existing.modified_tp_price,
 
-        modified_tp_qty:
-          exit_checkpoint === "MODIFIED_TP" ? modified_tp_qty : null,
+        modified_tp_qty: formData.getAll("modified_tp_qty").length
+          ? modified_tp_qty
+          : existing.modified_tp_qty,
       })
       .eq("id", id)
       .eq("user_id", user.id);
