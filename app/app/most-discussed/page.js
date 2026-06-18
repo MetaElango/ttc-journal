@@ -32,7 +32,8 @@ const journalSelect = `
   reference_images,
   symbols:symbol_id (
     id,
-    symbol_name
+    symbol_name,
+    category
   )
 `;
 
@@ -99,6 +100,13 @@ export default async function MostDiscussedPage() {
 
   if (error) {
     console.error("Most Discussed Error:", error);
+
+    return (
+      <div className="p-6">
+        <h1 className="text-xl font-semibold">Most Discussed Setups</h1>
+        <p className="mt-3 text-sm text-destructive">{error.message}</p>
+      </div>
+    );
   }
 
   const sortedJournals = (journals || [])
@@ -122,6 +130,10 @@ export default async function MostDiscussedPage() {
   );
 
   return (
-    <SocialClient journals={journalsWithImages} title="Most Discussed Setups" />
+    <SocialClient
+      journals={journalsWithImages}
+      title="Most Discussed Setups"
+      description="Shared trade setups ranked by community discussion and recent activity."
+    />
   );
 }

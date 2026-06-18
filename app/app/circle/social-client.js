@@ -3,16 +3,20 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowUpRight,
   BookOpen,
   CheckCircle2,
   Clock,
+  Copy,
   Eye,
   Filter,
   Layers,
+  MessageSquareText,
   PlusCircle,
   RefreshCcw,
   Share2,
   Sparkles,
+  StickyNote,
   Target,
   ThumbsDown,
   ThumbsUp,
@@ -36,12 +40,6 @@ function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100;
 }
 
-function shortText(value, max = 120) {
-  const text = String(value || "—");
-  if (text.length <= max) return text;
-  return `${text.slice(0, max)}...`;
-}
-
 function asArray(v) {
   return Array.isArray(v) ? v : [];
 }
@@ -58,6 +56,12 @@ function getAuthorName(journal) {
     journal.profiles?.username ||
     "Trader"
   );
+}
+
+function shortText(value, max = 120) {
+  const text = String(value || "—");
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}...`;
 }
 
 function getSharedTime(value) {
@@ -132,34 +136,69 @@ function calculatePlannedRR(journal) {
   return 0;
 }
 
+function formatRisk(journal) {
+  const mode = norm(journal.risk_mode);
+  const risk = journal.risk_per_trade;
+
+  if (risk == null) return "—";
+  if (mode === "PERCENT") return `${risk}%`;
+  if (mode === "AMOUNT") return `$${risk}`;
+
+  return risk;
+}
+
 function formatTP(tp = [], qty = []) {
   if (!Array.isArray(tp) || tp.length === 0) return "—";
 
   if (Array.isArray(qty) && qty.length === tp.length) {
     return tp
       .map((p, i) => `TP ${i + 1}: ${p} · ${qty[i] ?? "—"} lots`)
-      .join("\n");
+      .join(", ");
   }
 
-  return tp.map((p, i) => `TP ${i + 1}: ${p}`).join("\n");
+  return tp.map((p, i) => `TP ${i + 1}: ${p}`).join(", ");
 }
 
-function getStatusTone(status) {
+function getStatusStyle(status) {
   const s = norm(status);
 
   if (["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"].includes(s)) {
-    return "border-blue-200 bg-blue-50 text-blue-700";
+    return {
+      border: "border-l-emerald-500",
+      badge: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700",
+      label: status || "Open",
+    };
   }
 
   if (s === "TRADE CLOSE WITH PROFIT") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    return {
+      border: "border-l-blue-500",
+      badge: "border-blue-500/25 bg-blue-500/10 text-blue-700",
+      label: status,
+    };
   }
 
   if (s === "TRADE SL HIT") {
-    return "border-red-200 bg-red-50 text-red-700";
+    return {
+      border: "border-l-red-500",
+      badge: "border-red-500/25 bg-red-500/10 text-red-700",
+      label: status,
+    };
   }
 
-  return "border-slate-200 bg-slate-100 text-slate-600";
+  if (["ENTRY CANCELLED", "ENTRY MISSED"].includes(s)) {
+    return {
+      border: "border-l-muted-foreground/40",
+      badge: "border-border bg-muted text-muted-foreground",
+      label: status,
+    };
+  }
+
+  return {
+    border: "border-l-border",
+    badge: "border-border bg-background text-muted-foreground",
+    label: status || "No status",
+  };
 }
 
 function needsStatusConfirm(status) {
@@ -171,118 +210,11 @@ function needsStatusConfirm(status) {
   ].includes(norm(status));
 }
 
-function Pill({ children, className = "" }) {
+function MiniStat({ label, value }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${className}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-function StatCard({ icon: Icon, label, value, sub }) {
-  return (
-    <div className="group rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-xl">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-            {label}
-          </div>
-          <div className="mt-3 text-3xl font-black text-sky-600">{value}</div>
-          {sub ? (
-            <div className="mt-1 text-xs font-bold text-slate-500">{sub}</div>
-          ) : null}
-        </div>
-
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition group-hover:bg-sky-50 group-hover:text-sky-600">
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NotePreview({ title, value }) {
-  if (!value) return null;
-
-  return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4">
-      <div className="mb-2 text-sm font-black text-slate-950">{title}</div>
-      <div
-        className="note-content prose prose-sm max-w-none text-sm text-slate-500"
-        dangerouslySetInnerHTML={{ __html: value }}
-      />
-    </div>
-  );
-}
-
-function JournalCardTabs({ journal }) {
-  const [activeTab, setActiveTab] = useState("notes");
-  const [parentCommentCount, setParentCommentCount] = useState(0);
-
-  const hasNotes = Boolean(journal.owner_note || journal.admin_note);
-
-  const tabs = [
-    { key: "notes", label: "Notes", hasDot: hasNotes },
-    { key: "comments", label: `Comments (${parentCommentCount})` },
-  ];
-
-  return (
-    <div className="space-y-4 lg:col-span-3">
-      <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
-        {tabs.map((tab) => {
-          const active = activeTab === tab.key;
-
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-bold transition ${
-                active
-                  ? "bg-sky-600 text-white shadow-sm"
-                  : "text-slate-500 hover:bg-white hover:text-slate-950"
-              }`}
-            >
-              {tab.label}
-              {tab.hasDot ? (
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    active ? "bg-white" : "bg-emerald-500"
-                  }`}
-                />
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
-
-      {activeTab === "notes" ? (
-        journal.owner_note || journal.admin_note ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <NotePreview title="Trader Note" value={journal.owner_note} />
-            <NotePreview title="Admin Note" value={journal.admin_note} />
-          </div>
-        ) : (
-          <div className="rounded-3xl border border-dashed border-slate-200 p-6 text-sm font-semibold text-slate-500">
-            No notes added yet.
-          </div>
-        )
-      ) : null}
-
-      {activeTab === "comments" ? (
-        <CommentsSection
-          journalId={journal.id}
-          onParentCountChange={setParentCommentCount}
-        />
-      ) : (
-        <CommentsSection
-          journalId={journal.id}
-          onParentCountChange={setParentCommentCount}
-          hidden
-        />
-      )}
+    <div className="rounded-2xl border bg-background/70 p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold">{value ?? "—"}</div>
     </div>
   );
 }
@@ -292,7 +224,7 @@ function FilterSelect({ value, onChange, children }) {
     <select
       value={value}
       onChange={onChange}
-      className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+      className="h-10 rounded-xl border bg-background px-3 text-xs font-medium text-foreground outline-none transition hover:bg-accent focus:ring-2 focus:ring-ring"
     >
       {children}
     </select>
@@ -305,14 +237,105 @@ function ReactionButton({ active, children, onClick }) {
       type="button"
       onClick={onClick}
       className={[
-        "inline-flex h-10 items-center gap-2 rounded-2xl border px-3 text-sm font-bold transition",
+        "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-medium transition",
         active
-          ? "border-sky-200 bg-sky-50 text-sky-700"
-          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
       ].join(" ")}
     >
       {children}
     </button>
+  );
+}
+
+function NotePreview({ title, value }) {
+  return (
+    <div className="rounded-2xl border bg-background/70 p-4">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+        <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+        {title}
+      </div>
+
+      {value ? (
+        <div
+          className="note-content prose prose-sm max-w-none text-sm"
+          dangerouslySetInnerHTML={{ __html: value }}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">No note added yet.</p>
+      )}
+    </div>
+  );
+}
+
+function SocialJournalTabs({ journal }) {
+  const [activeTab, setActiveTab] = useState("notes");
+  const [commentCount, setCommentCount] = useState(0);
+
+  const hasNotes = Boolean(journal.owner_note || journal.admin_note);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("notes")}
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+            activeTab === "notes"
+              ? "bg-primary text-primary-foreground"
+              : "bg-background hover:bg-accent"
+          }`}
+        >
+          <StickyNote className="h-3.5 w-3.5" />
+          Notes
+          {hasNotes ? (
+            <span
+              className={`h-2 w-2 rounded-full ${
+                activeTab === "notes"
+                  ? "bg-primary-foreground"
+                  : "bg-emerald-500"
+              }`}
+            />
+          ) : null}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("comments")}
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+            activeTab === "comments"
+              ? "bg-primary text-primary-foreground"
+              : "bg-background hover:bg-accent"
+          }`}
+        >
+          <MessageSquareText className="h-3.5 w-3.5" />
+          Comments
+          <span className="rounded-full bg-black/10 px-2 py-0.5 text-[10px]">
+            {commentCount}
+          </span>
+        </button>
+      </div>
+
+      {activeTab === "notes" ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          <NotePreview title="Trader Note" value={journal.owner_note} />
+          <NotePreview title="Admin Note" value={journal.admin_note} />
+        </div>
+      ) : null}
+
+      {activeTab === "comments" ? (
+        <CommentsSection
+          journalId={journal.id}
+          onParentCountChange={setCommentCount}
+        />
+      ) : (
+        <CommentsSection
+          journalId={journal.id}
+          onParentCountChange={setCommentCount}
+          hidden
+        />
+      )}
+    </div>
   );
 }
 
@@ -332,26 +355,26 @@ function ConfirmIncorporateModal({ journal, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-6">
+      <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-3xl border bg-card shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b p-6">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-xs font-black uppercase text-orange-700">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700">
               <AlertTriangle className="h-4 w-4" />
               Confirm Incorporation
             </div>
 
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
+            <h2 className="mt-4 text-2xl font-bold tracking-tight">
               Continue with this opportunity?
             </h2>
 
-            <p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
               {alreadyCopied
                 ? "You already incorporated this journal before. Review the author’s latest changes before creating another copy."
                 : "This will create a new opportunity from this shared journal."}
             </p>
 
             {statusWarning ? (
-              <p className="mt-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-700">
+              <p className="mt-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
                 Current status: {journal.status}
               </p>
             ) : null}
@@ -360,7 +383,7 @@ function ConfirmIncorporateModal({ journal, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+            className="rounded-full p-2 text-muted-foreground hover:bg-accent"
           >
             <X className="h-5 w-5" />
           </button>
@@ -370,16 +393,16 @@ function ConfirmIncorporateModal({ journal, onClose }) {
           <div className="max-h-[52vh] overflow-y-auto p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-black text-slate-950">
+                <h3 className="text-lg font-bold">
                   Author updated these values
                 </h3>
-                <p className="mt-1 text-sm font-semibold text-slate-500">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Old value is what you copied. New value is the latest shared
                   version.
                 </p>
               </div>
 
-              <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-black uppercase text-orange-700">
+              <span className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-700">
                 {updatedFields.length} changes
               </span>
             </div>
@@ -388,27 +411,27 @@ function ConfirmIncorporateModal({ journal, onClose }) {
               {updatedFields.map((change) => (
                 <div
                   key={change.key}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
+                  className="rounded-2xl border bg-muted/20 p-4"
                 >
-                  <div className="mb-3 text-sm font-black uppercase tracking-wide text-slate-600">
+                  <div className="mb-3 text-sm font-bold uppercase text-muted-foreground">
                     {change.label}
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-2xl border border-red-200 bg-white p-4">
-                      <div className="mb-2 text-xs font-black uppercase text-red-600">
+                    <div className="rounded-2xl border border-red-200 bg-background p-4">
+                      <div className="mb-2 text-xs font-bold uppercase text-red-600">
                         Old
                       </div>
-                      <div className="whitespace-pre-wrap break-words text-sm font-bold leading-6 text-slate-800">
+                      <div className="whitespace-pre-wrap break-words text-sm font-semibold">
                         {formatChangeValue(change.oldValue)}
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-emerald-200 bg-white p-4">
-                      <div className="mb-2 text-xs font-black uppercase text-emerald-600">
+                    <div className="rounded-2xl border border-emerald-200 bg-background p-4">
+                      <div className="mb-2 text-xs font-bold uppercase text-emerald-600">
                         New
                       </div>
-                      <div className="whitespace-pre-wrap break-words text-sm font-bold leading-6 text-slate-800">
+                      <div className="whitespace-pre-wrap break-words text-sm font-semibold">
                         {formatChangeValue(change.newValue)}
                       </div>
                     </div>
@@ -418,30 +441,315 @@ function ConfirmIncorporateModal({ journal, onClose }) {
             </div>
           </div>
         ) : (
-          <div className="p-6 text-sm font-semibold text-slate-500">
+          <div className="p-6 text-sm text-muted-foreground">
             No updated values found.
           </div>
         )}
 
-        <div className="flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5">
+        <div className="flex flex-wrap justify-end gap-3 border-t bg-muted/20 p-5">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-10 items-center rounded-xl border bg-background px-4 text-xs font-medium hover:bg-accent"
           >
             Cancel
           </button>
 
           <a
             href={href}
-            className="inline-flex h-11 items-center gap-2 rounded-2xl bg-sky-600 px-5 text-sm font-bold text-white hover:bg-sky-700"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-medium text-primary-foreground"
           >
-            <PlusCircle className="h-4 w-4" />
+            <PlusCircle className="h-3.5 w-3.5" />
             Continue
           </a>
         </div>
       </div>
     </div>
+  );
+}
+
+function SocialJournalCard({
+  journal,
+  index,
+  setSelectedJournal,
+  handleIncorporateClick,
+  handleReaction,
+  localReactions,
+}) {
+  const strategy = getStrategy(journal);
+
+  const symbol = journal.symbols?.symbol_name || "—";
+  const category = journal.symbols?.category || "—";
+  const strategyName = strategy.strategy_name || "Shared Journal";
+  const tradingStyle = strategy.trading_style || "—";
+  const setup = strategy.setup_type || "—";
+  const approach = strategy.strategy_type || "—";
+  const rr = calculatePlannedRR(journal);
+
+  const statusStyle = getStatusStyle(journal.status);
+  const isBuy = norm(journal.direction) === "BUY";
+  const isSell = norm(journal.direction) === "SELL";
+
+  const incorporated = journal.copyStatus?.incorporated;
+  const authorUpdated = journal.copyStatus?.authorUpdatedAfterCopy;
+  const alreadySynced = incorporated && !authorUpdated;
+
+  const reaction = localReactions[journal.id] || journal.myReaction || null;
+
+  const incorporatedCount = Number(
+    journal.incorporatedCount || journal.copyCount || 0,
+  );
+
+  return (
+    <article
+      className={[
+        "group overflow-hidden rounded-3xl border border-l-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md",
+        authorUpdated
+          ? "border-l-orange-500"
+          : alreadySynced
+            ? "border-l-emerald-500"
+            : statusStyle.border,
+        index % 2 === 0 ? "bg-card" : "bg-muted/20",
+      ].join(" ")}
+    >
+      <div className="p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-xl font-bold tracking-tight ${
+                  isBuy
+                    ? "border-emerald-500 text-emerald-500"
+                    : isSell
+                      ? "border-orange-200 text-orange-400"
+                      : "border-slate-200 text-slate-500"
+                }`}
+              >
+                {isBuy ? (
+                  <TrendingUp className="h-4 w-4" />
+                ) : (
+                  <TrendingDown className="h-4 w-4" />
+                )}
+                {symbol}
+              </div>
+
+              <h3 className="truncate text-lg font-semibold tracking-tight text-muted-foreground">
+                {strategyName}
+              </h3>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex flex-wrap overflow-hidden rounded-2xl border bg-muted/30">
+                <div className="border-r px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Style
+                  </p>
+                  <p className="text-xs font-bold uppercase text-foreground">
+                    {tradingStyle}
+                  </p>
+                </div>
+
+                <div className="border-r px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Setup
+                  </p>
+                  <p className="text-xs font-bold uppercase text-foreground">
+                    {setup}
+                  </p>
+                </div>
+
+                <div className="border-r px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    RR
+                  </p>
+                  <p className="text-xs font-bold uppercase text-foreground">
+                    {rr > 0 ? `1:${round2(rr)}` : "—"}
+                  </p>
+                </div>
+
+                <div className="border-r px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Status
+                  </p>
+                  <p className="text-xs font-bold uppercase text-foreground">
+                    {statusStyle.label}
+                  </p>
+                </div>
+
+                <div className="border-r px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Category
+                  </p>
+                  <p className="text-xs font-bold uppercase text-foreground">
+                    {category}
+                  </p>
+                </div>
+
+                <div className="px-3 py-2">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Copies
+                  </p>
+                  <p className="text-xs font-bold uppercase text-foreground">
+                    {incorporatedCount}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span
+                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusStyle.badge}`}
+              >
+                {journal.purpose || "—"}
+              </span>
+
+              <span className="inline-flex rounded-full border bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                {approach}
+              </span>
+
+              {asArray(journal.htf || strategy.htf).map((tf) => (
+                <span
+                  key={`htf-${journal.id}-${tf}`}
+                  className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+                >
+                  HTF {tf}
+                </span>
+              ))}
+
+              {asArray(journal.entry_tf || strategy.entry_tf).map((tf) => (
+                <span
+                  key={`etf-${journal.id}-${tf}`}
+                  className="inline-flex rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-700"
+                >
+                  ETF {tf}
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <UserRound className="h-3.5 w-3.5" />
+                {getAuthorName(journal)}
+              </span>
+
+              <span className="inline-flex items-center gap-1">
+                <Clock className="h-3.5 w-3.5" />
+                {getSharedTime(journal.shared_at)}
+              </span>
+            </div>
+
+            {incorporated ? (
+              <div
+                className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium ${
+                  authorUpdated
+                    ? "border-orange-200 bg-orange-50 text-orange-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                {authorUpdated ? (
+                  <Sparkles className="h-3.5 w-3.5" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                {authorUpdated
+                  ? "Author updated this after your copy"
+                  : "Already incorporated by you"}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <ReactionButton
+              active={reaction === "INTERESTED"}
+              onClick={() => handleReaction(journal.id, "INTERESTED")}
+            >
+              <ThumbsUp className="h-3.5 w-3.5" />
+              Interested
+            </ReactionButton>
+
+            <ReactionButton
+              active={reaction === "NO_IDEA"}
+              onClick={() => handleReaction(journal.id, "NO_IDEA")}
+            >
+              <ThumbsDown className="h-3.5 w-3.5" />
+              No idea
+            </ReactionButton>
+
+            <button
+              type="button"
+              onClick={() => setSelectedJournal(journal)}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Details
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleIncorporateClick(journal)}
+              className={[
+                "inline-flex h-9 items-center gap-2 rounded-xl border px-3 text-xs font-medium transition",
+                authorUpdated
+                  ? "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100"
+                  : alreadySynced
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100",
+              ].join(" ")}
+            >
+              {alreadySynced ? (
+                <Copy className="h-3.5 w-3.5" />
+              ) : (
+                <PlusCircle className="h-3.5 w-3.5" />
+              )}
+
+              {authorUpdated
+                ? "Incorporate Updated"
+                : alreadySynced
+                  ? "Incorporate Again"
+                  : "Incorporate"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <MiniStat label="Entry" value={journal.entry_price} />
+          <MiniStat label="SL" value={journal.stop_loss} />
+          <MiniStat
+            label="TP"
+            value={formatTP(journal.take_profit, journal.take_profit_qty)}
+          />
+          <MiniStat label="Risk" value={formatRisk(journal)} />
+          <MiniStat label="Qty" value={journal.quantity} />
+          <MiniStat label="Direction" value={journal.direction || "—"} />
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="rounded-2xl border bg-background/70 p-4">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <Target className="h-4 w-4 text-muted-foreground" />
+              Entry Reason
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {shortText(journal.entry_reason, 180)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border bg-background/70 p-4">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              Exit Criteria
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {shortText(journal.exit_reason || strategy.exit_rules, 180)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 pb-5">
+        <SocialJournalTabs journal={journal} />
+      </div>
+    </article>
   );
 }
 
@@ -451,7 +759,6 @@ export default function SocialClient({ journals, title, description }) {
 
   const [purposeFilter, setPurposeFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [directionFilter, setDirectionFilter] = useState("ALL");
   const [symbolFilter, setSymbolFilter] = useState("ALL");
   const [copyFilter, setCopyFilter] = useState("ALL");
   const [htfFilter, setHtfFilter] = useState("ALL");
@@ -469,15 +776,12 @@ export default function SocialClient({ journals, title, description }) {
       (j) => j.copyStatus?.incorporated,
     ).length;
 
-    const buy = journals.filter((j) => norm(j.direction) === "BUY").length;
-    const sell = journals.filter((j) => norm(j.direction) === "SELL").length;
-
     const totalIncorporations = journals.reduce(
       (acc, j) => acc + Number(j.incorporatedCount || j.copyCount || 0),
       0,
     );
 
-    return { total, incorporated, buy, sell, totalIncorporations };
+    return { total, incorporated, totalIncorporations };
   }, [journals]);
 
   const filterOptions = useMemo(() => {
@@ -489,20 +793,8 @@ export default function SocialClient({ journals, title, description }) {
       new Set(journals.map((j) => j.status || "No status")),
     );
 
-    const directions = Array.from(
-      new Set(journals.map((j) => j.direction).filter(Boolean)),
-    );
-
     const symbols = Array.from(
-      new Set(
-        journals
-          .map((j) =>
-            j.symbols
-              ? `${j.symbols.symbol_name} — ${j.symbols.category}`
-              : null,
-          )
-          .filter(Boolean),
-      ),
+      new Set(journals.map((j) => j.symbols?.symbol_name).filter(Boolean)),
     );
 
     const htf = Array.from(
@@ -538,7 +830,6 @@ export default function SocialClient({ journals, title, description }) {
     return {
       purposes,
       statuses,
-      directions,
       symbols,
       htf,
       entryTf,
@@ -560,15 +851,8 @@ export default function SocialClient({ journals, title, description }) {
       const statusMatch =
         statusFilter === "ALL" || statusValue === statusFilter;
 
-      const directionMatch =
-        directionFilter === "ALL" || journal.direction === directionFilter;
-
-      const symbolValue = journal.symbols
-        ? `${journal.symbols.symbol_name} — ${journal.symbols.category}`
-        : "";
-
       const symbolMatch =
-        symbolFilter === "ALL" || symbolValue === symbolFilter;
+        symbolFilter === "ALL" || journal.symbols?.symbol_name === symbolFilter;
 
       const copyMatch =
         copyFilter === "ALL" ||
@@ -603,7 +887,6 @@ export default function SocialClient({ journals, title, description }) {
       return (
         purposeMatch &&
         statusMatch &&
-        directionMatch &&
         symbolMatch &&
         copyMatch &&
         htfMatch &&
@@ -618,7 +901,6 @@ export default function SocialClient({ journals, title, description }) {
     journals,
     purposeFilter,
     statusFilter,
-    directionFilter,
     symbolFilter,
     copyFilter,
     htfFilter,
@@ -632,7 +914,6 @@ export default function SocialClient({ journals, title, description }) {
   function resetFilters() {
     setPurposeFilter("ALL");
     setStatusFilter("ALL");
-    setDirectionFilter("ALL");
     setSymbolFilter("ALL");
     setCopyFilter("ALL");
     setHtfFilter("ALL");
@@ -668,8 +949,6 @@ export default function SocialClient({ journals, title, description }) {
         ...prev,
         [journalId]: current,
       }));
-
-      console.log("Reaction save failed");
     }
   }
 
@@ -685,99 +964,55 @@ export default function SocialClient({ journals, title, description }) {
     window.location.href = `/app/radars/new?sharedJournalId=${journal.id}`;
   }
 
-  console.log("FILTERED JOURNALS:", filteredJournals);
-
   return (
     <>
-      <div className="space-y-6">
-        <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 rounded-full bg-sky-100/70 blur-3xl" />
-
-          <div className="relative z-10 flex flex-wrap items-start justify-between gap-5">
+      <div className="space-y-8">
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-sky-600">
-                <Sparkles className="h-4 w-4" />
-                Collective Edge
-              </div>
-
-              <h1 className="mt-5 text-4xl font-black tracking-tight text-slate-950">
-                {title}
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-slate-500">
+              <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 {description}
               </p>
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-sky-600 shadow-sm">
-                  <Users className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-2xl font-black text-slate-950">
-                    {stats.total}
-                  </div>
-                  <div className="text-xs font-bold uppercase text-slate-500">
-                    Shared Opportunities
-                  </div>
-                </div>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                {stats.total} Shared
+              </span>
+
+              <span className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {stats.incorporated} Incorporated
+              </span>
+
+              <span className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs text-muted-foreground">
+                <Share2 className="h-3.5 w-3.5" />
+                {stats.totalIncorporations} Copies
+              </span>
             </div>
           </div>
         </section>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            icon={Share2}
-            label="Shared"
-            value={stats.total}
-            sub="Community ideas"
-          />
-          <StatCard
-            icon={CheckCircle2}
-            label="Incorporated"
-            value={stats.incorporated}
-            sub="Copied by you"
-          />
-          <StatCard
-            icon={BookOpen}
-            label="Total Copies"
-            value={stats.totalIncorporations}
-            sub="All users"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Buy Ideas"
-            value={stats.buy}
-            sub="Long setups"
-          />
-          <StatCard
-            icon={TrendingDown}
-            label="Sell Ideas"
-            value={stats.sell}
-            sub="Short setups"
-          />
-        </div>
-
-        <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-sm font-black text-slate-950">
-              <Filter className="h-4 w-4 text-sky-600" />
+        <section className="rounded-3xl border bg-card p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+              <Filter className="h-4 w-4" />
               Filters
             </div>
 
             <button
               type="button"
               onClick={resetFilters}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-600 hover:bg-slate-50"
+              className="inline-flex h-9 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-medium transition hover:bg-accent"
             >
-              <RefreshCcw className="h-4 w-4" />
+              <RefreshCcw className="h-3.5 w-3.5" />
               Reset
             </button>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-5">
             <FilterSelect
               value={copyFilter}
               onChange={(e) => setCopyFilter(e.target.value)}
@@ -828,7 +1063,7 @@ export default function SocialClient({ journals, title, description }) {
               value={tradingStyleFilter}
               onChange={(e) => setTradingStyleFilter(e.target.value)}
             >
-              <option value="ALL">All trading styles</option>
+              <option value="ALL">All styles</option>
               {filterOptions.tradingStyles.map((x) => (
                 <option key={x} value={x}>
                   {x}
@@ -840,7 +1075,7 @@ export default function SocialClient({ journals, title, description }) {
               value={setupTypeFilter}
               onChange={(e) => setSetupTypeFilter(e.target.value)}
             >
-              <option value="ALL">All setup types</option>
+              <option value="ALL">All setups</option>
               {filterOptions.setupTypes.map((x) => (
                 <option key={x} value={x}>
                   {x}
@@ -899,306 +1134,32 @@ export default function SocialClient({ journals, title, description }) {
         </section>
 
         {journals.length === 0 ? (
-          <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-12 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-100 text-slate-500">
-              <BookOpen className="h-7 w-7" />
-            </div>
-            <h2 className="mt-5 text-xl font-black text-slate-950">
+          <div className="rounded-3xl border border-dashed bg-card p-12 text-center">
+            <BookOpen className="mx-auto h-8 w-8 text-muted-foreground" />
+            <h2 className="mt-4 text-lg font-semibold">
               No community picks yet
             </h2>
-            <p className="mt-2 text-sm font-medium text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Shared journals from other traders will appear here.
             </p>
           </div>
         ) : filteredJournals.length === 0 ? (
-          <div className="rounded-[2rem] border border-slate-200 bg-white p-10 text-center text-sm font-semibold text-slate-500">
+          <div className="rounded-3xl border bg-card p-10 text-center text-sm text-muted-foreground">
             No community picks match your filters.
           </div>
         ) : (
-          <div className="grid gap-5">
-            {filteredJournals.map((journal) => {
-              const strategy = getStrategy(journal);
-              const symbol = journal.symbols
-                ? `${journal.symbols.symbol_name} — ${journal.symbols.category}`
-                : "—";
-
-              const rr = calculatePlannedRR(journal);
-              const isSell = norm(journal.direction) === "SELL";
-              const incorporated = journal.copyStatus?.incorporated;
-              const authorUpdated = journal.copyStatus?.authorUpdatedAfterCopy;
-              const alreadySynced = incorporated && !authorUpdated;
-              const reaction =
-                localReactions[journal.id] || journal.myReaction || null;
-              const incorporatedCount = Number(
-                journal.incorporatedCount || journal.copyCount || 0,
-              );
-
-              return (
-                <article
-                  key={journal.id}
-                  className={[
-                    "group overflow-hidden rounded-[2rem] border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl",
-                    authorUpdated
-                      ? "border-orange-200 hover:border-orange-300"
-                      : alreadySynced
-                        ? "border-emerald-200 bg-emerald-50/20 hover:border-emerald-300"
-                        : "border-slate-200 hover:border-sky-200",
-                  ].join(" ")}
-                >
-                  <div className="border-b border-slate-100 bg-gradient-to-br from-white to-slate-50 p-5">
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div
-                          className={[
-                            "inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black uppercase tracking-wide shadow-sm",
-                            alreadySynced
-                              ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200"
-                              : incorporated && authorUpdated
-                                ? "bg-orange-100 text-orange-700 ring-1 ring-orange-200"
-                                : "bg-sky-100 text-sky-700 ring-1 ring-sky-200",
-                          ].join(" ")}
-                        >
-                          {alreadySynced ? (
-                            <CheckCircle2 className="h-4 w-4" />
-                          ) : incorporated && authorUpdated ? (
-                            <Sparkles className="h-4 w-4" />
-                          ) : (
-                            <PlusCircle className="h-4 w-4" />
-                          )}
-
-                          <span>
-                            {alreadySynced
-                              ? "Already Incorporated"
-                              : incorporated && authorUpdated
-                                ? "Updated After Your Copy"
-                                : "New Opportunity"}
-                          </span>
-                        </div>
-
-                        {incorporated && (
-                          <div className="text-xs font-semibold text-slate-500">
-                            {authorUpdated
-                              ? "Author made new changes after your incorporation."
-                              : "You already incorporated this setup."}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <h2 className="text-2xl font-black tracking-tight text-slate-950">
-                            {strategy.strategy_name || "Shared Journal"}
-                          </h2>
-
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
-                            <span className="inline-flex items-center gap-1">
-                              <UserRound className="h-3.5 w-3.5" />
-                              {getAuthorName(journal)}
-                            </span>
-
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="h-3.5 w-3.5" />
-                              {getSharedTime(journal.shared_at)}
-                            </span>
-
-                            <span className="inline-flex items-center gap-1">
-                              <BookOpen className="h-3.5 w-3.5" />
-                              {incorporatedCount} incorporated
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-2">
-                          <ReactionButton
-                            active={reaction === "INTERESTED"}
-                            onClick={() =>
-                              handleReaction(journal.id, "INTERESTED")
-                            }
-                          >
-                            <ThumbsUp className="h-4 w-4" />
-                            Interested
-                          </ReactionButton>
-
-                          <ReactionButton
-                            active={reaction === "NO_IDEA"}
-                            onClick={() =>
-                              handleReaction(journal.id, "NO_IDEA")
-                            }
-                          >
-                            <ThumbsDown className="h-4 w-4" />
-                            No idea
-                          </ReactionButton>
-
-                          <button
-                            type="button"
-                            onClick={() => setSelectedJournal(journal)}
-                            className="inline-flex h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                          >
-                            <Eye className="h-4 w-4" />
-                            Details
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleIncorporateClick(journal)}
-                            className={[
-                              "inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-bold text-white",
-                              authorUpdated
-                                ? "bg-orange-500 hover:bg-orange-600"
-                                : alreadySynced
-                                  ? "bg-emerald-600 hover:bg-emerald-700"
-                                  : "bg-sky-600 hover:bg-sky-700",
-                            ].join(" ")}
-                          >
-                            <PlusCircle className="h-4 w-4" />
-
-                            {authorUpdated
-                              ? "Incorporate Updated"
-                              : alreadySynced
-                                ? "Incorporate Again"
-                                : "Incorporate"}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <Pill className="border-slate-200 bg-white text-slate-600">
-                          {journal.purpose || "—"}
-                        </Pill>
-
-                        <Pill className={getStatusTone(journal.status)}>
-                          {journal.status || "No status"}
-                        </Pill>
-
-                        <Pill className="border-slate-200 bg-white text-slate-600">
-                          {symbol}
-                        </Pill>
-
-                        <Pill
-                          className={
-                            isSell
-                              ? "border-red-200 bg-red-50 text-red-700"
-                              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          }
-                        >
-                          {journal.direction || "—"}
-                        </Pill>
-
-                        <Pill className="border-slate-200 bg-white text-slate-600">
-                          RR: {rr > 0 ? `1:${round2(rr)}` : "—"}
-                        </Pill>
-
-                        <Pill className="border-slate-200 bg-white text-slate-600">
-                          {strategy.trading_style || "—"}
-                        </Pill>
-
-                        <Pill className="border-slate-200 bg-white text-slate-600">
-                          {strategy.setup_type || "—"}
-                        </Pill>
-
-                        <Pill className="border-slate-200 bg-white text-slate-600">
-                          {strategy.strategy_type || "—"}
-                        </Pill>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {asArray(journal.htf || strategy.htf).map((tf) => (
-                          <Pill
-                            key={`htf-${journal.id}-${tf}`}
-                            className="border-indigo-200 bg-indigo-50 text-indigo-700"
-                          >
-                            HTF {tf}
-                          </Pill>
-                        ))}
-
-                        {asArray(journal.entry_tf || strategy.entry_tf).map(
-                          (tf) => (
-                            <Pill
-                              key={`etf-${journal.id}-${tf}`}
-                              className="border-cyan-200 bg-cyan-50 text-cyan-700"
-                            >
-                              ETF {tf}
-                            </Pill>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 p-5 lg:grid-cols-4">
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                      <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-950">
-                        <Target className="h-4 w-4 text-sky-600" />
-                        Trade Plan
-                      </div>
-
-                      <div className="grid gap-3 text-sm">
-                        <div className="flex justify-between gap-3">
-                          <span className="font-semibold text-slate-500">
-                            Entry
-                          </span>
-                          <span className="font-black text-slate-950">
-                            {journal.entry_price ?? "—"}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between gap-3">
-                          <span className="font-semibold text-slate-500">
-                            SL
-                          </span>
-                          <span className="font-black text-slate-950">
-                            {journal.stop_loss ?? "—"}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between gap-3">
-                          <span className="font-semibold text-slate-500">
-                            Risk
-                          </span>
-                          <span className="font-black text-slate-950">
-                            {journal.risk_per_trade ?? "—"}{" "}
-                            {journal.risk_mode || ""}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                      <div className="mb-4 text-sm font-black text-slate-950">
-                        Targets
-                      </div>
-                      <div className="whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-500">
-                        {formatTP(journal.take_profit, journal.take_profit_qty)}
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                      <div className="mb-4 text-sm font-black text-slate-950">
-                        Entry Reason
-                      </div>
-                      <div className="text-sm font-semibold leading-6 text-slate-500">
-                        {shortText(journal.entry_reason, 140)}
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                      <div className="mb-4 flex items-center gap-2 text-sm font-black text-slate-950">
-                        <Layers className="h-4 w-4 text-sky-600" />
-                        Exit Criteria
-                      </div>
-                      <div className="text-sm font-semibold leading-6 text-slate-500">
-                        {shortText(
-                          journal.exit_reason || strategy.exit_rules,
-                          140,
-                        )}
-                      </div>
-                    </div>
-
-                    <JournalCardTabs journal={journal} />
-                  </div>
-                </article>
-              );
-            })}
+          <div className="grid gap-4">
+            {filteredJournals.map((journal, index) => (
+              <SocialJournalCard
+                key={journal.id}
+                journal={journal}
+                index={index}
+                setSelectedJournal={setSelectedJournal}
+                handleIncorporateClick={handleIncorporateClick}
+                handleReaction={handleReaction}
+                localReactions={localReactions}
+              />
+            ))}
           </div>
         )}
       </div>

@@ -32,7 +32,8 @@ const journalSelect = `
   admin_note,
   symbols:symbol_id (
     id,
-    symbol_name
+    symbol_name,
+    category
   )
 `;
 
@@ -84,7 +85,9 @@ export default async function PreferableOpportunitiesPage() {
       ${journalSelect},
       profiles:user_id!inner (
         id,
-        type
+        type,
+        full_name,
+        username
       )
     `,
     )
@@ -96,6 +99,13 @@ export default async function PreferableOpportunitiesPage() {
 
   if (error) {
     console.error(error);
+
+    return (
+      <div className="p-6">
+        <h1 className="text-xl font-semibold">Preferable Opportunities</h1>
+        <p className="mt-3 text-sm text-destructive">{error.message}</p>
+      </div>
+    );
   }
 
   const journalsWithImages = await withSignedImageUrls(
@@ -107,6 +117,7 @@ export default async function PreferableOpportunitiesPage() {
     <SocialClient
       journals={journalsWithImages}
       title="Preferable Opportunities"
+      description="Mentor-prioritized shared opportunities from traders."
     />
   );
 }
