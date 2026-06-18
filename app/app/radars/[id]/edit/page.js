@@ -203,7 +203,8 @@ export default async function EditJournalPage({ params, searchParams }) {
 take_profit_qty,
 modified_sl_price,
 modified_tp_price,
-modified_tp_qty
+modified_tp_qty,
+sl_tp_adjustment_reason
     `,
       )
       .eq("id", id)
@@ -223,7 +224,9 @@ modified_tp_qty
     const journalStartAtRaw = String(
       getFormValue(formData, "journal_start_at") || "",
     ).trim();
-
+    const sl_tp_adjustment_reason =
+      String(getFormValue(formData, "sl_tp_adjustment_reason") || "").trim() ||
+      null;
     const journalEndAtRaw = String(
       getFormValue(formData, "journal_end_at") || "",
     ).trim();
@@ -290,7 +293,13 @@ modified_tp_qty
         )}`,
       );
     }
+    const hasModifiedSL = getFormValue(formData, "modified_sl_price") !== null;
 
+    const hasModifiedTP = formData.getAll("modified_tp_price").length > 0;
+
+    if ((hasModifiedSL || hasModifiedTP) && !sl_tp_adjustment_reason) {
+      redirect(`/app/radars/${id}/edit?error=adjustment_reason_required`);
+    }
     const needsExitReason = [
       "ENTRY CANCELLED",
       "ENTRY MISSED",
@@ -382,6 +391,10 @@ modified_tp_qty
         modified_tp_qty: formData.getAll("modified_tp_qty").length
           ? modified_tp_qty
           : existing.modified_tp_qty,
+        sl_tp_adjustment_reason:
+          getFormValue(formData, "sl_tp_adjustment_reason") !== null
+            ? sl_tp_adjustment_reason
+            : existing.sl_tp_adjustment_reason,
       })
       .eq("id", id)
       .eq("user_id", user.id);

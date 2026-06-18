@@ -529,6 +529,10 @@ export default function EditJournalForm({
         ? String(journal.modified_sl)
         : "",
   );
+  const [slTpAdjustmentReason, setSlTpAdjustmentReason] = useState(
+    journal.sl_tp_adjustment_reason || "",
+  );
+  const adjustmentReasonRequired = modifySlEnabled || modifyTpEnabled;
   const savedModifiedSlPrice =
     journal.modified_sl_price != null ? String(journal.modified_sl_price) : "";
 
@@ -630,6 +634,9 @@ export default function EditJournalForm({
 
     if (needsManualExitPrice && !exitPrice.trim()) return false;
     if (needsExitReason && !exitReason.trim()) return false;
+    if (adjustmentReasonRequired && !slTpAdjustmentReason.trim()) {
+      return false;
+    }
 
     return true;
   }, [
@@ -651,6 +658,8 @@ export default function EditJournalForm({
     exitPrice,
     needsExitReason,
     exitReason,
+    adjustmentReasonRequired,
+    slTpAdjustmentReason,
   ]);
 
   return (
@@ -844,6 +853,22 @@ export default function EditJournalForm({
                 </label>
               </div>
             </div>
+
+            {modifySlEnabled || modifyTpEnabled ? (
+              <div className="mt-4">
+                <FieldShell label="SL / TP Adjustment Reason" required>
+                  <textarea
+                    name="sl_tp_adjustment_reason"
+                    rows={4}
+                    value={slTpAdjustmentReason}
+                    onChange={(e) => setSlTpAdjustmentReason(e.target.value)}
+                    className={textareaClass()}
+                    placeholder="Why are you modifying the stop loss or take profit?"
+                    required
+                  />
+                </FieldShell>
+              </div>
+            ) : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
