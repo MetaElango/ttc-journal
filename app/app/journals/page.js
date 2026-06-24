@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Target } from "lucide-react";
-import JournalsTableClient from "./journals-table-client";
-import JournalIntelligencePanel from "./journal-intelligence-panel";
+import JournalsFilterShell from "./journals-filter-shell";
 
 const VIEWS = [
   { key: "my", label: "My Journals" },
@@ -299,12 +298,11 @@ export default async function JournalsPage({ searchParams }) {
           })}
         </div>
 
-        <JournalsTableClient
+        <JournalsFilterShell
           key={`${activeView}-${activeTab}`}
           journals={journals}
           activeTab={activeTab}
         />
-        <JournalIntelligencePanel journals={journals} />
       </div>
     </main>
   );

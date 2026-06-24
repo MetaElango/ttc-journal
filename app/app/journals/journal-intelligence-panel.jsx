@@ -2,27 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   Flame,
   ShieldAlert,
-  SlidersHorizontal,
   Star,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { calculateRMultiple } from "../insights/_lib/metrics";
+
 function norm(v) {
   return String(v || "")
     .trim()
     .toUpperCase();
-}
-
-function makeLocalDate(value) {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function fmtDate(value, options = {}) {
@@ -34,19 +29,6 @@ function fmtDate(value, options = {}) {
   return new Intl.DateTimeFormat(undefined, options).format(date);
 }
 
-function inputDateValue(date) {
-  if (!date) return "";
-
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return "";
-
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
 function dateKey(date) {
   const d = new Date(date);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -55,11 +37,6 @@ function dateKey(date) {
 function monthKey(date) {
   const d = new Date(date);
   return `${d.getFullYear()}-${d.getMonth()}`;
-}
-
-function getSetupSource(journal) {
-  if (journal.copied_from_journal_id) return "Incorporated";
-  return "Own";
 }
 
 function buildMonthDays(date) {
@@ -84,30 +61,79 @@ function buildWeekDays(date) {
     return d;
   });
 }
+function makeLocalDate(value, endOfDay = false) {
+  if (!value) return null;
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+
+  if (endOfDay) date.setHours(23, 59, 59, 999);
+
+  return date;
+}
+
+function formatR(value) {
+  const n = Number(value) || 0;
+  return `${n > 0 ? "+" : ""}${n.toFixed(2)}R`;
+}
+
+function getFlags(day) {
+  if (!day || !day.trades) return [];
+
+  const flags = [];
+
+  if (day.totalR <= -2) {
+    flags.push({
+      label: "High Drawdown",
+      icon: ShieldAlert,
+      cls: "bg-red-50 text-red-700 border-red-100",
+    });
+  }
+
+  if (day.trades >= 5) {
+    flags.push({
+      label: "High Volume",
+      icon: Flame,
+      cls: "bg-amber-50 text-amber-700 border-amber-100",
+    });
+  }
+
+  if (day.totalR >= 2) {
+    flags.push({
+      label: "Strong Recovery",
+      icon: TrendingUp,
+      cls: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    });
+  }
+
+  return flags;
+}
 
 function MetricCard({ label, value, positive = true, helper = "" }) {
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+    <div className="min-w-0 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-[11px] font-black uppercase tracking-wide text-slate-400">
         {label}
       </div>
 
-      <div className="mt-3 text-2xl font-black text-slate-950">{value}</div>
+      <div className="mt-2 truncate text-[22px] font-black leading-tight text-slate-950">
+        {value}
+      </div>
 
       {helper ? (
         <div
-          className={`mt-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
+          className={`mt-3 inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black ${
             positive
               ? "bg-emerald-50 text-emerald-600"
               : "bg-red-50 text-red-600"
           }`}
         >
           {positive ? (
-            <TrendingUp className="h-3.5 w-3.5" />
+            <TrendingUp className="h-3 w-3 shrink-0" />
           ) : (
-            <TrendingDown className="h-3.5 w-3.5" />
+            <TrendingDown className="h-3 w-3 shrink-0" />
           )}
-          {helper}
+          <span className="truncate">{helper}</span>
         </div>
       ) : null}
     </div>
@@ -120,161 +146,113 @@ function MiniDonut({ winning, losing, breakeven }) {
   const lossPct = (losing / total) * 100;
 
   return (
-    <div className="flex items-center gap-5 rounded-3xl border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur-xl">
-      <div
-        className="h-24 w-24 rounded-full p-4"
-        style={{
-          background: `conic-gradient(#10b981 0 ${winPct}%, #ef4444 ${winPct}% ${
-            winPct + lossPct
-          }%, #94a3b8 ${winPct + lossPct}% 100%)`,
-        }}
-      >
-        <div className="h-16 w-16 rounded-full bg-white" />
-      </div>
-
-      <div className="space-y-2 text-sm">
-        <div className="flex items-center gap-2 font-bold text-slate-700">
-          <span className="h-3 w-3 rounded-full bg-emerald-500" />
-          Winning {winning}
+    <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-4">
+        <div
+          className="h-20 w-20 shrink-0 rounded-full p-3"
+          style={{
+            background: `conic-gradient(#10b981 0 ${winPct}%, #ef4444 ${winPct}% ${
+              winPct + lossPct
+            }%, #94a3b8 ${winPct + lossPct}% 100%)`,
+          }}
+        >
+          <div className="h-14 w-14 rounded-full bg-white" />
         </div>
 
-        <div className="flex items-center gap-2 font-bold text-slate-700">
-          <span className="h-3 w-3 rounded-full bg-red-500" />
-          Losing {losing}
-        </div>
-
-        <div className="flex items-center gap-2 font-bold text-slate-700">
-          <span className="h-3 w-3 rounded-full bg-slate-400" />
-          Breakeven {breakeven}
+        <div className="min-w-0 space-y-1 text-xs font-bold text-slate-600">
+          <div className="truncate">Winning: {winning}</div>
+          <div className="truncate">Losing: {losing}</div>
+          <div className="truncate">Breakeven: {breakeven}</div>
         </div>
       </div>
     </div>
   );
 }
 
-function getFlags(day) {
-  if (!day || !day.trades) return [];
-
-  const flags = [];
-
-  if (day.totalR <= -2) {
-    flags.push({
-      label: "High Drawdown",
-      icon: ShieldAlert,
-      cls: "bg-red-100 text-red-700",
-    });
-  }
-
-  if (day.trades >= 5) {
-    flags.push({
-      label: "High Volume",
-      icon: Flame,
-      cls: "bg-amber-100 text-amber-700",
-    });
-  }
-
-  if (day.totalR >= 2) {
-    flags.push({
-      label: "Recovery",
-      icon: TrendingUp,
-      cls: "bg-emerald-100 text-emerald-700",
-    });
-  }
-
-  return flags;
-}
-
 function DayCell({ day, data, currentMonth, bestDay, onClick }) {
   const totalR = data?.totalR || 0;
   const trades = data?.trades || 0;
-  const flags = getFlags(data);
   const isBest = bestDay && dateKey(bestDay.date) === dateKey(day);
 
   let tone = "border-slate-100 bg-slate-50 text-slate-400";
 
   if (trades && totalR > 0) {
-    tone =
-      totalR >= 2
-        ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-        : "border-emerald-200 bg-emerald-50 text-emerald-700";
+    tone = "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
   if (trades && totalR < 0) {
-    tone =
-      totalR <= -2
-        ? "border-red-300 bg-red-100 text-red-800"
-        : "border-red-200 bg-red-50 text-red-700";
+    tone = "border-red-200 bg-red-50 text-red-700";
   }
 
-  if (isBest) tone = "border-blue-300 bg-blue-50 text-blue-700";
+  if (isBest) {
+    tone = "border-blue-300 bg-blue-50 text-blue-700";
+  }
 
   return (
     <button
       type="button"
       onClick={() => onClick(day)}
-      className={`relative min-h-[112px] rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${tone} ${
+      className={`min-w-0 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${tone} ${
         currentMonth ? "" : "opacity-35"
       }`}
     >
-      <div className="flex justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-black text-slate-600">
           {day.getDate()}
         </span>
 
         {isBest ? (
-          <Star className="h-4 w-4 fill-blue-500 text-blue-500" />
+          <Star className="h-3.5 w-3.5 shrink-0 fill-blue-500 text-blue-500" />
         ) : null}
       </div>
 
       {trades ? (
-        <>
-          <div className="mt-5 text-2xl font-black">
-            {totalR > 0 ? "+" : ""}
-            {totalR.toFixed(2)}R
+        <div className="mt-4 min-w-0">
+          <div className="truncate text-lg font-black leading-none">
+            {formatR(totalR)}
           </div>
 
-          <div className="mt-2 text-sm font-bold text-slate-500">
+          <div className="mt-2 truncate text-xs font-bold text-slate-500">
             {trades} {trades === 1 ? "trade" : "trades"}
           </div>
-
-          {flags.length ? (
-            <div className="mt-3 flex flex-wrap gap-1">
-              {flags.slice(0, 2).map((f) => {
-                const Icon = f.icon;
-
-                return (
-                  <span
-                    key={f.label}
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ${f.cls}`}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {f.label}
-                  </span>
-                );
-              })}
-            </div>
-          ) : null}
-        </>
+        </div>
       ) : (
-        <div className="mt-7 text-sm font-bold text-slate-300">Inactive</div>
+        <div className="mt-5 truncate text-xs font-bold text-slate-300">
+          Inactive
+        </div>
       )}
     </button>
   );
 }
 
-export default function JournalIntelligencePanel({ journals = [] }) {
+export default function JournalIntelligencePanel({
+  journals = [],
+  rangeStart = "",
+  rangeEnd = "",
+}) {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState("Calendar");
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedDay, setSelectedDay] = useState(null);
 
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
+  const rangeStartDate = useMemo(() => makeLocalDate(rangeStart), [rangeStart]);
+  const rangeEndDate = useMemo(() => makeLocalDate(rangeEnd, true), [rangeEnd]);
 
-  const [account, setAccount] = useState("ALL");
-  const [strategy, setStrategy] = useState("ALL");
-  const [asset, setAsset] = useState("ALL");
-  const [setupSource, setSetupSource] = useState("ALL");
+  function isBeforeRange(date) {
+    if (!rangeStartDate) return false;
+    return date < rangeStartDate;
+  }
+
+  function isAfterRange(date) {
+    if (!rangeEndDate) return false;
+    return date > rangeEndDate;
+  }
+
+  function clampToRange(date) {
+    if (rangeStartDate && date < rangeStartDate) return rangeStartDate;
+    if (rangeEndDate && date > rangeEndDate) return rangeEndDate;
+    return date;
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -285,65 +263,16 @@ export default function JournalIntelligencePanel({ journals = [] }) {
         .filter((d) => !Number.isNaN(d.getTime()))
         .sort((a, b) => b - a)[0] || new Date();
 
-    setSelectedDate(latest);
-    setSelectedDay(latest);
-  }, [journals]);
+    const safeDate = clampToRange(latest);
 
-  const filterOptions = useMemo(() => {
-    return {
-      accounts: [
-        ...new Set(
-          journals.map((j) => j.trading_accounts?.account_name).filter(Boolean),
-        ),
-      ],
-      strategies: [
-        ...new Set(
-          journals
-            .map((j) => j.strategy_snapshot?.strategy_name)
-            .filter(Boolean),
-        ),
-      ],
-      assets: [
-        ...new Set(journals.map((j) => j.symbols?.symbol_name).filter(Boolean)),
-      ],
-      setupSources: ["Own", "Incorporated"],
-    };
-  }, [journals]);
-
-  const filteredJournals = useMemo(() => {
-    return journals.filter((j) => {
-      const accountName = j.trading_accounts?.account_name || "";
-      const strategyName = j.strategy_snapshot?.strategy_name || "";
-      const assetName = j.symbols?.symbol_name || "";
-      const source = getSetupSource(j);
-
-      const rawDate = j.journal_end_at || j.created_at;
-      const tradeDate = rawDate ? new Date(rawDate) : null;
-
-      let dateOk = true;
-
-      if (customStart && customEnd && tradeDate) {
-        const start = makeLocalDate(customStart);
-        const end = makeLocalDate(customEnd);
-        end?.setHours(23, 59, 59, 999);
-
-        if (start && end) dateOk = tradeDate >= start && tradeDate <= end;
-      }
-
-      return (
-        dateOk &&
-        (account === "ALL" || accountName === account) &&
-        (strategy === "ALL" || strategyName === strategy) &&
-        (asset === "ALL" || assetName === asset) &&
-        (setupSource === "ALL" || source === setupSource)
-      );
-    });
-  }, [journals, account, strategy, asset, setupSource, customStart, customEnd]);
+    setSelectedDate(safeDate);
+    setSelectedDay(safeDate);
+  }, [journals, rangeStartDate, rangeEndDate]);
 
   const analytics = useMemo(() => {
     const daily = new Map();
 
-    filteredJournals.forEach((journal) => {
+    journals.forEach((journal) => {
       const rawDate = journal.journal_end_at || journal.created_at;
       if (!rawDate) return;
 
@@ -375,14 +304,28 @@ export default function JournalIntelligencePanel({ journals = [] }) {
     });
 
     const days = Array.from(daily.values());
-    const totalTrades = filteredJournals.length;
+    const totalTrades = journals.length;
     const totalR = days.reduce((a, b) => a + b.totalR, 0);
-    const wins = filteredJournals.filter(
-      (j) => calculateRMultiple(j) > 0,
-    ).length;
-    const losses = filteredJournals.filter(
-      (j) => calculateRMultiple(j) < 0,
-    ).length;
+
+    const rValues = journals.map((j) => calculateRMultiple(j));
+
+    const wins = rValues.filter((r) => r > 0).length;
+    const losses = rValues.filter((r) => r < 0).length;
+
+    const grossProfit = rValues
+      .filter((r) => r > 0)
+      .reduce((sum, r) => sum + r, 0);
+
+    const grossLoss = Math.abs(
+      rValues.filter((r) => r < 0).reduce((sum, r) => sum + r, 0),
+    );
+
+    const profitFactor =
+      grossLoss > 0
+        ? (grossProfit / grossLoss).toFixed(2)
+        : grossProfit > 0
+          ? "∞"
+          : "0";
 
     const winningDays = days.filter((d) => d.totalR > 0).length;
     const losingDays = days.filter((d) => d.totalR < 0).length;
@@ -410,19 +353,18 @@ export default function JournalIntelligencePanel({ journals = [] }) {
       winRate: totalTrades ? (wins / totalTrades) * 100 : 0,
       avgWinR,
       avgLossR,
-      profitFactor:
-        losses > 0 ? Math.abs(wins / losses).toFixed(2) : wins > 0 ? "∞" : "0",
+      profitFactor,
       maxDrawdown: worstDay?.totalR || 0,
       winningDays,
       losingDays,
       breakevenDays,
       bestDay,
     };
-  }, [filteredJournals]);
+  }, [journals]);
 
   if (!mounted || !selectedDate) {
     return (
-      <section className="rounded-[2rem] border border-slate-200 bg-white/80 p-8 text-sm font-bold text-slate-400">
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-8 text-sm font-bold text-slate-400">
         Loading calendar intelligence...
       </section>
     );
@@ -439,173 +381,80 @@ export default function JournalIntelligencePanel({ journals = [] }) {
     ? analytics.daily.get(dateKey(selectedDay))
     : null;
 
-  function changePeriod(delta) {
-    setSelectedDate((current) => {
-      const next = new Date(current);
+  function getPeriodDate(delta) {
+    const next = new Date(selectedDate);
 
-      if (mode === "Daily") next.setDate(current.getDate() + delta);
-      else if (mode === "Weekly") next.setDate(current.getDate() + delta * 7);
-      else next.setMonth(current.getMonth() + delta);
+    if (mode === "Daily") next.setDate(selectedDate.getDate() + delta);
+    else if (mode === "Weekly")
+      next.setDate(selectedDate.getDate() + delta * 7);
+    else next.setMonth(selectedDate.getMonth() + delta);
 
-      setSelectedDay(next);
-      return next;
-    });
+    return next;
   }
 
-  function focusCalendarFromDate(value) {
-    const d = makeLocalDate(value);
-    if (!d) return;
+  function getPeriodBounds(date) {
+    const start = new Date(date);
+    const end = new Date(date);
 
-    setSelectedDate(d);
-    setSelectedDay(d);
+    if (mode === "Weekly") {
+      start.setDate(date.getDate() - date.getDay());
+      start.setHours(0, 0, 0, 0);
+
+      end.setTime(start.getTime());
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+    } else if (mode === "Monthly" || mode === "Calendar") {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+
+      end.setMonth(start.getMonth() + 1, 0);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    return { start, end };
+  }
+
+  function periodOverlapsRange(date) {
+    const { start, end } = getPeriodBounds(date);
+
+    if (rangeStartDate && end < rangeStartDate) return false;
+    if (rangeEndDate && start > rangeEndDate) return false;
+
+    return true;
+  }
+
+  const previousDate = selectedDate ? getPeriodDate(-1) : null;
+  const nextDate = selectedDate ? getPeriodDate(1) : null;
+
+  const canGoPrevious = previousDate
+    ? periodOverlapsRange(previousDate)
+    : false;
+  const canGoNext = nextDate ? periodOverlapsRange(nextDate) : false;
+
+  function changePeriod(delta) {
+    const next = getPeriodDate(delta);
+
+    if (!periodOverlapsRange(next)) return;
+
+    setSelectedDate(next);
+    setSelectedDay(next);
   }
 
   return (
     <section className="space-y-6">
-      <div className="rounded-[2rem] border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur-xl">
-        <div className="flex flex-col gap-5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex rounded-2xl border border-slate-200 bg-white p-1">
-              {["Calendar", "Daily", "Weekly", "Monthly"].map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => {
-                    setMode(item);
-
-                    if (customStart) {
-                      focusCalendarFromDate(customStart);
-                    }
-                  }}
-                  className={`rounded-xl px-5 py-2.5 text-sm font-bold transition ${
-                    mode === item
-                      ? "bg-sky-50 text-sky-700"
-                      : "text-slate-500 hover:bg-slate-50"
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-bold text-slate-400">
-                Date Range:
-              </span>
-
-              <input
-                type="date"
-                value={customStart}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setCustomStart(value);
-                  focusCalendarFromDate(value);
-                }}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 outline-none"
-              />
-
-              <span className="text-sm font-bold text-slate-400">to</span>
-
-              <input
-                type="date"
-                value={customEnd}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setCustomEnd(value);
-
-                  if (!customStart) {
-                    focusCalendarFromDate(value);
-                  }
-                }}
-                className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1fr_1.2fr_auto]">
-            <select
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 outline-none"
-            >
-              <option value="ALL">Account: All</option>
-              {filterOptions.accounts.map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={strategy}
-              onChange={(e) => setStrategy(e.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 outline-none"
-            >
-              <option value="ALL">Strategy: All</option>
-              {filterOptions.strategies.map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={asset}
-              onChange={(e) => setAsset(e.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 outline-none"
-            >
-              <option value="ALL">Asset: All</option>
-              {filterOptions.assets.map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={setupSource}
-              onChange={(e) => setSetupSource(e.target.value)}
-              className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 outline-none"
-            >
-              <option value="ALL">Setup Source: All</option>
-              {filterOptions.setupSources.map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAccount("ALL");
-                setStrategy("ALL");
-                setAsset("ALL");
-                setSetupSource("ALL");
-                setCustomStart("");
-                setCustomEnd("");
-              }}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 hover:bg-slate-50"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Reset
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Total Trades"
+          label="Trades"
           value={analytics.totalTrades}
           helper="Filtered"
         />
 
         <MetricCard
           label="Total R"
-          value={`${analytics.totalR > 0 ? "+" : ""}${analytics.totalR.toFixed(
-            2,
-          )}R`}
+          value={formatR(analytics.totalR)}
           positive={analytics.totalR >= 0}
           helper={analytics.totalR >= 0 ? "Positive" : "Negative"}
         />
@@ -617,27 +466,23 @@ export default function JournalIntelligencePanel({ journals = [] }) {
         />
 
         <MetricCard
-          label="Avg Win R"
-          value={`+${analytics.avgWinR.toFixed(2)}R`}
+          label="Avg Win"
+          value={formatR(analytics.avgWinR)}
           helper="Winning days"
         />
 
         <MetricCard
-          label="Avg Loss R"
-          value={`${analytics.avgLossR.toFixed(2)}R`}
+          label="Avg Loss"
+          value={formatR(analytics.avgLossR)}
           positive={false}
           helper="Losing days"
         />
 
-        <MetricCard
-          label="Profit Factor"
-          value={analytics.profitFactor}
-          helper="Ratio"
-        />
+        <MetricCard label="PF" value={analytics.profitFactor} helper="Ratio" />
 
         <MetricCard
-          label="Max Drawdown"
-          value={`${analytics.maxDrawdown.toFixed(2)}R`}
+          label="Drawdown"
+          value={formatR(analytics.maxDrawdown)}
           positive={false}
           helper="Worst day"
         />
@@ -649,13 +494,13 @@ export default function JournalIntelligencePanel({ journals = [] }) {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-        <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-xl">
-          <div className="flex items-center justify-between">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-black text-sky-600">
                 <CalendarDays className="h-3.5 w-3.5" />
-                Behavioral Calendar Intelligence
+                Behavioral Calendar
               </div>
 
               <h2 className="mt-3 text-2xl font-black text-slate-950">
@@ -679,19 +524,36 @@ export default function JournalIntelligencePanel({ journals = [] }) {
               </h2>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {["Calendar", "Daily", "Weekly", "Monthly"].map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setMode(item)}
+                  className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+                    mode === item
+                      ? "bg-sky-600 text-white"
+                      : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+
               <button
                 type="button"
+                disabled={!canGoPrevious}
                 onClick={() => changePeriod(-1)}
-                className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
 
               <button
                 type="button"
+                disabled={!canGoNext}
                 onClick={() => changePeriod(1)}
-                className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"
+                className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -699,7 +561,7 @@ export default function JournalIntelligencePanel({ journals = [] }) {
           </div>
 
           {mode !== "Daily" ? (
-            <div className="mt-5 grid grid-cols-7 gap-2 text-center text-xs font-black uppercase text-slate-400">
+            <div className="mt-6 grid grid-cols-7 gap-2 text-center text-[11px] font-black uppercase text-slate-400">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                 <div key={d}>{d}</div>
               ))}
@@ -728,7 +590,7 @@ export default function JournalIntelligencePanel({ journals = [] }) {
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur-xl">
+        <div className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-lg font-black text-slate-950">
             Day Intelligence
           </h3>
@@ -749,9 +611,7 @@ export default function JournalIntelligencePanel({ journals = [] }) {
 
                 <MetricCard
                   label="Total R"
-                  value={`${selectedDayData.totalR > 0 ? "+" : ""}${selectedDayData.totalR.toFixed(
-                    2,
-                  )}R`}
+                  value={formatR(selectedDayData.totalR)}
                   positive={selectedDayData.totalR >= 0}
                 />
               </div>
@@ -769,7 +629,7 @@ export default function JournalIntelligencePanel({ journals = [] }) {
                       return (
                         <div
                           key={flag.label}
-                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${flag.cls}`}
+                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${flag.cls}`}
                         >
                           <Icon className="h-4 w-4" />
                           {flag.label}
@@ -777,7 +637,8 @@ export default function JournalIntelligencePanel({ journals = [] }) {
                       );
                     })
                   ) : (
-                    <div className="text-slate-500">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <AlertTriangle className="h-4 w-4 text-slate-400" />
                       No major warning detected.
                     </div>
                   )}
@@ -789,24 +650,24 @@ export default function JournalIntelligencePanel({ journals = [] }) {
                   Trades
                 </div>
 
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
                   {selectedDayData.journals.map((journal) => (
                     <div
                       key={journal.id}
                       className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm"
                     >
-                      <div className="font-black text-slate-900">
+                      <div className="truncate font-black text-slate-900">
                         {journal.symbols?.symbol_name || "—"} •{" "}
                         {journal.direction || "—"} •{" "}
-                        {calculateRMultiple(journal).toFixed(2)}R
+                        {formatR(calculateRMultiple(journal))}
                       </div>
 
-                      <div className="mt-1 text-xs font-bold text-slate-500">
+                      <div className="mt-1 truncate text-xs font-bold text-slate-500">
                         {journal.strategy_snapshot?.strategy_name ||
                           "No Strategy"}
                       </div>
 
-                      <div className="mt-1 text-xs font-bold text-slate-400">
+                      <div className="mt-1 truncate text-xs font-bold text-slate-400">
                         {journal.status || "—"}
                       </div>
                     </div>

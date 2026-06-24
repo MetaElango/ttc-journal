@@ -1,8 +1,7 @@
 // app/app/journals/journals-table-client.jsx
 
 "use client";
-
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownUp,
   BookOpen,
@@ -17,6 +16,7 @@ import {
 
 import JournalDetailsModal from "../radars/journal-details-modal";
 
+const PAGE_SIZE = 10;
 function norm(value) {
   return String(value || "")
     .trim()
@@ -333,11 +333,20 @@ export default function JournalsTableClient({ journals, activeTab }) {
   const [items, setItems] = useState(journals);
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [editingJournal, setEditingJournal] = useState(null);
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [items, page]);
 
   useEffect(() => {
     setItems(journals);
     setSelectedJournal(null);
     setEditingJournal(null);
+    setPage(1);
   }, [journals]);
 
   function handleSaved(journalId, updated) {
@@ -404,7 +413,7 @@ export default function JournalsTableClient({ journals, activeTab }) {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {items.map((journal) => {
+              {paginatedItems.map((journal) => {
                 const strategyName =
                   journal.strategy_snapshot?.strategy_name || "No Strategy";
 
@@ -505,7 +514,46 @@ export default function JournalsTableClient({ journals, activeTab }) {
           </table>
         </div>
       </div>
+      {items.length > PAGE_SIZE ? (
+        <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-semibold text-slate-500">
+            Showing{" "}
+            <span className="font-bold text-slate-900">
+              {(page - 1) * PAGE_SIZE + 1}
+            </span>{" "}
+            to{" "}
+            <span className="font-bold text-slate-900">
+              {Math.min(page * PAGE_SIZE, items.length)}
+            </span>{" "}
+            of <span className="font-bold text-slate-900">{items.length}</span>{" "}
+            journals
+          </p>
 
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+
+            <div className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700">
+              Page {page} of {totalPages}
+            </div>
+
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              className="h-10 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
       <JournalDetailsModal
         journal={selectedJournal}
         onClose={() => setSelectedJournal(null)}
