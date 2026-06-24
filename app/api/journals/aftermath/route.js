@@ -22,16 +22,22 @@ export async function PATCH(req) {
       );
     }
 
-    const body = await req.json();
+    const formData = await req.formData();
 
-    const journalId = String(body.journalId || "").trim();
-    const aftermathResult = String(body.aftermath_result || "")
+    const journalId = String(formData.get("journalId") || "").trim();
+    const aftermathResult = String(formData.get("aftermath_result") || "")
       .trim()
       .toUpperCase();
 
-    const aftermathDateRaw = String(body.aftermath_date || "").trim();
-    const aftermathUserNote = String(body.aftermath_user_note || "").trim();
-    const aftermathMentorNote = String(body.aftermath_mentor_note || "").trim();
+    const aftermathDateRaw = String(
+      formData.get("aftermath_date") || "",
+    ).trim();
+    const aftermathUserNote = String(
+      formData.get("aftermath_user_note") || "",
+    ).trim();
+    const aftermathMentorNote = String(
+      formData.get("aftermath_mentor_note") || "",
+    ).trim();
 
     if (!journalId) {
       return NextResponse.json({
@@ -47,6 +53,49 @@ export async function PATCH(req) {
       });
     }
 
+    const images = formData
+      .getAll("aftermath_images")
+      .filter((file) => file && typeof file === "object" && file.size > 0);
+
+    if (images.length > 2) {
+      return NextResponse.json({
+        ok: false,
+        message: "You can upload maximum 2 aftermath images.",
+      });
+    }
+
+    const imagePaths = [];
+
+    for (const file of images) {
+      if (!file.type?.startsWith("image/")) {
+        return NextResponse.json({
+          ok: false,
+          message: "Please upload valid image files only.",
+        });
+      }
+
+      const ext = file.name?.split(".").pop() || "png";
+      const path = `${user.id}/${journalId}/aftermath-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2)}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("journal-images")
+        .upload(path, file, {
+          contentType: file.type || "image/png",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        return NextResponse.json({
+          ok: false,
+          message: uploadError.message,
+        });
+      }
+
+      imagePaths.push(path);
+    }
+
     const aftermath_date = aftermathDateRaw
       ? new Date(aftermathDateRaw).toISOString()
       : null;
@@ -58,6 +107,7 @@ export async function PATCH(req) {
         aftermath_date,
         aftermath_user_note: aftermathUserNote || null,
         aftermath_mentor_note: aftermathMentorNote || null,
+        aftermath_images: imagePaths,
         aftermath_updated_at: new Date().toISOString(),
       })
       .eq("id", journalId)
@@ -69,22 +119,17 @@ export async function PATCH(req) {
         aftermath_date,
         aftermath_user_note,
         aftermath_mentor_note,
+        aftermath_images,
         aftermath_updated_at
-        `,
+      `,
       )
       .single();
 
     if (error) {
-      return NextResponse.json({
-        ok: false,
-        message: error.message,
-      });
+      return NextResponse.json({ ok: false, message: error.message });
     }
 
-    return NextResponse.json({
-      ok: true,
-      journal: data,
-    });
+    return NextResponse.json({ ok: true, journal: data });
   } catch (err) {
     return NextResponse.json({
       ok: false,

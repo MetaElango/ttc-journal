@@ -134,6 +134,7 @@ export default async function JournalsPage({ searchParams }) {
       aftermath_user_note,
       aftermath_mentor_note,
       aftermath_updated_at,
+      aftermath_images,
       symbols:symbol_id (
         id,
         symbol_name,

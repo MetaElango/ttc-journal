@@ -173,6 +173,7 @@ function AftermathDetails({ journal }) {
 
 function AftermathModal({ journal, onClose, onSaved }) {
   const [result, setResult] = useState(journal.aftermath_result || "");
+  const [images, setImages] = useState([]);
   const [date, setDate] = useState(toDatetimeLocal(journal.aftermath_date));
   const [userNote, setUserNote] = useState(journal.aftermath_user_note || "");
   const [mentorNote, setMentorNote] = useState(
@@ -187,16 +188,21 @@ function AftermathModal({ journal, onClose, onSaved }) {
     setSaving(true);
     setError("");
 
+    const formData = new FormData();
+
+    formData.append("journalId", journal.id);
+    formData.append("aftermath_result", result);
+    formData.append("aftermath_date", showDate ? date : "");
+    formData.append("aftermath_user_note", userNote);
+    formData.append("aftermath_mentor_note", mentorNote);
+
+    images.forEach((file) => {
+      formData.append("aftermath_images", file);
+    });
+
     const res = await fetch("/api/journals/aftermath", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        journalId: journal.id,
-        aftermath_result: result,
-        aftermath_date: showDate ? date : "",
-        aftermath_user_note: userNote,
-        aftermath_mentor_note: mentorNote,
-      }),
+      body: formData,
     });
 
     const json = await res.json();
@@ -238,7 +244,7 @@ function AftermathModal({ journal, onClose, onSaved }) {
           </button>
         </div>
 
-        <div className="space-y-6 p-6">
+        <div className="max-h-[75vh] space-y-6 overflow-y-auto p-6">
           <div className="grid gap-3 md:grid-cols-4">
             {[
               ["OPTIMAL_TRADE_CLOSE", "Optimal Trade Close"],
@@ -306,13 +312,58 @@ function AftermathModal({ journal, onClose, onSaved }) {
             </div>
           </div>
 
+          <div>
+            <label className="text-sm font-bold text-slate-900">
+              Aftermath Images{" "}
+              <span className="font-semibold text-slate-400">
+                (optional, max 2)
+              </span>
+            </label>
+
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []).slice(0, 2);
+                setImages(files);
+              }}
+              className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-sky-50 file:px-4 file:py-2 file:text-sm file:font-bold file:text-sky-700 hover:file:bg-sky-100 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+            />
+
+            {images.length ? (
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {images.map((file, index) => (
+                  <div
+                    key={`${file.name}-${index}`}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                  >
+                    <span className="truncate font-semibold text-slate-700">
+                      {file.name}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setImages((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      className="shrink-0 rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 hover:text-red-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           {error ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-600">
               {error}
             </div>
           ) : null}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end border-t border-slate-100 pt-5">
             <button
               type="button"
               disabled={saving || !result}
