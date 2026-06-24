@@ -680,10 +680,22 @@ export default async function AppPage() {
   ]);
 
   const journals = journalsRes.data || [];
-  const allShared = allSharedRes.data || [];
-  const hariPicks = hariPicksRes.data || [];
-  const topSuggestions = topSuggestionsRes.data || [];
-  const topComments = topCommentsRes.data || [];
+
+  const allShared = (allSharedRes.data || []).filter(
+    (j) => !j.trading_accounts?.is_hidden,
+  );
+
+  const hariPicks = (hariPicksRes.data || []).filter(
+    (j) => !j.trading_accounts?.is_hidden,
+  );
+
+  const topSuggestions = (topSuggestionsRes.data || []).filter(
+    (j) => !j.trading_accounts?.is_hidden,
+  );
+
+  const topComments = (topCommentsRes.data || []).filter(
+    (j) => !j.trading_accounts?.is_hidden,
+  );
 
   const communityFocus = topComments
     .map((journal) => ({
