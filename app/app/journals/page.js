@@ -66,10 +66,21 @@ async function attachImageUrls(supabase, journals = []) {
         journal.reference_images || [],
       );
 
+      let closedEvidenceImageUrl = "";
+
+      if (journal.closed_evidence_image) {
+        const { data } = await supabase.storage
+          .from("journal-images")
+          .createSignedUrl(journal.closed_evidence_image, 60 * 60);
+
+        closedEvidenceImageUrl = data?.signedUrl || "";
+      }
+
       return {
         ...journal,
         setupImageUrls,
         referenceImageUrls,
+        closedEvidenceImageUrl,
       };
     }),
   );
@@ -117,6 +128,7 @@ export default async function JournalsPage({ searchParams }) {
       exit_price,
       journal_start_at,
       journal_end_at,
+      closed_evidence_image,
       htf,
       entry_tf,
       setup_images,

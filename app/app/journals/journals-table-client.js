@@ -8,6 +8,8 @@ import {
   CircleDashed,
   Eye,
   FilePenLine,
+  ImageIcon,
+  Paperclip,
   Save,
   TrendingDown,
   TrendingUp,
@@ -380,11 +382,159 @@ function AftermathModal({ journal, onClose, onSaved }) {
   );
 }
 
+function ClosedEvidenceModal({ journal, onClose, onSaved }) {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  function handleFileChange(e) {
+    const selected = e.target.files?.[0] || null;
+    setFile(selected);
+    setPreview(selected ? URL.createObjectURL(selected) : "");
+  }
+
+  async function saveEvidence() {
+    if (!file) {
+      setError("Please choose an image.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const formData = new FormData();
+    formData.append("journalId", journal.id);
+    formData.append("closed_evidence_image", file);
+
+    const res = await fetch("/api/journals/closed-evidence", {
+      method: "PATCH",
+      body: formData,
+    });
+
+    const json = await res.json();
+    setSaving(false);
+
+    if (!json.ok) {
+      setError(json.message || "Failed to upload evidence.");
+      return;
+    }
+
+    onSaved(journal.id, json.journal);
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-slate-100 p-6">
+          <div>
+            <div className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-black uppercase tracking-wide text-sky-600">
+              Closed Evidence
+            </div>
+            <h3 className="mt-3 text-2xl font-black text-slate-950">
+              Upload close proof
+            </h3>
+            <p className="mt-1 text-sm font-medium text-slate-500">
+              Add one screenshot/image as evidence for this closed trade.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 bg-white p-2.5 text-slate-500 hover:bg-slate-50"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-6">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center transition hover:border-sky-300 hover:bg-sky-50/50">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            <div className="rounded-2xl bg-white p-4 shadow-sm">
+              <BookOpen className="h-7 w-7 text-sky-600" />
+            </div>
+
+            <p className="mt-4 text-sm font-black text-slate-900">
+              Click to choose image
+            </p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              PNG, JPG, JPEG or WEBP
+            </p>
+          </label>
+
+          {preview ? (
+            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50">
+              <img
+                src={preview}
+                alt="Closed evidence preview"
+                className="max-h-[360px] w-full object-contain"
+              />
+            </div>
+          ) : null}
+
+          {file ? (
+            <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+              <span className="truncate font-bold text-slate-700">
+                {file.name}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setFile(null);
+                  setPreview("");
+                }}
+                className="shrink-0 rounded-full border border-slate-200 p-1.5 text-slate-500 hover:text-red-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-600">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              disabled={saving || !file}
+              onClick={saveEvidence}
+              className="h-11 rounded-2xl bg-sky-600 px-5 text-sm font-bold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? "Uploading..." : "Save Evidence"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function JournalsTableClient({ journals, activeTab }) {
   const [items, setItems] = useState(journals);
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [editingJournal, setEditingJournal] = useState(null);
   const [page, setPage] = useState(1);
+  const [editingEvidenceJournal, setEditingEvidenceJournal] = useState(null);
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
 
@@ -456,7 +606,9 @@ export default function JournalsTableClient({ journals, activeTab }) {
                 <th className="px-5 py-4 font-bold">Take profit</th>
                 <th className="px-5 py-4 font-bold">Close time</th>
                 <th className="px-5 py-4 font-bold">Trade Status</th>
-
+                {activeTab === "closed" ? (
+                  <th className="px-5 py-4 font-bold">Closed Evidence</th>
+                ) : null}
                 <th className="sticky right-0 z-30 border-l bg-[#f3f7fb] px-5 py-4 text-center font-bold">
                   Actions
                 </th>
@@ -538,7 +690,31 @@ export default function JournalsTableClient({ journals, activeTab }) {
                         {journal.status || "—"}
                       </span>
                     </td>
-
+                    {activeTab === "closed" ? (
+                      <td className="px-5 py-4">
+                        <div className="flex justify-center">
+                          {journal.closedEvidenceImageUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedJournal(journal)}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600"
+                              title="View closed evidence"
+                            >
+                              <ImageIcon className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setEditingEvidenceJournal(journal)}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600"
+                              title="Upload closed evidence"
+                            >
+                              <Paperclip className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    ) : null}
                     <td className="sticky right-0 z-20 border-l bg-white px-5 py-4">
                       <div className="flex justify-center gap-2">
                         <button
@@ -619,6 +795,13 @@ export default function JournalsTableClient({ journals, activeTab }) {
         <AftermathModal
           journal={editingJournal}
           onClose={() => setEditingJournal(null)}
+          onSaved={handleSaved}
+        />
+      ) : null}
+      {editingEvidenceJournal ? (
+        <ClosedEvidenceModal
+          journal={editingEvidenceJournal}
+          onClose={() => setEditingEvidenceJournal(null)}
           onSaved={handleSaved}
         />
       ) : null}

@@ -312,6 +312,31 @@ export default function JournalDetailsModal({
                   ))}
                 </div>
               ) : null}
+
+              {journal.closedEvidenceImageUrl ? (
+                <div className="mt-5 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 text-sm font-bold text-slate-950">
+                    Closed Evidence
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCarousel({
+                        images: [journal.closedEvidenceImageUrl],
+                        index: 0,
+                      })
+                    }
+                    className="block w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+                  >
+                    <img
+                      src={journal.closedEvidenceImageUrl}
+                      alt="Closed evidence"
+                      className="max-h-[420px] w-full object-contain"
+                    />
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <div className="space-y-4 overflow-y-auto bg-white p-5">
