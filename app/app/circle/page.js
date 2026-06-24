@@ -111,8 +111,7 @@ export default async function SocialPage() {
         symbol_name,
         category
       ),
-
-      trading_accounts!inner (
+      trading_accounts:trading_account_id (
   id,
   account_name,
   account_size,
@@ -123,7 +122,6 @@ export default async function SocialPage() {
       `,
     )
     .eq("is_shared", true)
-    .eq("trading_accounts.is_hidden", false)
     .neq("user_id", user.id);
 
   if (adminIds.length > 0) {
@@ -134,6 +132,10 @@ export default async function SocialPage() {
     ascending: false,
   });
 
+  const visibleJournals = (journals || []).filter(
+    (journal) => !journal.trading_accounts?.is_hidden,
+  );
+
   if (error) {
     return (
       <div className="p-6">
@@ -143,7 +145,7 @@ export default async function SocialPage() {
     );
   }
 
-  const journalIds = (journals || []).map((j) => j.id);
+  const journalIds = visibleJournals.map((j) => j.id);
   const idsForQuery = journalIds.length ? journalIds : [SAFE_EMPTY_ID];
 
   const { data: allCopies, error: allCopiesError } = await supabase
@@ -176,19 +178,7 @@ export default async function SocialPage() {
 
   const { data: fallbackCopiedJournals, error: fallbackError } = await supabase
     .from("journals")
-    .select(
-      `
-    id,
-    user_id,
-    copied_from_journal_id,
-    created_at,
-    trading_accounts!inner (
-      id,
-      is_hidden
-    )
-  `,
-    )
-    .eq("trading_accounts.is_hidden", false)
+    .select("id, user_id, copied_from_journal_id, created_at")
     .in("copied_from_journal_id", idsForQuery);
 
   if (fallbackError) {
@@ -211,7 +201,7 @@ export default async function SocialPage() {
   const copyMap = new Map();
 
   (myCopies || []).forEach((copy) => {
-    const latestJournal = (journals || []).find(
+    const latestJournal = visibleJournals.find(
       (j) => j.id === copy.original_journal_id,
     );
 
@@ -275,7 +265,7 @@ export default async function SocialPage() {
   });
 
   const sharedJournals = await Promise.all(
-    (journals || []).map(async (journal) => {
+    visibleJournals.map(async (journal) => {
       const copy = copyMap.get(journal.id);
 
       const authorUpdatedAt = journal.updated_at
