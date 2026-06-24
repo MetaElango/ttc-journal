@@ -140,15 +140,17 @@ export default async function JournalsPage({ searchParams }) {
         symbol_name,
         category
       ),
-      trading_accounts:trading_account_id (
-        id,
-        account_name,
-        account_size,
-        framework
-      )
+      trading_accounts!inner (
+  id,
+  account_name,
+  account_size,
+  framework,
+  is_hidden
+)
       `,
     )
     .eq("user_id", user.id)
+    .eq("trading_accounts.is_hidden", false)
     .order("journal_end_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
 

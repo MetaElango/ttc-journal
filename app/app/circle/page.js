@@ -112,16 +112,18 @@ export default async function SocialPage() {
         category
       ),
 
-      trading_accounts:trading_account_id (
-        id,
-        account_name,
-        account_size,
-        framework,
-        tag
-      )
+      trading_accounts!inner (
+  id,
+  account_name,
+  account_size,
+  framework,
+  tag,
+  is_hidden
+)
       `,
     )
     .eq("is_shared", true)
+    .eq("trading_accounts.is_hidden", false)
     .neq("user_id", user.id);
 
   if (adminIds.length > 0) {
@@ -174,7 +176,19 @@ export default async function SocialPage() {
 
   const { data: fallbackCopiedJournals, error: fallbackError } = await supabase
     .from("journals")
-    .select("id, user_id, copied_from_journal_id, created_at")
+    .select(
+      `
+    id,
+    user_id,
+    copied_from_journal_id,
+    created_at,
+    trading_accounts!inner (
+      id,
+      is_hidden
+    )
+  `,
+    )
+    .eq("trading_accounts.is_hidden", false)
     .in("copied_from_journal_id", idsForQuery);
 
   if (fallbackError) {

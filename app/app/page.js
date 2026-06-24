@@ -585,9 +585,11 @@ export default async function AppPage() {
   reference_images,
   owner_note,
   admin_note,
-  trading_accounts:trading_account_id (
-    account_name
-  ),
+  trading_accounts!inner (
+  id,
+  account_name,
+  is_hidden
+),
   symbols:symbol_id (
     id,
     symbol_name,
@@ -607,6 +609,7 @@ export default async function AppPage() {
       .from("journals")
       .select(journalSelect)
       .eq("user_id", user.id)
+      .eq("trading_accounts.is_hidden", false)
       .order("created_at", { ascending: false }),
 
     supabase.from("strategies").select("id", {
@@ -618,6 +621,7 @@ export default async function AppPage() {
       .from("journals")
       .select(journalSelect)
       .eq("is_shared", true)
+      .eq("trading_accounts.is_hidden", false)
       .order("shared_at", { ascending: false })
       .limit(200),
 
@@ -634,6 +638,7 @@ export default async function AppPage() {
       )
       .eq("is_shared", true)
       .eq("profiles.type", "admin")
+      .eq("trading_accounts.is_hidden", false)
       .order("updated_at", { ascending: false }),
 
     supabase
@@ -649,6 +654,7 @@ export default async function AppPage() {
       )
       .eq("is_shared", true)
       .eq("profiles.type", "user")
+      .eq("trading_accounts.is_hidden", false)
       .not("mentor_pick_priority", "is", null)
       .order("mentor_pick_priority", {
         ascending: true,
@@ -673,6 +679,7 @@ export default async function AppPage() {
   `,
       )
       .eq("is_shared", true)
+      .eq("trading_accounts.is_hidden", false)
       .eq("profiles.type", "user"),
   ]);
 

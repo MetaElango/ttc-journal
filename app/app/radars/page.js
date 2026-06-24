@@ -106,16 +106,18 @@ export default async function JournalsPage({ searchParams }) {
         symbol_name,
         category
       ),
-      trading_accounts:trading_account_id (
-        id,
-        account_name,
-        account_size,
-        framework,
-        tag
-      )
+      trading_accounts!inner (
+  id,
+  account_name,
+  account_size,
+  framework,
+  tag,
+  is_hidden
+)
       `,
     )
     .eq("user_id", user.id)
+    .eq("trading_accounts.is_hidden", false)
     .order("created_at", { ascending: false });
 
   if (error) {

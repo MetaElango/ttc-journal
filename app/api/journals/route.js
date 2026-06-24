@@ -41,49 +41,51 @@ export async function GET() {
       .from("journals")
       .select(
         `
-        id,
-        user_id,
-        strategy_id,
-        trading_account_id,
-        symbol_id,
-        purpose,
-        status,
-        direction,
-        quantity,
-        entry_price,
-        stop_loss,
-        take_profit,
-        take_profit_qty,
-        entry_reason,
-        exit_reason,
-        exit_price,
-        risk_mode,
-        risk_per_trade,
-        strategy_snapshot,
-        setup_images,
-        reference_images,
-        journal_start_at,
-        journal_end_at,
-        is_shared,
-        shared_at,
-        copied_from_journal_id,
-        created_at,
-        updated_at,
-        symbols:symbol_id (
-          id,
-          symbol_name,
-          category
-        ),
-        trading_accounts:trading_account_id (
-          id,
-          account_name,
-          account_size,
-          framework,
-          tag
-        )
-      `,
+    id,
+    user_id,
+    strategy_id,
+    trading_account_id,
+    symbol_id,
+    purpose,
+    status,
+    direction,
+    quantity,
+    entry_price,
+    stop_loss,
+    take_profit,
+    take_profit_qty,
+    entry_reason,
+    exit_reason,
+    exit_price,
+    risk_mode,
+    risk_per_trade,
+    strategy_snapshot,
+    setup_images,
+    reference_images,
+    journal_start_at,
+    journal_end_at,
+    is_shared,
+    shared_at,
+    copied_from_journal_id,
+    created_at,
+    updated_at,
+    symbols:symbol_id (
+      id,
+      symbol_name,
+      category
+    ),
+    trading_accounts!inner (
+      id,
+      account_name,
+      account_size,
+      framework,
+      tag,
+      is_hidden
+    )
+  `,
       )
       .eq("user_id", user.id)
+      .eq("trading_accounts.is_hidden", false)
       .order("created_at", { ascending: false });
 
     if (error) {

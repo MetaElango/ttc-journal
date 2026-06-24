@@ -74,6 +74,7 @@ export default function ProfileClient({
   updateProfile,
   createTradingAccount,
   deleteTradingAccount,
+  toggleTradingAccountVisibility,
 }) {
   const [profileState, profileAction, profilePending] = useActionState(
     updateProfile,
@@ -537,6 +538,27 @@ export default function ProfileClient({
                       Remove
                     </button>
                   </form> */}
+                  <form action={toggleTradingAccountVisibility}>
+                    <input type="hidden" name="account_id" value={account.id} />
+                    <input
+                      type="hidden"
+                      name="is_hidden"
+                      value={account.is_hidden ? "false" : "true"}
+                    />
+
+                    <button
+                      type="submit"
+                      className={`inline-flex h-11 items-center rounded-2xl border px-5 text-sm font-semibold ${
+                        account.is_hidden
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {account.is_hidden
+                        ? "Hidden from metrics"
+                        : "Hide from metrics"}
+                    </button>
+                  </form>
                 </div>
               </div>
             ))

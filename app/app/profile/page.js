@@ -30,7 +30,7 @@ export default async function ProfilePage() {
   const { data: tradingAccounts } = await supabase
     .from("trading_accounts")
     .select(
-      "id, account_name, account_size, framework, tag, daily_drawdown, max_drawdown, risk_per_trade, max_risk_exposure, created_at",
+      "id, account_name, account_size, framework, tag, daily_drawdown, max_drawdown, risk_per_trade, max_risk_exposure, is_hidden, created_at",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -224,6 +224,34 @@ export default async function ProfilePage() {
     revalidatePath("/app/profile");
   }
 
+  async function toggleTradingAccountVisibility(formData) {
+    "use server";
+
+    const supabase = await createClient();
+
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+
+    if (!user) redirect("/login");
+
+    const accountId = String(formData.get("account_id") || "");
+    const isHidden = String(formData.get("is_hidden") || "") === "true";
+
+    if (!accountId) return;
+
+    await supabase
+      .from("trading_accounts")
+      .update({
+        is_hidden: isHidden,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", accountId)
+      .eq("user_id", user.id);
+
+    revalidatePath("/app/profile");
+    revalidatePath("/app");
+    revalidatePath("/app/journals");
+  }
   return (
     <ProfileClient
       user={user}
@@ -232,6 +260,7 @@ export default async function ProfilePage() {
       updateProfile={updateProfile}
       createTradingAccount={createTradingAccount}
       deleteTradingAccount={deleteTradingAccount}
+      toggleTradingAccountVisibility={toggleTradingAccountVisibility}
     />
   );
 }
