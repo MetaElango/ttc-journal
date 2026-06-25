@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import JournalDetailsModal from "../radars/journal-details-modal";
+import { calculateRMultiple } from "../insights/_lib/metrics";
 
 const PAGE_SIZE = 10;
 function norm(value) {
@@ -79,7 +80,28 @@ function formatRisk(journal) {
 
   return `${risk}%`;
 }
+function getPlannedRR(journal) {
+  const entry = Number(journal.entry_price);
+  const sl = Number(journal.stop_loss);
+  const tp = Number(firstTp(journal.take_profit));
 
+  if (!entry || !sl || !tp || entry === sl) return "—";
+
+  const risk = Math.abs(entry - sl);
+  const reward = Math.abs(tp - entry);
+
+  if (!risk) return "—";
+
+  return `${(reward / risk).toFixed(2)}R`;
+}
+
+function getActualRR(journal) {
+  const r = calculateRMultiple(journal);
+
+  if (!r) return "—";
+
+  return `${r > 0 ? "+" : ""}${r.toFixed(2)}R`;
+}
 function getTradeStatusBadge(status) {
   const s = norm(status);
 
@@ -576,7 +598,7 @@ export default function JournalsTableClient({ journals, activeTab }) {
       </div>
     );
   }
-
+  console.log("Table journals", paginatedItems);
   return (
     <>
       <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 shadow-sm backdrop-blur-xl">
@@ -592,7 +614,12 @@ export default function JournalsTableClient({ journals, activeTab }) {
                 </th>
 
                 <th className="px-5 py-4 font-bold">Initial Risk</th>
-
+                {activeTab === "closed" ? (
+                  <>
+                    <th className="px-5 py-4 font-bold">Planned RR</th>
+                    <th className="px-5 py-4 font-bold">Actual RR</th>
+                  </>
+                ) : null}
                 <th className="px-5 py-4 font-bold">
                   <span className="inline-flex items-center gap-1">
                     Timeframe <ArrowDownUp className="h-3.5 w-3.5" />
@@ -636,6 +663,17 @@ export default function JournalsTableClient({ journals, activeTab }) {
                     <td className="px-5 py-4 font-semibold">
                       {formatRisk(journal)}
                     </td>
+                    {activeTab === "closed" ? (
+                      <>
+                        <td className="px-5 py-4 font-semibold text-slate-900">
+                          {getPlannedRR(journal)}
+                        </td>
+
+                        <td className="px-5 py-4 font-semibold text-slate-900">
+                          {getActualRR(journal)}
+                        </td>
+                      </>
+                    ) : null}
 
                     <td className="px-5 py-4 font-medium">
                       {Array.isArray(journal.entry_tf) &&

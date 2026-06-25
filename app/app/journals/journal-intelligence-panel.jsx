@@ -331,20 +331,47 @@ export default function JournalIntelligencePanel({
     const losingDays = days.filter((d) => d.totalR < 0).length;
     const breakevenDays = days.filter((d) => d.totalR === 0).length;
 
+    const winningTrades = rValues.filter((r) => r > 0);
+    const losingTrades = rValues.filter((r) => r < 0);
+
     const avgWinR =
-      winningDays > 0
-        ? days.filter((d) => d.totalR > 0).reduce((a, b) => a + b.totalR, 0) /
-          winningDays
+      winningTrades.length > 0
+        ? winningTrades.reduce((sum, r) => sum + r, 0) / winningTrades.length
         : 0;
 
     const avgLossR =
-      losingDays > 0
-        ? days.filter((d) => d.totalR < 0).reduce((a, b) => a + b.totalR, 0) /
-          losingDays
+      losingTrades.length > 0
+        ? losingTrades.reduce((sum, r) => sum + r, 0) / losingTrades.length
         : 0;
 
     const bestDay = [...days].sort((a, b) => b.totalR - a.totalR)[0] || null;
-    const worstDay = [...days].sort((a, b) => a.totalR - b.totalR)[0] || null;
+
+    const orderedJournals = [...journals]
+      .map((journal) => ({
+        journal,
+        date: new Date(journal.journal_end_at || journal.created_at),
+        r: calculateRMultiple(journal),
+      }))
+      .filter((item) => !Number.isNaN(item.date.getTime()))
+      .sort((a, b) => a.date - b.date);
+
+    let equity = 0;
+    let peak = 0;
+    let maxDrawdown = 0;
+
+    orderedJournals.forEach((item) => {
+      equity += item.r;
+
+      if (equity > peak) {
+        peak = equity;
+      }
+
+      const drawdown = equity - peak;
+
+      if (drawdown < maxDrawdown) {
+        maxDrawdown = drawdown;
+      }
+    });
 
     return {
       daily,
@@ -354,7 +381,7 @@ export default function JournalIntelligencePanel({
       avgWinR,
       avgLossR,
       profitFactor,
-      maxDrawdown: worstDay?.totalR || 0,
+      maxDrawdown,
       winningDays,
       losingDays,
       breakevenDays,
@@ -468,23 +495,23 @@ export default function JournalIntelligencePanel({
         <MetricCard
           label="Avg Win"
           value={formatR(analytics.avgWinR)}
-          helper="Winning days"
+          helper="Winning trades"
         />
 
         <MetricCard
           label="Avg Loss"
           value={formatR(analytics.avgLossR)}
           positive={false}
-          helper="Losing days"
+          helper="Losing trades"
         />
 
         <MetricCard label="PF" value={analytics.profitFactor} helper="Ratio" />
 
         <MetricCard
-          label="Drawdown"
+          label="Max Drawdown"
           value={formatR(analytics.maxDrawdown)}
-          positive={false}
-          helper="Worst day"
+          positive={analytics.maxDrawdown >= 0}
+          helper="Peak-to-trough"
         />
 
         <MiniDonut
