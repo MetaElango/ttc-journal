@@ -949,7 +949,17 @@ function JournalDetailsCommon({
 
   const exitReasonRequired = !!required.exit_reason || isClosedStatus(status);
   const exitPriceRequired = !!required.exit_price || isClosedStatus(status);
-  const statusOptions = getStatusOptions(purpose);
+  const isEditingPlannedOrPlaced =
+    prefillJournal &&
+    ["ENTRY PLANNED", "ENTRY PLACED"].includes(
+      String(prefillJournal.status || "")
+        .trim()
+        .toUpperCase(),
+    );
+
+  const statusOptions = isEditingPlannedOrPlaced
+    ? ["ENTRY TRIGGERED"]
+    : getStatusOptions(purpose);
   const statusRequired = !!required.status;
 
   function onPurposeChange(next) {
@@ -1074,12 +1084,31 @@ function JournalDetailsCommon({
             </FieldShell>
           </div>
 
-          <FieldShell label="Status" required={statusRequired}>
+          {isEditingPlannedOrPlaced ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase text-slate-500">
+                Current Status
+              </div>
+              <div className="mt-2 text-sm font-bold text-slate-900">
+                {prefillJournal.status}
+              </div>
+            </div>
+          ) : null}
+
+          <FieldShell
+            label={isEditingPlannedOrPlaced ? "Update Status To" : "Status"}
+            required={statusRequired}
+          >
+            {" "}
             <NativeSelect
               name="status"
-              value={status}
+              value={
+                isEditingPlannedOrPlaced && status !== "ENTRY TRIGGERED"
+                  ? ""
+                  : status
+              }
               onChange={(e) => setStatus(e.target.value)}
-              required={statusRequired}
+              required={isEditingPlannedOrPlaced ? false : statusRequired}
             >
               <option value="">
                 {statusRequired ? "Select status" : "No status"}
@@ -2025,7 +2054,7 @@ export default function NewJournalForm({
                       selectedHtf.length === 0 ||
                       selectedEntryTf.length === 0 ||
                       !setupImagesOk ||
-                      (cfg.required?.status && !status)
+                      (cfg.required?.status && !status && !prefillJournal)
                     }
                     className="h-11 rounded-2xl bg-sky-600 px-5 text-white hover:bg-sky-700 md:ml-auto"
                   >

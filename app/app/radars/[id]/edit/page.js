@@ -217,9 +217,18 @@ sl_tp_adjustment_reason
       redirect("/app/radars");
     }
 
-    const statusRaw = String(getFormValue(formData, "status") || "")
+    const submittedStatus = String(getFormValue(formData, "status") || "")
       .trim()
       .toUpperCase();
+
+    if (submittedStatus && submittedStatus !== "ENTRY TRIGGERED") {
+      return {
+        ok: false,
+        message: "Invalid status update.",
+      };
+    }
+
+    const statusRaw = submittedStatus || existing.status;
 
     const journalStartAtRaw = String(
       getFormValue(formData, "journal_start_at") || "",
@@ -446,9 +455,18 @@ sl_tp_adjustment_reason
       getFormValue(formData, "entry_tf_json") || "[]",
     );
 
-    const statusRaw = String(getFormValue(formData, "status") || "")
+    const submittedStatus = String(getFormValue(formData, "status") || "")
       .trim()
       .toUpperCase();
+
+    if (submittedStatus && submittedStatus !== "ENTRY TRIGGERED") {
+      return {
+        ok: false,
+        message: "Invalid status update.",
+      };
+    }
+
+    const statusRaw = submittedStatus || existing.status;
 
     const journalStartAtRaw = String(
       getFormValue(formData, "journal_start_at") || "",

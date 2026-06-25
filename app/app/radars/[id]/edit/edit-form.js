@@ -614,6 +614,19 @@ export default function EditJournalForm({
     !modifyTpEnabled ||
     Math.abs(round2(modifiedTpQtySum) - round2(journal.quantity)) <= 0.01;
 
+  const hasSavedModifiedSl = journal.modified_sl_price != null;
+  const hasSavedModifiedTp =
+    Array.isArray(journal.modified_tp_price) &&
+    journal.modified_tp_price.length > 0;
+
+  const visibleSlCheckpoints = SL_CHECKPOINTS.filter(
+    (x) => x.value !== "MODIFIED_SL" || hasSavedModifiedSl || modifySlEnabled,
+  );
+
+  const visibleProfitCheckpoints = PROFIT_CHECKPOINTS.filter(
+    (x) => x.value !== "MODIFIED_TP" || hasSavedModifiedTp || modifyTpEnabled,
+  );
+
   const canSubmit = useMemo(() => {
     if (!status) return false;
     if (disableUpdate) return false;
@@ -894,7 +907,7 @@ export default function EditJournalForm({
 
                 {modifySlEnabled ? (
                   <div className="mt-4">
-                    <FieldShell label="Modified SL" optional={!modifySlEnabled}>
+                    <FieldShell label="Modified SL" required={modifySlEnabled}>
                       <input
                         value={modifiedSlPrice}
                         onChange={(e) =>
@@ -979,7 +992,7 @@ export default function EditJournalForm({
                   <option value="" disabled>
                     Select SL type
                   </option>
-                  {SL_CHECKPOINTS.map((x) => (
+                  {visibleSlCheckpoints.map((x) => (
                     <option key={x.value} value={x.value}>
                       {x.label}
                     </option>
@@ -999,7 +1012,7 @@ export default function EditJournalForm({
                   <option value="" disabled>
                     Select profit type
                   </option>
-                  {PROFIT_CHECKPOINTS.map((x) => (
+                  {visibleProfitCheckpoints.map((x) => (
                     <option key={x.value} value={x.value}>
                       {x.label}
                     </option>
