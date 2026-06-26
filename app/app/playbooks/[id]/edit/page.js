@@ -72,7 +72,6 @@ export default async function EditStrategyPage({ params }) {
       .createSignedUrls(paths, 60 * 60);
 
     if (error) {
-      console.log("Strategy image signed URL error:", error.message);
       return [];
     }
 

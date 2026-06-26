@@ -724,9 +724,6 @@ export default async function AppPage() {
     return ACTIVE_STATUSES.includes(status);
   });
 
-  console.log("TOP SUGGESTIONS", topSuggestions.length);
-  console.log(topSuggestions);
-
   return (
     <div className="min-h-screen bg-[#f8fafc]">
       <div className="mx-auto max-w-8xl space-y-4 px-4 py-4">

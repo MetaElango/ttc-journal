@@ -598,7 +598,6 @@ export default function JournalsTableClient({ journals, activeTab }) {
       </div>
     );
   }
-  console.log("Table journals", paginatedItems);
   return (
     <>
       <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white/90 shadow-sm backdrop-blur-xl">

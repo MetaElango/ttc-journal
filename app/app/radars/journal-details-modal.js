@@ -146,7 +146,6 @@ export default function JournalDetailsModal({
   onClose,
   afterContent,
 }) {
-  console.log("JournalDetailsModal render", journal);
   const [carousel, setCarousel] = useState({ images: [], index: 0 });
   const [activeIndex, setActiveIndex] = useState(0);
   const [commentCount, setCommentCount] = useState(0);

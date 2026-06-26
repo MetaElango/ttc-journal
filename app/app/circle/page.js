@@ -172,7 +172,6 @@ export default async function SocialPage() {
     )
     .eq("copied_by", user.id)
     .in("original_journal_id", idsForQuery);
-  console.log("MY COPIES:", myCopies);
 
   if (myCopiesError) console.log("MY COPIES ERROR:", myCopiesError.message);
 
