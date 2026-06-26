@@ -30,7 +30,7 @@ export default async function ProfilePage() {
   const { data: tradingAccounts } = await supabase
     .from("trading_accounts")
     .select(
-      "id, account_name, account_size, framework, tag, daily_drawdown, max_drawdown, risk_per_trade, max_risk_exposure, is_hidden, created_at",
+      "id, account_name, account_size, framework, tag, daily_drawdown, max_drawdown, risk_per_trade, max_risk_exposure, is_hidden, created_at, target_mode, profit_target_percentage, r_collection_target, max_open_positions",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
@@ -122,17 +122,111 @@ export default async function ProfilePage() {
     const user = authData?.user;
 
     if (!user) {
+      return { ok: false, message: "Unauthorized." };
+    }
+
+    const account_id = String(formData.get("account_id") || "").trim();
+
+    const account_name = String(formData.get("account_name") || "").trim();
+    const tag = String(formData.get("tag") || "").trim();
+
+    const daily_drawdown = Number(formData.get("daily_drawdown"));
+    const max_drawdown = Number(formData.get("max_drawdown"));
+    const risk_per_trade = Number(formData.get("risk_per_trade"));
+    const max_risk_exposure = Number(formData.get("max_risk_exposure"));
+
+    const target_mode = String(formData.get("target_mode") || "PROFIT_TARGET")
+      .trim()
+      .toUpperCase();
+
+    const profit_target_percentage =
+      target_mode === "PROFIT_TARGET"
+        ? Number(formData.get("profit_target_percentage"))
+        : null;
+
+    const r_collection_target =
+      target_mode === "R_COLLECTION"
+        ? Number(formData.get("r_collection_target"))
+        : null;
+
+    const max_open_positions = Number(formData.get("max_open_positions"));
+
+    if (!account_name || !tag) {
       return {
         ok: false,
-        message: "Unauthorized.",
+        message: "Account name and tag are required.",
       };
     }
 
-    const account_name = String(formData.get("account_name") || "").trim();
+    if (Number.isNaN(daily_drawdown) || daily_drawdown < 0) {
+      return { ok: false, message: "Daily drawdown is required." };
+    }
+
+    if (Number.isNaN(max_drawdown) || max_drawdown < 0) {
+      return { ok: false, message: "Max drawdown is required." };
+    }
+
+    if (Number.isNaN(risk_per_trade) || risk_per_trade < 0) {
+      return { ok: false, message: "Risk per trade is required." };
+    }
+
+    if (Number.isNaN(max_risk_exposure) || max_risk_exposure < 0) {
+      return { ok: false, message: "Max risk exposure is required." };
+    }
+
+    if (!["PROFIT_TARGET", "R_COLLECTION"].includes(target_mode)) {
+      return { ok: false, message: "Select a valid target type." };
+    }
+
+    if (
+      target_mode === "PROFIT_TARGET" &&
+      (Number.isNaN(profit_target_percentage) || profit_target_percentage < 0)
+    ) {
+      return { ok: false, message: "Profit target percentage is required." };
+    }
+
+    if (
+      target_mode === "R_COLLECTION" &&
+      (Number.isNaN(r_collection_target) || r_collection_target < 0)
+    ) {
+      return { ok: false, message: "R collection target is required." };
+    }
+
+    if (Number.isNaN(max_open_positions) || max_open_positions <= 0) {
+      return { ok: false, message: "Max open positions is required." };
+    }
+
+    const editablePayload = {
+      account_name,
+      tag,
+      daily_drawdown,
+      max_drawdown,
+      risk_per_trade,
+      max_risk_exposure,
+      target_mode,
+      profit_target_percentage,
+      r_collection_target,
+      max_open_positions,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (account_id) {
+      const { error } = await supabase
+        .from("trading_accounts")
+        .update(editablePayload)
+        .eq("id", account_id)
+        .eq("user_id", user.id);
+
+      if (error) return { ok: false, message: error.message };
+
+      revalidatePath("/app/profile");
+      revalidatePath("/app");
+      revalidatePath("/app/journals");
+
+      return { ok: true, message: "Trading account updated." };
+    }
 
     const framework = String(formData.get("framework") || "").trim();
-
-    const tag = String(formData.get("tag") || "").trim();
 
     const account_size_preset = String(
       formData.get("account_size_preset") || "",
@@ -142,63 +236,32 @@ export default async function ProfilePage() {
       formData.get("account_size_custom") || "",
     ).trim();
 
-    const daily_drawdown = Number(formData.get("daily_drawdown"));
+    const account_size =
+      account_size_preset === "custom"
+        ? Number(account_size_custom)
+        : Number(account_size_preset);
 
-    const max_drawdown = Number(formData.get("max_drawdown"));
-
-    const risk_per_trade = Number(formData.get("risk_per_trade"));
-
-    const max_risk_exposure = Number(formData.get("max_risk_exposure"));
-
-    let account_size = 0;
-
-    if (account_size_preset === "custom") {
-      account_size = Number(account_size_custom);
-    } else {
-      account_size = Number(account_size_preset);
-    }
-
-    if (!account_name || !framework || !tag || !(account_size > 0)) {
+    if (!framework || !(account_size > 0)) {
       return {
         ok: false,
-        message:
-          "Account name, account type, tag and account size are required.",
+        message: "Account type and account size are required.",
       };
     }
 
     const { error } = await supabase.from("trading_accounts").insert({
       user_id: user.id,
-
-      account_name,
-
       framework,
-
-      tag,
-
       account_size,
-
-      daily_drawdown,
-
-      max_drawdown,
-
-      risk_per_trade,
-
-      max_risk_exposure,
+      ...editablePayload,
     });
 
-    if (error) {
-      return {
-        ok: false,
-        message: error.message,
-      };
-    }
+    if (error) return { ok: false, message: error.message };
 
     revalidatePath("/app/profile");
+    revalidatePath("/app");
+    revalidatePath("/app/journals");
 
-    return {
-      ok: true,
-      message: "Trading account added.",
-    };
+    return { ok: true, message: "Trading account added." };
   }
 
   async function deleteTradingAccount(formData) {
@@ -252,6 +315,7 @@ export default async function ProfilePage() {
     revalidatePath("/app");
     revalidatePath("/app/journals");
   }
+
   return (
     <ProfileClient
       user={user}

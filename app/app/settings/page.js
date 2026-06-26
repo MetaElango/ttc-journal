@@ -145,8 +145,8 @@ export default async function SettingsPage({ searchParams }) {
           user_id: user.id,
           account_name: "TTC-100K Account",
           account_size: 100000,
-          framework: "",
-          tag: "default",
+          framework: "Demo",
+          tag: "TTC Demo account",
         });
 
       if (accountError) {
