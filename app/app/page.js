@@ -637,7 +637,7 @@ export default async function AppPage() {
       .eq("is_shared", true)
       .eq("profiles.type", "admin")
       .order("updated_at", { ascending: false })
-      .limit(3),
+      .limit(4),
 
     supabase
       .from("journals")
@@ -659,7 +659,7 @@ export default async function AppPage() {
       .order("updated_at", {
         ascending: false,
       })
-      .limit(20),
+      .limit(6),
 
     supabase
       .from("journals")
@@ -686,15 +686,30 @@ export default async function AppPage() {
   );
 
   const hariPicks = (hariPicksRes.data || []).filter(
-    (j) => !j.trading_accounts?.is_hidden,
+    (j) =>
+      !j.trading_accounts?.is_hidden &&
+      j.status !== "ENTRY CLOSED" &&
+      j.status !== "TRADE EXIT IN MID" &&
+      j.status !== "TRADE SL HIT" &&
+      j.status !== "TRADE CLOSE WITH PROFIT",
   );
 
   const topSuggestions = (topSuggestionsRes.data || []).filter(
-    (j) => !j.trading_accounts?.is_hidden,
+    (j) =>
+      !j.trading_accounts?.is_hidden &&
+      j.status !== "ENTRY CLOSED" &&
+      j.status !== "TRADE EXIT IN MID" &&
+      j.status !== "TRADE SL HIT" &&
+      j.status !== "TRADE CLOSE WITH PROFIT",
   );
 
   const topComments = (topCommentsRes.data || []).filter(
-    (j) => !j.trading_accounts?.is_hidden,
+    (j) =>
+      !j.trading_accounts?.is_hidden &&
+      j.status !== "ENTRY CLOSED" &&
+      j.status !== "TRADE EXIT IN MID" &&
+      j.status !== "TRADE SL HIT" &&
+      j.status !== "TRADE CLOSE WITH PROFIT",
   );
 
   const communityFocus = topComments

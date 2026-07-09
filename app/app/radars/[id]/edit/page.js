@@ -221,7 +221,20 @@ sl_tp_adjustment_reason
       .trim()
       .toUpperCase();
 
-    if (submittedStatus && submittedStatus !== "ENTRY TRIGGERED") {
+    const allowedStatusUpdates = {
+      "ENTRY PLANNED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
+      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
+    };
+
+    const currentStatus = String(existing.status || "")
+      .trim()
+      .toUpperCase();
+
+    if (
+      submittedStatus &&
+      allowedStatusUpdates[currentStatus] &&
+      !allowedStatusUpdates[currentStatus].includes(submittedStatus)
+    ) {
       return {
         ok: false,
         message: "Invalid status update.",
@@ -459,7 +472,25 @@ sl_tp_adjustment_reason
       .trim()
       .toUpperCase();
 
-    if (submittedStatus && submittedStatus !== "ENTRY TRIGGERED") {
+    const allowedStatusUpdates = {
+      "ENTRY PLANNED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
+      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
+    };
+
+    const currentStatus = String(existing.status || "")
+      .trim()
+      .toUpperCase();
+
+    console.log("STATUS DEBUG:", {
+      currentStatus,
+      submittedStatus,
+    });
+
+    if (
+      submittedStatus &&
+      allowedStatusUpdates[currentStatus] &&
+      !allowedStatusUpdates[currentStatus].includes(submittedStatus)
+    ) {
       return {
         ok: false,
         message: "Invalid status update.",

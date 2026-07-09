@@ -957,9 +957,16 @@ function JournalDetailsCommon({
         .toUpperCase(),
     );
 
-  const statusOptions = isEditingPlannedOrPlaced
-    ? ["ENTRY TRIGGERED"]
-    : getStatusOptions(purpose);
+  const currentStatus = String(prefillJournal?.status || "")
+    .trim()
+    .toUpperCase();
+
+  const statusOptions =
+    prefillJournal && currentStatus === "ENTRY PLANNED"
+      ? ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"]
+      : prefillJournal && currentStatus === "ENTRY PLACED"
+        ? ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"]
+        : getStatusOptions(purpose);
   const statusRequired = !!required.status;
 
   function onPurposeChange(next) {
@@ -1102,13 +1109,9 @@ function JournalDetailsCommon({
             {" "}
             <NativeSelect
               name="status"
-              value={
-                isEditingPlannedOrPlaced && status !== "ENTRY TRIGGERED"
-                  ? ""
-                  : status
-              }
+              value={statusOptions.includes(status) ? status : ""}
               onChange={(e) => setStatus(e.target.value)}
-              required={isEditingPlannedOrPlaced ? false : statusRequired}
+              required={statusRequired}
             >
               <option value="">
                 {statusRequired ? "Select status" : "No status"}
