@@ -222,8 +222,18 @@ sl_tp_adjustment_reason
       .toUpperCase();
 
     const allowedStatusUpdates = {
-      "ENTRY PLANNED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
-      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
+      "ENTRY PLANNED": [
+        "ENTRY PLACED",
+        "ENTRY TRIGGERED",
+        "ENTRY CANCELLED",
+        "ENTRY MISSED",
+      ],
+      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY CANCELLED", "ENTRY MISSED"],
+      "ENTRY TRIGGERED": [
+        "TRADE SL HIT",
+        "TRADE CLOSE WITH PROFIT",
+        "TRADE EXIT IN MID",
+      ],
     };
 
     const currentStatus = String(existing.status || "")
@@ -473,8 +483,18 @@ sl_tp_adjustment_reason
       .toUpperCase();
 
     const allowedStatusUpdates = {
-      "ENTRY PLANNED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
-      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"],
+      "ENTRY PLANNED": [
+        "ENTRY PLACED",
+        "ENTRY TRIGGERED",
+        "ENTRY CANCELLED",
+        "ENTRY MISSED",
+      ],
+      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY CANCELLED", "ENTRY MISSED"],
+      "ENTRY TRIGGERED": [
+        "TRADE SL HIT",
+        "TRADE CLOSE WITH PROFIT",
+        "TRADE EXIT IN MID",
+      ],
     };
 
     const currentStatus = String(existing.status || "")

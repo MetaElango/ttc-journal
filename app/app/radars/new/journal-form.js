@@ -961,12 +961,20 @@ function JournalDetailsCommon({
     .trim()
     .toUpperCase();
 
+  const EDIT_STATUS_TRANSITIONS = {
+    "ENTRY PLANNED": [
+      "ENTRY PLACED",
+      "ENTRY TRIGGERED",
+      "ENTRY CANCELLED",
+      "ENTRY MISSED",
+    ],
+    "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY CANCELLED", "ENTRY MISSED"],
+  };
+
   const statusOptions =
-    prefillJournal && currentStatus === "ENTRY PLANNED"
-      ? ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"]
-      : prefillJournal && currentStatus === "ENTRY PLACED"
-        ? ["ENTRY TRIGGERED", "ENTRY MISSED", "ENTRY CANCELLED"]
-        : getStatusOptions(purpose);
+    prefillJournal && EDIT_STATUS_TRANSITIONS[currentStatus]
+      ? EDIT_STATUS_TRANSITIONS[currentStatus]
+      : getStatusOptions(purpose);
   const statusRequired = !!required.status;
 
   function onPurposeChange(next) {

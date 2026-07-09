@@ -18,8 +18,7 @@ import {
 } from "lucide-react";
 
 const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
-const HIDDEN_EDIT_STATUSES = ["ENTRY PLANNED", "ENTRY PLACED", "RUNNING TRADE"];
-
+const HIDDEN_EDIT_STATUSES = ["ENTRY PLANNED", "RUNNING TRADE"];
 const PROFIT_CHECKPOINTS = [
   { value: "ACTUAL_TP", label: "Actual TP Hit" },
   { value: "MODIFIED_TP", label: "Modified TP Hit" },
