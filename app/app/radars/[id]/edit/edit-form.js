@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 
 const ACTIVE_STATUSES = ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"];
-const HIDDEN_EDIT_STATUSES = ["ENTRY PLANNED", "RUNNING TRADE"];
+const HIDDEN_EDIT_STATUSES = [
+  "ENTRY PLANNED",
+  "ENTRY PLACED",
+  "ENTRY TRIGGERED",
+  "RUNNING TRADE",
+];
 const PROFIT_CHECKPOINTS = [
   { value: "ACTUAL_TP", label: "Actual TP Hit" },
   { value: "MODIFIED_TP", label: "Modified TP Hit" },
@@ -30,6 +35,21 @@ const SL_CHECKPOINTS = [
   { value: "MODIFIED_SL", label: "Modified SL Hit" },
   { value: "SL_BREAKEVEN", label: "SL at Breakeven" },
 ];
+
+const STATUS_TRANSITIONS = {
+  "ENTRY PLANNED": [
+    "ENTRY PLACED",
+    "ENTRY TRIGGERED",
+    "ENTRY CANCELLED",
+    "ENTRY MISSED",
+  ],
+  "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY CANCELLED", "ENTRY MISSED"],
+  "ENTRY TRIGGERED": [
+    "TRADE SL HIT",
+    "TRADE CLOSE WITH PROFIT",
+    "TRADE EXIT IN MID",
+  ],
+};
 
 function needsEndDate(status) {
   const value = String(status || "")
@@ -502,7 +522,11 @@ export default function EditJournalForm({
   statusOptions,
   errorType,
 }) {
-  const [status, setStatus] = useState(journal.status || "");
+  const [status, setStatus] = useState(
+    String(journal.status || "")
+      .trim()
+      .toUpperCase(),
+  );
   const [exitCheckpoint, setExitCheckpoint] = useState(
     journal.exit_checkpoint || "",
   );
@@ -567,9 +591,19 @@ export default function EditJournalForm({
   const journalStartAt = toDatetimeLocal(journal.journal_start_at);
   const endDateRequired = useMemo(() => needsEndDate(status), [status]);
 
+  const currentJournalStatus = String(journal.status || "")
+    .trim()
+    .toUpperCase();
+
   const filteredStatusOptions = useMemo(() => {
-    return statusOptions.filter((x) => !HIDDEN_EDIT_STATUSES.includes(x));
-  }, [statusOptions]);
+    const allowed = STATUS_TRANSITIONS[currentJournalStatus];
+
+    if (!allowed) {
+      return statusOptions.filter((x) => !HIDDEN_EDIT_STATUSES.includes(x));
+    }
+
+    return statusOptions.filter((x) => allowed.includes(x));
+  }, [statusOptions, currentJournalStatus]);
 
   const isEntryTriggered = status === "ENTRY TRIGGERED";
   const isEntryCancelled = status === "ENTRY CANCELLED";
@@ -789,8 +823,8 @@ export default function EditJournalForm({
                 className={inputClass()}
                 required
               >
-                <option value="" disabled>
-                  Select status
+                <option value={currentJournalStatus}>
+                  Current: {currentJournalStatus}
                 </option>
 
                 {filteredStatusOptions.map((x) => (
