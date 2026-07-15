@@ -12,73 +12,488 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { calculateRMultiple } from "../insights/_lib/metrics";
 
-function norm(v) {
-  return String(v || "")
+const PROFIT_STATUSES = ["TRADE CLOSE WITH PROFIT"];
+const LOSS_STATUSES = ["TRADE SL HIT"];
+
+const PERFORMANCE_STATUSES = [
+  "TRADE CLOSE WITH PROFIT",
+  "TRADE SL HIT",
+  "TRADE EXIT IN MID",
+  "ENTRY CLOSED",
+];
+
+function norm(value) {
+  return String(value || "")
     .trim()
     .toUpperCase();
+}
+
+function toNumber(value, fallback = null) {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseArray(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function numberArray(value) {
+  return parseArray(value)
+    .map((item) => toNumber(item))
+    .filter((item) => item !== null);
+}
+
+function roundNumber(value, decimalPlaces = 2) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  const multiplier = 10 ** decimalPlaces;
+
+  return Math.round((parsed + Number.EPSILON) * multiplier) / multiplier;
 }
 
 function fmtDate(value, options = {}) {
   if (!value) return "—";
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
 
   return new Intl.DateTimeFormat(undefined, options).format(date);
 }
 
 function dateKey(date) {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const value = new Date(date);
+
+  return `${value.getFullYear()}-${value.getMonth()}-${value.getDate()}`;
 }
 
 function monthKey(date) {
-  const d = new Date(date);
-  return `${d.getFullYear()}-${d.getMonth()}`;
+  const value = new Date(date);
+
+  return `${value.getFullYear()}-${value.getMonth()}`;
 }
 
 function buildMonthDays(date) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const start = new Date(first);
+
   start.setDate(first.getDate() - first.getDay());
 
-  return Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d;
+  return Array.from({ length: 42 }, (_, index) => {
+    const value = new Date(start);
+
+    value.setDate(start.getDate() + index);
+
+    return value;
   });
 }
 
 function buildWeekDays(date) {
   const start = new Date(date);
+
   start.setDate(date.getDate() - date.getDay());
 
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d;
+  return Array.from({ length: 7 }, (_, index) => {
+    const value = new Date(start);
+
+    value.setDate(start.getDate() + index);
+
+    return value;
   });
 }
+
 function makeLocalDate(value, endOfDay = false) {
   if (!value) return null;
 
   const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return null;
 
-  if (endOfDay) date.setHours(23, 59, 59, 999);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (endOfDay) {
+    date.setHours(23, 59, 59, 999);
+  }
 
   return date;
 }
 
 function formatR(value) {
-  const n = Number(value) || 0;
-  return `${n > 0 ? "+" : ""}${n.toFixed(2)}R`;
+  const parsed = toNumber(value, 0);
+
+  return `${parsed > 0 ? "+" : ""}${parsed.toFixed(2)}R`;
+}
+
+function formatUsd(value) {
+  const parsed = toNumber(value);
+
+  if (parsed === null) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parsed);
+}
+
+function getLotSize(journal) {
+  return toNumber(journal.lot_size) ?? toNumber(journal.quantity);
+}
+
+function getEffectiveContractSize(journal) {
+  return (
+    toNumber(journal.effective_contract_size) ??
+    toNumber(journal.effective_symbol?.contract_size) ??
+    toNumber(journal.symbol_override?.contract_size) ??
+    toNumber(journal.symbols?.contract_size)
+  );
+}
+
+function getOriginalStopLoss(journal) {
+  return toNumber(journal.stop_loss);
+}
+
+function getModifiedStopLoss(journal) {
+  return toNumber(journal.modified_sl_price);
+}
+
+function getEffectiveStopLoss(journal) {
+  return getModifiedStopLoss(journal) ?? getOriginalStopLoss(journal);
+}
+
+function buildTargetLegs(pricesValue, quantitiesValue, totalQuantity) {
+  const prices = numberArray(pricesValue);
+  const quantities = numberArray(quantitiesValue);
+  const totalLots = toNumber(totalQuantity);
+
+  if (!prices.length) {
+    return [];
+  }
+
+  if (
+    quantities.length === prices.length &&
+    quantities.every((quantity) => quantity > 0)
+  ) {
+    return prices.map((price, index) => ({
+      price,
+      quantity: quantities[index],
+    }));
+  }
+
+  if (totalLots !== null && totalLots > 0) {
+    const equalQuantity = totalLots / prices.length;
+
+    return prices.map((price, index) => {
+      if (index === prices.length - 1) {
+        const previousAllocation = equalQuantity * (prices.length - 1);
+
+        return {
+          price,
+          quantity: totalLots - previousAllocation,
+        };
+      }
+
+      return {
+        price,
+        quantity: equalQuantity,
+      };
+    });
+  }
+
+  return [];
+}
+
+function getOriginalTargetLegs(journal) {
+  return buildTargetLegs(
+    journal.take_profit,
+    journal.take_profit_qty,
+    getLotSize(journal),
+  );
+}
+
+function getModifiedTargetLegs(journal) {
+  return buildTargetLegs(
+    journal.modified_tp_price,
+    journal.modified_tp_qty,
+    getLotSize(journal),
+  );
+}
+
+function getEffectiveTargetLegs(journal) {
+  const modifiedLegs = getModifiedTargetLegs(journal);
+
+  if (modifiedLegs.length) {
+    return modifiedLegs;
+  }
+
+  return getOriginalTargetLegs(journal);
+}
+
+function calculateDollarAmount({
+  direction,
+  entryPrice,
+  targetPrice,
+  lotSize,
+  contractSize,
+}) {
+  const entry = toNumber(entryPrice);
+  const target = toNumber(targetPrice);
+  const lots = toNumber(lotSize);
+  const contract = toNumber(contractSize);
+  const normalizedDirection = norm(direction);
+
+  if (
+    entry === null ||
+    target === null ||
+    lots === null ||
+    contract === null ||
+    lots <= 0 ||
+    contract <= 0 ||
+    !["BUY", "SELL"].includes(normalizedDirection)
+  ) {
+    return null;
+  }
+
+  const movement =
+    normalizedDirection === "BUY" ? target - entry : entry - target;
+
+  return movement * contract * lots;
+}
+
+function calculateTargetLegsDollarAmount(journal, legs) {
+  if (!Array.isArray(legs) || !legs.length) {
+    return null;
+  }
+
+  const entryPrice = toNumber(journal.entry_price);
+  const contractSize = getEffectiveContractSize(journal);
+
+  if (entryPrice === null || contractSize === null) {
+    return null;
+  }
+
+  let total = 0;
+  let validLegs = 0;
+
+  for (const leg of legs) {
+    const amount = calculateDollarAmount({
+      direction: journal.direction,
+      entryPrice,
+      targetPrice: leg.price,
+      lotSize: leg.quantity,
+      contractSize,
+    });
+
+    if (amount === null) {
+      continue;
+    }
+
+    total += amount;
+    validLegs += 1;
+  }
+
+  return validLegs ? total : null;
+}
+
+function getOriginalRiskUsd(journal) {
+  const amount = calculateDollarAmount({
+    direction: journal.direction,
+    entryPrice: journal.entry_price,
+    targetPrice: getOriginalStopLoss(journal),
+    lotSize: getLotSize(journal),
+    contractSize: getEffectiveContractSize(journal),
+  });
+
+  return amount === null ? null : Math.abs(amount);
+}
+
+function getPlannedRewardUsd(journal) {
+  const amount = calculateTargetLegsDollarAmount(
+    journal,
+    getOriginalTargetLegs(journal),
+  );
+
+  return amount === null ? null : Math.abs(amount);
+}
+
+function getExitPriceFromCheckpoint(journal) {
+  const status = norm(journal.status);
+  const checkpoint = norm(journal.exit_checkpoint);
+  const entryPrice = toNumber(journal.entry_price);
+
+  if (LOSS_STATUSES.includes(status)) {
+    if (checkpoint === "ACTUAL_SL") {
+      return getOriginalStopLoss(journal);
+    }
+
+    if (checkpoint === "MODIFIED_SL") {
+      return getModifiedStopLoss(journal) ?? getOriginalStopLoss(journal);
+    }
+
+    if (checkpoint === "SL_BREAKEVEN") {
+      return entryPrice;
+    }
+  }
+
+  if (PROFIT_STATUSES.includes(status)) {
+    if (checkpoint === "TP_BREAKEVEN") {
+      return entryPrice;
+    }
+  }
+
+  return null;
+}
+
+function getActualExitLegs(journal) {
+  const status = norm(journal.status);
+  const checkpoint = norm(journal.exit_checkpoint);
+  const lotSize = getLotSize(journal);
+  const savedExitPrice = toNumber(journal.exit_price);
+
+  /*
+   * exit_price is the strongest source because it represents
+   * the actual stored closing price.
+   */
+  if (savedExitPrice !== null && lotSize !== null && lotSize > 0) {
+    return [
+      {
+        price: savedExitPrice,
+        quantity: lotSize,
+      },
+    ];
+  }
+
+  if (status === "TRADE CLOSE WITH PROFIT" && checkpoint === "MODIFIED_TP") {
+    return getModifiedTargetLegs(journal);
+  }
+
+  if (status === "TRADE CLOSE WITH PROFIT" && checkpoint === "ACTUAL_TP") {
+    return getOriginalTargetLegs(journal);
+  }
+
+  const checkpointExitPrice = getExitPriceFromCheckpoint(journal);
+
+  if (checkpointExitPrice !== null && lotSize !== null && lotSize > 0) {
+    return [
+      {
+        price: checkpointExitPrice,
+        quantity: lotSize,
+      },
+    ];
+  }
+
+  /*
+   * Compatibility for older journals without exit_checkpoint.
+   */
+  if (status === "TRADE SL HIT") {
+    const stopPrice = getEffectiveStopLoss(journal);
+
+    if (stopPrice !== null && lotSize !== null && lotSize > 0) {
+      return [
+        {
+          price: stopPrice,
+          quantity: lotSize,
+        },
+      ];
+    }
+  }
+
+  if (status === "TRADE CLOSE WITH PROFIT") {
+    return getEffectiveTargetLegs(journal);
+  }
+
+  return [];
+}
+
+function calculateProfitLossUsd(journal) {
+  const serverValue =
+    toNumber(journal.profit_loss_usd) ??
+    toNumber(journal.calculation?.profit_loss_usd);
+
+  if (serverValue !== null) {
+    return serverValue;
+  }
+
+  const calculated = calculateTargetLegsDollarAmount(
+    journal,
+    getActualExitLegs(journal),
+  );
+
+  return calculated === null ? 0 : roundNumber(calculated, 2);
+}
+
+function calculatePlannedRMultiple(journal) {
+  const serverValue = toNumber(journal.calculated_planned_rr);
+
+  if (serverValue !== null) {
+    return serverValue;
+  }
+
+  const riskUsd = getOriginalRiskUsd(journal);
+  const rewardUsd = getPlannedRewardUsd(journal);
+
+  if (riskUsd === null || rewardUsd === null || riskUsd <= 0) {
+    return 0;
+  }
+
+  return rewardUsd / riskUsd;
+}
+
+function calculateRMultiple(journal) {
+  const serverValue = toNumber(journal.calculated_r_multiple);
+
+  if (serverValue !== null) {
+    return serverValue;
+  }
+
+  const riskUsd = getOriginalRiskUsd(journal);
+  const profitLossUsd = calculateProfitLossUsd(journal);
+
+  if (riskUsd === null || profitLossUsd === null || riskUsd <= 0) {
+    return 0;
+  }
+
+  return profitLossUsd / riskUsd;
 }
 
 function getFlags(day) {
-  if (!day || !day.trades) return [];
+  if (!day || !day.trades) {
+    return [];
+  }
 
   const flags = [];
 
@@ -133,6 +548,7 @@ function MetricCard({ label, value, positive = true, helper = "" }) {
           ) : (
             <TrendingDown className="h-3 w-3 shrink-0" />
           )}
+
           <span className="truncate">{helper}</span>
         </div>
       ) : null}
@@ -160,9 +576,9 @@ function MiniDonut({ winning, losing, breakeven }) {
         </div>
 
         <div className="min-w-0 space-y-1 text-xs font-bold text-slate-600">
-          <div className="truncate">Winning: {winning}</div>
-          <div className="truncate">Losing: {losing}</div>
-          <div className="truncate">Breakeven: {breakeven}</div>
+          <div className="truncate">Winning days: {winning}</div>
+          <div className="truncate">Losing days: {losing}</div>
+          <div className="truncate">Breakeven days: {breakeven}</div>
         </div>
       </div>
     </div>
@@ -171,7 +587,9 @@ function MiniDonut({ winning, losing, breakeven }) {
 
 function DayCell({ day, data, currentMonth, bestDay, onClick }) {
   const totalR = data?.totalR || 0;
+  const totalProfitLossUsd = data?.totalProfitLossUsd || 0;
   const trades = data?.trades || 0;
+
   const isBest = bestDay && dateKey(bestDay.date) === dateKey(day);
 
   let tone = "border-slate-100 bg-slate-50 text-slate-400";
@@ -212,7 +630,20 @@ function DayCell({ day, data, currentMonth, bestDay, onClick }) {
             {formatR(totalR)}
           </div>
 
-          <div className="mt-2 truncate text-xs font-bold text-slate-500">
+          <div
+            className={`mt-2 truncate text-xs font-black ${
+              totalProfitLossUsd > 0
+                ? "text-emerald-700"
+                : totalProfitLossUsd < 0
+                  ? "text-red-700"
+                  : "text-slate-500"
+            }`}
+          >
+            {totalProfitLossUsd > 0 ? "+" : ""}
+            {formatUsd(totalProfitLossUsd)}
+          </div>
+
+          <div className="mt-1 truncate text-xs font-bold text-slate-500">
             {trades} {trades === 1 ? "trade" : "trades"}
           </div>
         </div>
@@ -236,21 +667,18 @@ export default function JournalIntelligencePanel({
   const [selectedDay, setSelectedDay] = useState(null);
 
   const rangeStartDate = useMemo(() => makeLocalDate(rangeStart), [rangeStart]);
+
   const rangeEndDate = useMemo(() => makeLocalDate(rangeEnd, true), [rangeEnd]);
 
-  function isBeforeRange(date) {
-    if (!rangeStartDate) return false;
-    return date < rangeStartDate;
-  }
-
-  function isAfterRange(date) {
-    if (!rangeEndDate) return false;
-    return date > rangeEndDate;
-  }
-
   function clampToRange(date) {
-    if (rangeStartDate && date < rangeStartDate) return rangeStartDate;
-    if (rangeEndDate && date > rangeEndDate) return rangeEndDate;
+    if (rangeStartDate && date < rangeStartDate) {
+      return new Date(rangeStartDate);
+    }
+
+    if (rangeEndDate && date > rangeEndDate) {
+      return new Date(rangeEndDate);
+    }
+
     return date;
   }
 
@@ -259,9 +687,13 @@ export default function JournalIntelligencePanel({
 
     const latest =
       journals
-        .map((j) => new Date(j.journal_end_at || j.created_at))
-        .filter((d) => !Number.isNaN(d.getTime()))
-        .sort((a, b) => b - a)[0] || new Date();
+        .map((journal) => {
+          return new Date(
+            journal.journal_end_at || journal.updated_at || journal.created_at,
+          );
+        })
+        .filter((date) => !Number.isNaN(date.getTime()))
+        .sort((first, second) => second - first)[0] || new Date();
 
     const safeDate = clampToRange(latest);
 
@@ -272,104 +704,199 @@ export default function JournalIntelligencePanel({
   const analytics = useMemo(() => {
     const daily = new Map();
 
-    journals.forEach((journal) => {
-      const rawDate = journal.journal_end_at || journal.created_at;
+    const performanceJournals = journals.filter((journal) => {
+      return PERFORMANCE_STATUSES.includes(norm(journal.status));
+    });
+
+    performanceJournals.forEach((journal) => {
+      const rawDate =
+        journal.journal_end_at || journal.updated_at || journal.created_at;
+
       if (!rawDate) return;
 
-      const d = new Date(rawDate);
-      if (Number.isNaN(d.getTime())) return;
+      const date = new Date(rawDate);
 
-      const key = dateKey(d);
+      if (Number.isNaN(date.getTime())) {
+        return;
+      }
+
+      const key = dateKey(date);
       const r = calculateRMultiple(journal);
+      const profitLossUsd = calculateProfitLossUsd(journal);
 
-      const prev = daily.get(key) || {
-        date: d,
+      const previous = daily.get(key) || {
+        date,
         trades: 0,
         wins: 0,
         losses: 0,
         breakeven: 0,
         totalR: 0,
+        totalProfitLossUsd: 0,
         journals: [],
       };
 
-      prev.trades += 1;
-      prev.totalR += r;
-      prev.journals.push(journal);
+      previous.trades += 1;
+      previous.totalR += r;
+      previous.totalProfitLossUsd += profitLossUsd;
+      previous.journals.push(journal);
 
-      if (r > 0) prev.wins += 1;
-      else if (r < 0) prev.losses += 1;
-      else prev.breakeven += 1;
+      if (r > 0) {
+        previous.wins += 1;
+      } else if (r < 0) {
+        previous.losses += 1;
+      } else {
+        previous.breakeven += 1;
+      }
 
-      daily.set(key, prev);
+      daily.set(key, previous);
     });
 
     const days = Array.from(daily.values());
-    const totalTrades = journals.length;
-    const totalR = days.reduce((a, b) => a + b.totalR, 0);
 
-    const rValues = journals.map((j) => calculateRMultiple(j));
+    const calculatedTrades = performanceJournals.map((journal) => ({
+      journal,
+      r: calculateRMultiple(journal),
+      plannedR: calculatePlannedRMultiple(journal),
+      profitLossUsd: calculateProfitLossUsd(journal),
+    }));
 
-    const wins = rValues.filter((r) => r > 0).length;
-    const losses = rValues.filter((r) => r < 0).length;
+    const totalTrades = calculatedTrades.length;
 
-    const grossProfit = rValues
-      .filter((r) => r > 0)
-      .reduce((sum, r) => sum + r, 0);
+    const totalR = calculatedTrades.reduce((sum, trade) => sum + trade.r, 0);
 
-    const grossLoss = Math.abs(
-      rValues.filter((r) => r < 0).reduce((sum, r) => sum + r, 0),
+    const totalProfitLossUsd = calculatedTrades.reduce(
+      (sum, trade) => sum + trade.profitLossUsd,
+      0,
+    );
+
+    const winningTrades = calculatedTrades.filter((trade) => trade.r > 0);
+
+    const losingTrades = calculatedTrades.filter((trade) => trade.r < 0);
+
+    const breakevenTrades = calculatedTrades.filter((trade) => trade.r === 0);
+
+    const wins = winningTrades.length;
+    const losses = losingTrades.length;
+
+    const winRate = totalTrades ? (wins / totalTrades) * 100 : 0;
+
+    const grossProfitR = winningTrades.reduce((sum, trade) => sum + trade.r, 0);
+
+    const grossLossR = Math.abs(
+      losingTrades.reduce((sum, trade) => sum + trade.r, 0),
+    );
+
+    const grossProfitUsd = winningTrades.reduce(
+      (sum, trade) => sum + trade.profitLossUsd,
+      0,
+    );
+
+    const grossLossUsd = Math.abs(
+      losingTrades.reduce((sum, trade) => sum + trade.profitLossUsd, 0),
     );
 
     const profitFactor =
-      grossLoss > 0
-        ? (grossProfit / grossLoss).toFixed(2)
-        : grossProfit > 0
+      grossLossUsd > 0
+        ? (grossProfitUsd / grossLossUsd).toFixed(2)
+        : grossProfitUsd > 0
           ? "∞"
-          : "0";
+          : "0.00";
 
-    const winningDays = days.filter((d) => d.totalR > 0).length;
-    const losingDays = days.filter((d) => d.totalR < 0).length;
-    const breakevenDays = days.filter((d) => d.totalR === 0).length;
+    const avgWinR = winningTrades.length
+      ? grossProfitR / winningTrades.length
+      : 0;
 
-    const winningTrades = rValues.filter((r) => r > 0);
-    const losingTrades = rValues.filter((r) => r < 0);
+    const avgLossR = losingTrades.length
+      ? -grossLossR / losingTrades.length
+      : 0;
 
-    const avgWinR =
-      winningTrades.length > 0
-        ? winningTrades.reduce((sum, r) => sum + r, 0) / winningTrades.length
+    const expectancyR =
+      totalTrades > 0
+        ? (wins / totalTrades) * avgWinR + (losses / totalTrades) * avgLossR
         : 0;
 
-    const avgLossR =
-      losingTrades.length > 0
-        ? losingTrades.reduce((sum, r) => sum + r, 0) / losingTrades.length
-        : 0;
+    const plannedRValues = calculatedTrades
+      .map((trade) => trade.plannedR)
+      .filter((value) => Number.isFinite(value) && value > 0);
 
-    const bestDay = [...days].sort((a, b) => b.totalR - a.totalR)[0] || null;
+    const averagePlannedR = plannedRValues.length
+      ? plannedRValues.reduce((sum, value) => sum + value, 0) /
+        plannedRValues.length
+      : 0;
 
-    const orderedJournals = [...journals]
-      .map((journal) => ({
-        journal,
-        date: new Date(journal.journal_end_at || journal.created_at),
-        r: calculateRMultiple(journal),
+    const winningDays = days.filter((day) => day.totalR > 0).length;
+
+    const losingDays = days.filter((day) => day.totalR < 0).length;
+
+    const breakevenDays = days.filter((day) => day.totalR === 0).length;
+
+    const bestDay =
+      [...days].sort((first, second) => second.totalR - first.totalR)[0] ||
+      null;
+
+    const orderedTrades = calculatedTrades
+      .map((trade) => ({
+        ...trade,
+        date: new Date(
+          trade.journal.journal_end_at ||
+            trade.journal.updated_at ||
+            trade.journal.created_at,
+        ),
       }))
-      .filter((item) => !Number.isNaN(item.date.getTime()))
-      .sort((a, b) => a.date - b.date);
+      .filter((trade) => !Number.isNaN(trade.date.getTime()))
+      .sort((first, second) => first.date - second.date);
 
-    let equity = 0;
-    let peak = 0;
-    let maxDrawdown = 0;
+    let equityR = 0;
+    let peakR = 0;
+    let maxDrawdownR = 0;
 
-    orderedJournals.forEach((item) => {
-      equity += item.r;
+    let equityUsd = 0;
+    let peakUsd = 0;
+    let maxDrawdownUsd = 0;
 
-      if (equity > peak) {
-        peak = equity;
+    let currentWinStreak = 0;
+    let currentLossStreak = 0;
+    let longestWinStreak = 0;
+    let longestLossStreak = 0;
+
+    orderedTrades.forEach((trade) => {
+      equityR += trade.r;
+
+      if (equityR > peakR) {
+        peakR = equityR;
       }
 
-      const drawdown = equity - peak;
+      const drawdownR = equityR - peakR;
 
-      if (drawdown < maxDrawdown) {
-        maxDrawdown = drawdown;
+      if (drawdownR < maxDrawdownR) {
+        maxDrawdownR = drawdownR;
+      }
+
+      equityUsd += trade.profitLossUsd;
+
+      if (equityUsd > peakUsd) {
+        peakUsd = equityUsd;
+      }
+
+      const drawdownUsd = equityUsd - peakUsd;
+
+      if (drawdownUsd < maxDrawdownUsd) {
+        maxDrawdownUsd = drawdownUsd;
+      }
+
+      if (trade.r > 0) {
+        currentWinStreak += 1;
+        currentLossStreak = 0;
+
+        longestWinStreak = Math.max(longestWinStreak, currentWinStreak);
+      } else if (trade.r < 0) {
+        currentLossStreak += 1;
+        currentWinStreak = 0;
+
+        longestLossStreak = Math.max(longestLossStreak, currentLossStreak);
+      } else {
+        currentWinStreak = 0;
+        currentLossStreak = 0;
       }
     });
 
@@ -377,15 +904,24 @@ export default function JournalIntelligencePanel({
       daily,
       totalTrades,
       totalR,
-      winRate: totalTrades ? (wins / totalTrades) * 100 : 0,
+      totalProfitLossUsd,
+      winRate,
       avgWinR,
       avgLossR,
+      expectancyR,
+      averagePlannedR,
       profitFactor,
-      maxDrawdown,
+      maxDrawdownR,
+      maxDrawdownUsd,
+      winningTrades: wins,
+      losingTrades: losses,
+      breakevenTrades: breakevenTrades.length,
       winningDays,
       losingDays,
       breakevenDays,
       bestDay,
+      longestWinStreak,
+      longestLossStreak,
     };
   }, [journals]);
 
@@ -411,10 +947,13 @@ export default function JournalIntelligencePanel({
   function getPeriodDate(delta) {
     const next = new Date(selectedDate);
 
-    if (mode === "Daily") next.setDate(selectedDate.getDate() + delta);
-    else if (mode === "Weekly")
+    if (mode === "Daily") {
+      next.setDate(selectedDate.getDate() + delta);
+    } else if (mode === "Weekly") {
       next.setDate(selectedDate.getDate() + delta * 7);
-    else next.setMonth(selectedDate.getMonth() + delta);
+    } else {
+      next.setMonth(selectedDate.getMonth() + delta);
+    }
 
     return next;
   }
@@ -447,24 +986,29 @@ export default function JournalIntelligencePanel({
   function periodOverlapsRange(date) {
     const { start, end } = getPeriodBounds(date);
 
-    if (rangeStartDate && end < rangeStartDate) return false;
-    if (rangeEndDate && start > rangeEndDate) return false;
+    if (rangeStartDate && end < rangeStartDate) {
+      return false;
+    }
+
+    if (rangeEndDate && start > rangeEndDate) {
+      return false;
+    }
 
     return true;
   }
 
-  const previousDate = selectedDate ? getPeriodDate(-1) : null;
-  const nextDate = selectedDate ? getPeriodDate(1) : null;
+  const previousDate = getPeriodDate(-1);
+  const nextDate = getPeriodDate(1);
 
-  const canGoPrevious = previousDate
-    ? periodOverlapsRange(previousDate)
-    : false;
-  const canGoNext = nextDate ? periodOverlapsRange(nextDate) : false;
+  const canGoPrevious = periodOverlapsRange(previousDate);
+  const canGoNext = periodOverlapsRange(nextDate);
 
   function changePeriod(delta) {
     const next = getPeriodDate(delta);
 
-    if (!periodOverlapsRange(next)) return;
+    if (!periodOverlapsRange(next)) {
+      return;
+    }
 
     setSelectedDate(next);
     setSelectedDay(next);
@@ -474,9 +1018,16 @@ export default function JournalIntelligencePanel({
     <section className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Trades"
+          label="Closed Trades"
           value={analytics.totalTrades}
           helper="Filtered"
+        />
+
+        <MetricCard
+          label="Net P&L"
+          value={formatUsd(analytics.totalProfitLossUsd)}
+          positive={analytics.totalProfitLossUsd >= 0}
+          helper={analytics.totalProfitLossUsd >= 0 ? "Net profit" : "Net loss"}
         />
 
         <MetricCard
@@ -489,7 +1040,8 @@ export default function JournalIntelligencePanel({
         <MetricCard
           label="Win Rate"
           value={`${analytics.winRate.toFixed(1)}%`}
-          helper="Accuracy"
+          positive={analytics.winRate >= 50}
+          helper={`${analytics.winningTrades} wins`}
         />
 
         <MetricCard
@@ -505,13 +1057,40 @@ export default function JournalIntelligencePanel({
           helper="Losing trades"
         />
 
-        <MetricCard label="PF" value={analytics.profitFactor} helper="Ratio" />
+        <MetricCard
+          label="Expectancy"
+          value={formatR(analytics.expectancyR)}
+          positive={analytics.expectancyR >= 0}
+          helper="Per closed trade"
+        />
+
+        <MetricCard
+          label="Profit Factor"
+          value={analytics.profitFactor}
+          positive={
+            analytics.profitFactor === "∞" ||
+            Number(analytics.profitFactor) >= 1
+          }
+          helper="USD profit / loss"
+        />
 
         <MetricCard
           label="Max Drawdown"
-          value={formatR(analytics.maxDrawdown)}
-          positive={analytics.maxDrawdown >= 0}
-          helper="Peak-to-trough"
+          value={formatR(analytics.maxDrawdownR)}
+          positive={false}
+          helper={formatUsd(analytics.maxDrawdownUsd)}
+        />
+
+        <MetricCard
+          label="Avg Planned RR"
+          value={formatR(analytics.averagePlannedR)}
+          helper="Original targets"
+        />
+
+        <MetricCard
+          label="Best Win Streak"
+          value={analytics.longestWinStreak}
+          helper="Consecutive wins"
         />
 
         <MiniDonut
@@ -551,7 +1130,7 @@ export default function JournalIntelligencePanel({
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {["Calendar", "Daily", "Weekly", "Monthly"].map((item) => (
                 <button
                   key={item}
@@ -589,8 +1168,8 @@ export default function JournalIntelligencePanel({
 
           {mode !== "Daily" ? (
             <div className="mt-6 grid grid-cols-7 gap-2 text-center text-[11px] font-black uppercase text-slate-400">
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                <div key={d}>{d}</div>
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div key={day}>{day}</div>
               ))}
             </div>
           ) : null}
@@ -641,6 +1220,21 @@ export default function JournalIntelligencePanel({
                   value={formatR(selectedDayData.totalR)}
                   positive={selectedDayData.totalR >= 0}
                 />
+
+                <MetricCard
+                  label="P&L"
+                  value={formatUsd(selectedDayData.totalProfitLossUsd)}
+                  positive={selectedDayData.totalProfitLossUsd >= 0}
+                />
+
+                <MetricCard
+                  label="Win Rate"
+                  value={`${(
+                    (selectedDayData.wins / selectedDayData.trades) *
+                    100
+                  ).toFixed(1)}%`}
+                  positive={selectedDayData.wins >= selectedDayData.losses}
+                />
               </div>
 
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
@@ -678,27 +1272,55 @@ export default function JournalIntelligencePanel({
                 </div>
 
                 <div className="mt-3 max-h-[320px] space-y-2 overflow-y-auto pr-1">
-                  {selectedDayData.journals.map((journal) => (
-                    <div
-                      key={journal.id}
-                      className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm"
-                    >
-                      <div className="truncate font-black text-slate-900">
-                        {journal.symbols?.symbol_name || "—"} •{" "}
-                        {journal.direction || "—"} •{" "}
-                        {formatR(calculateRMultiple(journal))}
-                      </div>
+                  {selectedDayData.journals.map((journal) => {
+                    const tradeR = calculateRMultiple(journal);
+                    const profitLossUsd = calculateProfitLossUsd(journal);
 
-                      <div className="mt-1 truncate text-xs font-bold text-slate-500">
-                        {journal.strategy_snapshot?.strategy_name ||
-                          "No Strategy"}
-                      </div>
+                    return (
+                      <div
+                        key={journal.id}
+                        className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate font-black text-slate-900">
+                              {journal.symbols?.symbol_name ||
+                                journal.effective_symbol?.symbol_name ||
+                                "—"}{" "}
+                              • {journal.direction || "—"}
+                            </div>
 
-                      <div className="mt-1 truncate text-xs font-bold text-slate-400">
-                        {journal.status || "—"}
+                            <div className="mt-1 text-xs font-black text-slate-600">
+                              {formatR(tradeR)}
+                            </div>
+                          </div>
+
+                          <div
+                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-black ${
+                              profitLossUsd > 0
+                                ? "bg-emerald-50 text-emerald-700"
+                                : profitLossUsd < 0
+                                  ? "bg-red-50 text-red-700"
+                                  : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {profitLossUsd > 0 ? "+" : ""}
+                            {formatUsd(profitLossUsd)}
+                          </div>
+                        </div>
+
+                        <div className="mt-2 truncate text-xs font-bold text-slate-500">
+                          {journal.strategy_snapshot?.strategy_name ||
+                            "No Strategy"}
+                        </div>
+
+                        <div className="mt-1 truncate text-xs font-bold text-slate-400">
+                          Lot: {getLotSize(journal) ?? "—"} •{" "}
+                          {journal.status || "—"}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

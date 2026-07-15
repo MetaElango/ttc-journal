@@ -12,19 +12,27 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Settings2,
   ShieldCheck,
   Target,
+  Trash2,
   User,
   Wallet,
   X,
 } from "lucide-react";
 
-function FieldShell({ label, children, required }) {
+function FieldShell({ label, children, required, optional }) {
   return (
     <div className="space-y-2">
       <label className="text-sm font-semibold text-slate-950">
         {label} {required ? <span className="text-red-500">*</span> : null}
+        {optional ? (
+          <span className="ml-1 text-xs font-medium text-slate-400">
+            optional
+          </span>
+        ) : null}
       </label>
+
       {children}
     </div>
   );
@@ -35,24 +43,42 @@ function inputClass() {
 }
 
 function sanitize2Decimals(raw) {
-  const s = String(raw ?? "");
-  let out = s.replace(/[^\d.]/g, "");
-  const firstDot = out.indexOf(".");
+  const value = String(raw ?? "");
+  let output = value.replace(/[^\d.]/g, "");
+  const firstDot = output.indexOf(".");
 
   if (firstDot !== -1) {
-    out =
-      out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
+    output =
+      output.slice(0, firstDot + 1) +
+      output.slice(firstDot + 1).replace(/\./g, "");
 
-    const [a, b] = out.split(".");
-    out = a + "." + (b || "").slice(0, 2);
+    const [whole, decimal] = output.split(".");
+    output = `${whole}.${(decimal || "").slice(0, 2)}`;
   }
 
-  return out;
+  return output;
 }
 
-function NativeSelect({ children, ...props }) {
+function sanitize8Decimals(raw) {
+  const value = String(raw ?? "");
+  let output = value.replace(/[^\d.]/g, "");
+  const firstDot = output.indexOf(".");
+
+  if (firstDot !== -1) {
+    output =
+      output.slice(0, firstDot + 1) +
+      output.slice(firstDot + 1).replace(/\./g, "");
+
+    const [whole, decimal] = output.split(".");
+    output = `${whole}.${(decimal || "").slice(0, 8)}`;
+  }
+
+  return output;
+}
+
+function NativeSelect({ children, className = "", ...props }) {
   return (
-    <select {...props} className={inputClass()}>
+    <select {...props} className={`${inputClass()} ${className}`}>
       {children}
     </select>
   );
@@ -72,8 +98,8 @@ function TagCombobox({ name, defaultValue = "", tags = [], required }) {
         placeholder="Eg: Main"
         className={`${inputClass()} pr-11`}
         onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setValue(e.target.value);
+        onChange={(event) => {
+          setValue(event.target.value);
           setOpen(true);
         }}
         onBlur={() => {
@@ -83,8 +109,8 @@ function TagCombobox({ name, defaultValue = "", tags = [], required }) {
 
       <button
         type="button"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((x) => !x)}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={() => setOpen((current) => !current)}
         className="absolute right-3 top-3 rounded-lg p-1 text-slate-500 hover:bg-slate-100"
       >
         <ChevronDown className="h-4 w-4" />
@@ -96,7 +122,7 @@ function TagCombobox({ name, defaultValue = "", tags = [], required }) {
             <button
               key={tag}
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 setValue(tag);
                 setOpen(false);
@@ -134,19 +160,47 @@ function StatCard({ icon: Icon, label, value }) {
 }
 
 function formatMoney(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return "—";
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "—";
+  }
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 0,
-  }).format(n);
+  }).format(number);
 }
 
 function formatValue(value, suffix = "") {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "") {
+    return "—";
+  }
+
   return `${value}${suffix}`;
+}
+
+function formatContractSize(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 8,
+  }).format(number);
+}
+
+function formatLeverage(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number <= 0) {
+    return "—";
+  }
+
+  return `1:${number}`;
 }
 
 function ReadOnlyField({ label, value }) {
@@ -155,6 +209,7 @@ function ReadOnlyField({ label, value }) {
       <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
         {label}
       </div>
+
       <div className="mt-1 text-sm font-bold text-slate-900">
         {value || "—"}
       </div>
@@ -171,29 +226,60 @@ function MiniInfoCard({ label, value }) {
   );
 }
 
+function SymbolOverrideBadge({ children }) {
+  return (
+    <span className="inline-flex items-center rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700">
+      {children}
+    </span>
+  );
+}
+
 export default function ProfileClient({
   user,
   profile,
-  tradingAccounts,
+  tradingAccounts = [],
+  symbols = [],
+  accountSymbolSettings = [],
   updateProfile,
   createTradingAccount,
   toggleTradingAccountVisibility,
+  saveAccountSymbolSetting,
+  deleteAccountSymbolSetting,
 }) {
   const [profileState, profileAction, profilePending] = useActionState(
     updateProfile,
-    { ok: true, message: "" },
+    {
+      ok: true,
+      message: "",
+    },
   );
 
   const [accountState, accountAction, accountPending] = useActionState(
     createTradingAccount,
-    { ok: true, message: "" },
+    {
+      ok: true,
+      message: "",
+    },
   );
+
+  const [symbolSettingState, symbolSettingAction, symbolSettingPending] =
+    useActionState(saveAccountSymbolSetting, {
+      ok: true,
+      message: "",
+    });
 
   const [editingAccount, setEditingAccount] = useState(null);
   const [accountFormKey, setAccountFormKey] = useState(0);
   const [accountTargetMode, setAccountTargetMode] = useState("PROFIT_TARGET");
   const [avatarPreview, setAvatarPreview] = useState(profile?.avatar_url || "");
   const [accountSizePreset, setAccountSizePreset] = useState("100000");
+
+  const [symbolSettingsAccount, setSymbolSettingsAccount] = useState(null);
+
+  const [selectedSymbolId, setSelectedSymbolId] = useState("");
+  const [symbolContractSize, setSymbolContractSize] = useState("");
+  const [symbolLeverage, setSymbolLeverage] = useState("");
+  const [editingSymbolSettingId, setEditingSymbolSettingId] = useState("");
 
   const existingTags = useMemo(() => {
     return Array.from(
@@ -205,13 +291,55 @@ export default function ProfileClient({
     );
   }, [tradingAccounts]);
 
-  const totalCapital = tradingAccounts.reduce(
-    (acc, account) => acc + Number(account.account_size || 0),
-    0,
-  );
+  const totalCapital = useMemo(() => {
+    return tradingAccounts.reduce(
+      (total, account) => total + Number(account.account_size || 0),
+      0,
+    );
+  }, [tradingAccounts]);
+
+  const selectedSymbol = useMemo(() => {
+    return symbols.find((symbol) => symbol.id === selectedSymbolId) || null;
+  }, [symbols, selectedSymbolId]);
+
+  const selectedAccountSettings = useMemo(() => {
+    if (!symbolSettingsAccount?.id) {
+      return [];
+    }
+
+    return accountSymbolSettings.filter(
+      (setting) => setting.trading_account_id === symbolSettingsAccount.id,
+    );
+  }, [accountSymbolSettings, symbolSettingsAccount?.id]);
+
+  const selectedAccountSettingMap = useMemo(() => {
+    return new Map(
+      selectedAccountSettings.map((setting) => [setting.symbol_id, setting]),
+    );
+  }, [selectedAccountSettings]);
+
+  const groupedSymbols = useMemo(() => {
+    const grouped = new Map();
+
+    symbols.forEach((symbol) => {
+      const category = symbol.category || "OTHER";
+
+      if (!grouped.has(category)) {
+        grouped.set(category, []);
+      }
+
+      grouped.get(category).push(symbol);
+    });
+
+    return Array.from(grouped.entries()).sort(([categoryA], [categoryB]) =>
+      categoryA.localeCompare(categoryB),
+    );
+  }, [symbols]);
 
   useEffect(() => {
-    if (!accountState?.ok || !accountState?.message) return;
+    if (!accountState?.ok || !accountState?.message) {
+      return;
+    }
 
     if (
       accountState.message === "Trading account added." ||
@@ -220,15 +348,28 @@ export default function ProfileClient({
       setEditingAccount(null);
       setAccountTargetMode("PROFIT_TARGET");
       setAccountSizePreset("100000");
-      setAccountFormKey((x) => x + 1);
+      setAccountFormKey((current) => current + 1);
     }
   }, [accountState?.ok, accountState?.message]);
+
+  useEffect(() => {
+    if (!symbolSettingState?.ok || !symbolSettingState?.message) {
+      return;
+    }
+
+    if (
+      symbolSettingState.message === "Symbol settings saved." ||
+      symbolSettingState.message.includes("Master settings will be used")
+    ) {
+      resetSymbolForm();
+    }
+  }, [symbolSettingState?.ok, symbolSettingState?.message]);
 
   function startEditAccount(account) {
     setEditingAccount(account);
     setAccountSizePreset("custom");
     setAccountTargetMode(account.target_mode || "PROFIT_TARGET");
-    setAccountFormKey((x) => x + 1);
+    setAccountFormKey((current) => current + 1);
 
     setTimeout(() => {
       document.getElementById("trading-account-form")?.scrollIntoView({
@@ -242,7 +383,72 @@ export default function ProfileClient({
     setEditingAccount(null);
     setAccountTargetMode("PROFIT_TARGET");
     setAccountSizePreset("100000");
-    setAccountFormKey((x) => x + 1);
+    setAccountFormKey((current) => current + 1);
+  }
+
+  function resetSymbolForm() {
+    setSelectedSymbolId("");
+    setSymbolContractSize("");
+    setSymbolLeverage("");
+    setEditingSymbolSettingId("");
+  }
+
+  function openSymbolSettings(account) {
+    setSymbolSettingsAccount(account);
+    resetSymbolForm();
+
+    setTimeout(() => {
+      document.getElementById("account-symbol-settings")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 50);
+  }
+
+  function closeSymbolSettings() {
+    setSymbolSettingsAccount(null);
+    resetSymbolForm();
+  }
+
+  function selectSymbol(symbolId) {
+    setSelectedSymbolId(symbolId);
+
+    const existingSetting = selectedAccountSettingMap.get(symbolId);
+
+    if (existingSetting) {
+      setEditingSymbolSettingId(existingSetting.id);
+      setSymbolContractSize(
+        existingSetting.contract_size != null
+          ? String(existingSetting.contract_size)
+          : "",
+      );
+      setSymbolLeverage(
+        existingSetting.leverage != null
+          ? String(existingSetting.leverage)
+          : "",
+      );
+      return;
+    }
+
+    setEditingSymbolSettingId("");
+    setSymbolContractSize("");
+    setSymbolLeverage("");
+  }
+
+  function editSymbolSetting(setting) {
+    setEditingSymbolSettingId(setting.id);
+    setSelectedSymbolId(setting.symbol_id);
+    setSymbolContractSize(
+      setting.contract_size != null ? String(setting.contract_size) : "",
+    );
+    setSymbolLeverage(setting.leverage != null ? String(setting.leverage) : "");
+
+    setTimeout(() => {
+      document.getElementById("symbol-setting-form")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 50);
   }
 
   return (
@@ -294,16 +500,19 @@ export default function ProfileClient({
           label="Experience"
           value={profile?.experience_level || "—"}
         />
+
         <StatCard
           icon={Globe2}
           label="Country"
           value={profile?.country || "—"}
         />
+
         <StatCard
           icon={Banknote}
           label="Trading Accounts"
           value={tradingAccounts.length}
         />
+
         <StatCard
           icon={Wallet}
           label="Total Capital"
@@ -330,9 +539,13 @@ export default function ProfileClient({
                 type="file"
                 accept="image/*"
                 className={inputClass()}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+
+                  if (!file) {
+                    return;
+                  }
+
                   setAvatarPreview(URL.createObjectURL(file));
                 }}
               />
@@ -378,6 +591,7 @@ export default function ProfileClient({
               <FieldShell label="Instagram Handle">
                 <div className="relative">
                   <Instagram className="absolute left-4 top-4 h-4 w-4 text-slate-400" />
+
                   <input
                     name="instagram_handle"
                     defaultValue={profile?.instagram_handle || ""}
@@ -389,6 +603,7 @@ export default function ProfileClient({
               <FieldShell label="Discord ID / Name">
                 <div className="relative">
                   <Disc3 className="absolute left-4 top-4 h-4 w-4 text-slate-400" />
+
                   <input
                     name="discord_handle"
                     defaultValue={profile?.discord_handle || ""}
@@ -400,7 +615,11 @@ export default function ProfileClient({
 
             {profileState.message ? (
               <p
-                className={`rounded-2xl border p-4 text-sm font-medium ${profileState.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-600"}`}
+                className={`rounded-2xl border p-4 text-sm font-medium ${
+                  profileState.ok
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-red-200 bg-red-50 text-red-600"
+                }`}
               >
                 {profileState.message}
               </p>
@@ -447,11 +666,13 @@ export default function ProfileClient({
                   name="framework"
                   value={editingAccount.framework || ""}
                 />
+
                 <input
                   type="hidden"
                   name="account_size_preset"
                   value="custom"
                 />
+
                 <input
                   type="hidden"
                   name="account_size_custom"
@@ -508,7 +729,9 @@ export default function ProfileClient({
                     name="account_size_preset"
                     required
                     value={accountSizePreset}
-                    onChange={(e) => setAccountSizePreset(e.target.value)}
+                    onChange={(event) =>
+                      setAccountSizePreset(event.target.value)
+                    }
                   >
                     <option value="10000">10K</option>
                     <option value="25000">25K</option>
@@ -620,7 +843,9 @@ export default function ProfileClient({
                     name="target_mode"
                     required
                     value={accountTargetMode}
-                    onChange={(e) => setAccountTargetMode(e.target.value)}
+                    onChange={(event) =>
+                      setAccountTargetMode(event.target.value)
+                    }
                   >
                     <option value="PROFIT_TARGET">Profit Target</option>
                     <option value="R_COLLECTION">R Collection</option>
@@ -638,9 +863,11 @@ export default function ProfileClient({
                         editingAccount?.profit_target_percentage ?? ""
                       }
                       className={inputClass()}
-                      onChange={(e) =>
-                        (e.target.value = sanitize2Decimals(e.target.value))
-                      }
+                      onChange={(event) => {
+                        event.target.value = sanitize2Decimals(
+                          event.target.value,
+                        );
+                      }}
                       required
                     />
                   </FieldShell>
@@ -653,9 +880,11 @@ export default function ProfileClient({
                       step="0.01"
                       defaultValue={editingAccount?.r_collection_target ?? ""}
                       className={inputClass()}
-                      onChange={(e) =>
-                        (e.target.value = sanitize2Decimals(e.target.value))
-                      }
+                      onChange={(event) => {
+                        event.target.value = sanitize2Decimals(
+                          event.target.value,
+                        );
+                      }}
                       required
                     />
                   </FieldShell>
@@ -677,7 +906,11 @@ export default function ProfileClient({
 
             {accountState.message ? (
               <p
-                className={`rounded-2xl border p-4 text-sm font-medium ${accountState.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-600"}`}
+                className={`rounded-2xl border p-4 text-sm font-medium ${
+                  accountState.ok
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-red-200 bg-red-50 text-red-600"
+                }`}
               >
                 {accountState.message}
               </p>
@@ -712,6 +945,7 @@ export default function ProfileClient({
                     ) : (
                       <Plus className="mr-2 h-4 w-4" />
                     )}
+
                     {editingAccount ? "Update Trading Account" : "Add Account"}
                   </>
                 )}
@@ -732,127 +966,480 @@ export default function ProfileClient({
               No trading accounts added yet.
             </div>
           ) : (
-            tradingAccounts.map((account) => (
-              <div
-                key={account.id}
-                className="rounded-3xl border border-slate-200 bg-slate-50/60 p-5"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-bold text-slate-950">
-                      {account.account_name}
-                    </h3>
+            tradingAccounts.map((account) => {
+              const overrideCount = accountSymbolSettings.filter(
+                (setting) => setting.trading_account_id === account.id,
+              ).length;
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      {account.framework || "—"} •{" "}
-                      {formatMoney(account.account_size)}
-                      {account.tag ? ` • ${account.tag}` : ""}
-                    </p>
+              return (
+                <div
+                  key={account.id}
+                  className="rounded-3xl border border-slate-200 bg-slate-50/60 p-5"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-bold text-slate-950">
+                          {account.account_name}
+                        </h3>
 
-                    <div className="mt-4">
-                      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                        Risk Rules
+                        {overrideCount > 0 ? (
+                          <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                            {overrideCount} symbol override
+                            {overrideCount === 1 ? "" : "s"}
+                          </span>
+                        ) : null}
                       </div>
 
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <MiniInfoCard
-                          label="Daily DD"
-                          value={formatValue(account.daily_drawdown, "%")}
-                        />
-                        <MiniInfoCard
-                          label="Max DD"
-                          value={formatValue(account.max_drawdown, "%")}
-                        />
-                        <MiniInfoCard
-                          label="Risk / Trade"
-                          value={formatValue(account.risk_per_trade, "%")}
-                        />
-                        <MiniInfoCard
-                          label="Max Exposure"
-                          value={formatValue(account.max_risk_exposure, "%")}
-                        />
+                      <p className="mt-1 text-sm text-slate-500">
+                        {account.framework || "—"} •{" "}
+                        {formatMoney(account.account_size)}
+                        {account.tag ? ` • ${account.tag}` : ""}
+                      </p>
+
+                      <div className="mt-4">
+                        <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                          Risk Rules
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <MiniInfoCard
+                            label="Daily DD"
+                            value={formatValue(account.daily_drawdown, "%")}
+                          />
+
+                          <MiniInfoCard
+                            label="Max DD"
+                            value={formatValue(account.max_drawdown, "%")}
+                          />
+
+                          <MiniInfoCard
+                            label="Risk / Trade"
+                            value={formatValue(account.risk_per_trade, "%")}
+                          />
+
+                          <MiniInfoCard
+                            label="Max Exposure"
+                            value={formatValue(account.max_risk_exposure, "%")}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+                          Target Rules
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <MiniInfoCard
+                            label="Target Type"
+                            value={
+                              account.target_mode === "R_COLLECTION"
+                                ? "R Collection"
+                                : "Profit Target"
+                            }
+                          />
+
+                          <MiniInfoCard
+                            label={
+                              account.target_mode === "R_COLLECTION"
+                                ? "R Target"
+                                : "Profit Target"
+                            }
+                            value={
+                              account.target_mode === "R_COLLECTION"
+                                ? formatValue(account.r_collection_target, "R")
+                                : formatValue(
+                                    account.profit_target_percentage,
+                                    "%",
+                                  )
+                            }
+                          />
+
+                          <MiniInfoCard
+                            label="Max Open Positions"
+                            value={formatValue(account.max_open_positions)}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="mt-4">
-                      <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">
-                        Target Rules
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEditAccount(account)}
+                        className="inline-flex h-11 items-center rounded-2xl border border-sky-200 bg-sky-50 px-5 text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </button>
 
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <MiniInfoCard
-                          label="Target Type"
-                          value={
-                            account.target_mode === "R_COLLECTION"
-                              ? "R Collection"
-                              : "Profit Target"
-                          }
+                      <button
+                        type="button"
+                        onClick={() => openSymbolSettings(account)}
+                        className="inline-flex h-11 items-center rounded-2xl border border-violet-200 bg-violet-50 px-5 text-sm font-semibold text-violet-700 hover:bg-violet-100"
+                      >
+                        <Settings2 className="mr-2 h-4 w-4" />
+                        Symbol Settings
+                      </button>
+
+                      <form action={toggleTradingAccountVisibility}>
+                        <input
+                          type="hidden"
+                          name="account_id"
+                          value={account.id}
                         />
-                        <MiniInfoCard
-                          label={
-                            account.target_mode === "R_COLLECTION"
-                              ? "R Target"
-                              : "Profit Target"
-                          }
-                          value={
-                            account.target_mode === "R_COLLECTION"
-                              ? formatValue(account.r_collection_target, "R")
-                              : formatValue(
-                                  account.profit_target_percentage,
-                                  "%",
-                                )
-                          }
+
+                        <input
+                          type="hidden"
+                          name="is_hidden"
+                          value={account.is_hidden ? "false" : "true"}
                         />
-                        <MiniInfoCard
-                          label="Max Open Positions"
-                          value={formatValue(account.max_open_positions)}
-                        />
-                      </div>
+
+                        <button
+                          type="submit"
+                          className={`inline-flex h-11 items-center rounded-2xl border px-5 text-sm font-semibold ${
+                            account.is_hidden
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {account.is_hidden
+                            ? "Hidden from metrics"
+                            : "Hide from metrics"}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
+      {symbolSettingsAccount ? (
+        <section
+          id="account-symbol-settings"
+          className="rounded-3xl border border-violet-200 bg-white p-6 shadow-sm"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700">
+                <Settings2 className="h-4 w-4" />
+                ACCOUNT SYMBOL SETTINGS
+              </div>
+
+              <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-950">
+                {symbolSettingsAccount.account_name}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Override the master contract size or leverage for this trading
+                account.
+              </p>
+
+              <p className="mt-2 text-xs font-medium text-slate-400">
+                Leave a field empty to use the value from the master symbol
+                table.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={closeSymbolSettings}
+              className="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Close
+            </button>
+          </div>
+
+          <form
+            id="symbol-setting-form"
+            action={symbolSettingAction}
+            className="mt-6 space-y-5 rounded-3xl border border-slate-200 bg-slate-50 p-5"
+          >
+            <input
+              type="hidden"
+              name="trading_account_id"
+              value={symbolSettingsAccount.id}
+            />
+
+            <input
+              type="hidden"
+              name="setting_id"
+              value={editingSymbolSettingId}
+            />
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <FieldShell label="Symbol" required>
+                <NativeSelect
+                  name="symbol_id"
+                  value={selectedSymbolId}
+                  onChange={(event) => selectSymbol(event.target.value)}
+                  required
+                >
+                  <option value="" disabled>
+                    Select symbol
+                  </option>
+
+                  {groupedSymbols.map(([category, categorySymbols]) => (
+                    <optgroup key={category} label={category}>
+                      {categorySymbols.map((symbol) => (
+                        <option key={symbol.id} value={symbol.id}>
+                          {symbol.symbol_name} — {symbol.full_name || category}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </NativeSelect>
+              </FieldShell>
+
+              <FieldShell label="Contract Size" optional>
+                <input
+                  name="contract_size"
+                  type="text"
+                  inputMode="decimal"
+                  value={symbolContractSize}
+                  onChange={(event) =>
+                    setSymbolContractSize(sanitize8Decimals(event.target.value))
+                  }
+                  className={inputClass()}
+                  placeholder={
+                    selectedSymbol?.contract_size != null
+                      ? `Master: ${selectedSymbol.contract_size}`
+                      : "No master value"
+                  }
+                />
+              </FieldShell>
+
+              <FieldShell label="Leverage" optional>
+                <input
+                  name="leverage"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={symbolLeverage}
+                  onChange={(event) =>
+                    setSymbolLeverage(event.target.value.replace(/[^\d]/g, ""))
+                  }
+                  className={inputClass()}
+                  placeholder={
+                    selectedSymbol?.leverage
+                      ? `Master: 1:${selectedSymbol.leverage}`
+                      : "No master value"
+                  }
+                />
+              </FieldShell>
+            </div>
+
+            {selectedSymbol ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="font-bold text-slate-950">
+                      {selectedSymbol.symbol_name}
+                    </div>
+
+                    <div className="mt-1 text-sm text-slate-500">
+                      {selectedSymbol.full_name ||
+                        selectedSymbol.category ||
+                        "—"}
                     </div>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startEditAccount(account)}
-                      className="inline-flex h-11 items-center rounded-2xl border border-sky-200 bg-sky-50 px-5 text-sm font-semibold text-sky-700 hover:bg-sky-100"
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </button>
+                    <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                      Master Contract:{" "}
+                      {formatContractSize(selectedSymbol.contract_size)}
+                    </span>
 
-                    <form action={toggleTradingAccountVisibility}>
-                      <input
-                        type="hidden"
-                        name="account_id"
-                        value={account.id}
-                      />
-                      <input
-                        type="hidden"
-                        name="is_hidden"
-                        value={account.is_hidden ? "false" : "true"}
-                      />
-
-                      <button
-                        type="submit"
-                        className={`inline-flex h-11 items-center rounded-2xl border px-5 text-sm font-semibold ${
-                          account.is_hidden
-                            ? "border-amber-200 bg-amber-50 text-amber-700"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
-                      >
-                        {account.is_hidden
-                          ? "Hidden from metrics"
-                          : "Hide from metrics"}
-                      </button>
-                    </form>
+                    <span className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                      Master Leverage: {formatLeverage(selectedSymbol.leverage)}
+                    </span>
                   </div>
                 </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <MiniInfoCard
+                    label="Effective Contract Size"
+                    value={formatContractSize(
+                      symbolContractSize || selectedSymbol.contract_size,
+                    )}
+                  />
+
+                  <MiniInfoCard
+                    label="Effective Leverage"
+                    value={formatLeverage(
+                      symbolLeverage || selectedSymbol.leverage,
+                    )}
+                  />
+                </div>
               </div>
-            ))
-          )}
-        </div>
-      </section>
+            ) : null}
+
+            {symbolSettingState.message ? (
+              <p
+                className={`rounded-2xl border p-4 text-sm font-medium ${
+                  symbolSettingState.ok
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-red-200 bg-red-50 text-red-600"
+                }`}
+              >
+                {symbolSettingState.message}
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={symbolSettingPending || !selectedSymbolId}
+                className="inline-flex h-12 items-center rounded-2xl bg-violet-600 px-5 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {symbolSettingPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    {editingSymbolSettingId
+                      ? "Update Symbol Settings"
+                      : "Save Symbol Settings"}
+                  </>
+                )}
+              </button>
+
+              {selectedSymbolId ? (
+                <button
+                  type="button"
+                  onClick={resetSymbolForm}
+                  className="inline-flex h-12 items-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          </form>
+
+          <div className="mt-8">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-950">
+                  Saved Overrides
+                </h3>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Only symbols with account-specific values appear here.
+                </p>
+              </div>
+
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                {selectedAccountSettings.length} saved
+              </span>
+            </div>
+
+            <div className="grid gap-3">
+              {selectedAccountSettings.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                  This account currently uses master settings for every symbol.
+                </div>
+              ) : (
+                selectedAccountSettings.map((setting) => {
+                  const symbol =
+                    setting.symbols ||
+                    symbols.find((item) => item.id === setting.symbol_id);
+
+                  const effectiveContractSize =
+                    setting.contract_size ?? symbol?.contract_size ?? null;
+
+                  const effectiveLeverage =
+                    setting.leverage ?? symbol?.leverage ?? null;
+
+                  return (
+                    <div
+                      key={setting.id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="font-bold text-slate-950">
+                            {symbol?.symbol_name || "Unknown symbol"}
+                          </div>
+
+                          <div className="mt-1 text-sm text-slate-500">
+                            {symbol?.full_name || symbol?.category || "—"}
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {setting.contract_size != null ? (
+                              <SymbolOverrideBadge>
+                                Contract override:{" "}
+                                {formatContractSize(setting.contract_size)}
+                              </SymbolOverrideBadge>
+                            ) : null}
+
+                            {setting.leverage != null ? (
+                              <SymbolOverrideBadge>
+                                Leverage override:{" "}
+                                {formatLeverage(setting.leverage)}
+                              </SymbolOverrideBadge>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <div className="grid min-w-[280px] grid-cols-2 gap-3">
+                            <MiniInfoCard
+                              label="Effective Contract"
+                              value={formatContractSize(effectiveContractSize)}
+                            />
+
+                            <MiniInfoCard
+                              label="Effective Leverage"
+                              value={formatLeverage(effectiveLeverage)}
+                            />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editSymbolSetting(setting)}
+                              className="inline-flex h-11 items-center rounded-2xl border border-sky-200 bg-sky-50 px-4 text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit
+                            </button>
+
+                            <form action={deleteAccountSymbolSetting}>
+                              <input
+                                type="hidden"
+                                name="setting_id"
+                                value={setting.id}
+                              />
+
+                              <button
+                                type="submit"
+                                className="inline-flex h-11 items-center rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-600 hover:bg-red-100"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Remove
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

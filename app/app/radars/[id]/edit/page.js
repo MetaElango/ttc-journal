@@ -6,6 +6,7 @@ import NewJournalForm from "../../new/journal-form";
 
 const STATUS_OPTIONS_BY_PURPOSE = {
   "TRADE OBSERVATION": ["ENTRY MISSED", "ENTRY CLOSED"],
+
   "TRADE EXECUTION": [
     "ENTRY PLANNED",
     "ENTRY PLACED",
@@ -17,6 +18,7 @@ const STATUS_OPTIONS_BY_PURPOSE = {
     "TRADE CLOSE WITH PROFIT",
     "TRADE EXIT IN MID",
   ],
+
   "FORWARD TESTING": [
     "ENTRY PLANNED",
     "ENTRY PLACED",
@@ -30,15 +32,6 @@ const STATUS_OPTIONS_BY_PURPOSE = {
   ],
 };
 
-const EDITABLE_ACTIVE_STATUSES = [
-  "RUNNING TRADE",
-  "ENTRY PLANNED",
-  "ENTRY TRIGGERED",
-  "ENTRY PLACED",
-];
-
-const EXIT_REQUIRED_STATUSES = ["TRADE CLOSE WITH PROFIT", "TRADE EXIT IN MID"];
-
 const ACTIVE_STATUSES = [
   "ENTRY PLANNED",
   "ENTRY PLACED",
@@ -46,72 +39,100 @@ const ACTIVE_STATUSES = [
   "RUNNING TRADE",
 ];
 
+const EDITABLE_ACTIVE_STATUSES = [...ACTIVE_STATUSES];
+
 const FULL_EDIT_STATUSES = ["ENTRY PLANNED", "ENTRY PLACED"];
 
-function needsEndDate(status) {
-  const value = String(status || "")
+const STATUS_TRANSITIONS = {
+  "ENTRY PLANNED": [
+    "ENTRY PLACED",
+    "ENTRY TRIGGERED",
+    "ENTRY CANCELLED",
+    "ENTRY MISSED",
+  ],
+
+  "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY CANCELLED", "ENTRY MISSED"],
+
+  "ENTRY TRIGGERED": [
+    "TRADE SL HIT",
+    "TRADE CLOSE WITH PROFIT",
+    "TRADE EXIT IN MID",
+  ],
+
+  "RUNNING TRADE": [
+    "TRADE SL HIT",
+    "TRADE CLOSE WITH PROFIT",
+    "TRADE EXIT IN MID",
+  ],
+};
+
+function normalize(value) {
+  return String(value || "")
     .trim()
     .toUpperCase();
-  return value && !ACTIVE_STATUSES.includes(value);
+}
+
+function needsEndDate(status) {
+  const value = normalize(status);
+  return Boolean(value) && !ACTIVE_STATUSES.includes(value);
 }
 
 function canEditJournal(journal) {
   if (!journal) return false;
 
-  if (journal.purpose === "TRADE OBSERVATION") {
-    return journal.status == null || journal.status === "";
+  const purpose = normalize(journal.purpose);
+  const status = normalize(journal.status);
+
+  if (purpose === "TRADE OBSERVATION") {
+    return !status;
   }
 
-  if (
-    journal.purpose === "TRADE EXECUTION" ||
-    journal.purpose === "FORWARD TESTING"
-  ) {
-    return EDITABLE_ACTIVE_STATUSES.includes(journal.status || "");
+  if (purpose === "TRADE EXECUTION" || purpose === "FORWARD TESTING") {
+    return EDITABLE_ACTIVE_STATUSES.includes(status);
   }
 
   return false;
 }
 
 function sanitize2dp(raw) {
-  const s = String(raw ?? "");
-  let out = s.replace(/[^\d.]/g, "");
-  const firstDot = out.indexOf(".");
+  const value = String(raw ?? "");
+  let output = value.replace(/[^\d.]/g, "");
+
+  const firstDot = output.indexOf(".");
 
   if (firstDot !== -1) {
-    out =
-      out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
+    output =
+      output.slice(0, firstDot + 1) +
+      output.slice(firstDot + 1).replace(/\./g, "");
+
+    const [whole, decimal] = output.split(".");
+    output = `${whole}.${(decimal || "").slice(0, 2)}`;
   }
 
-  if (firstDot !== -1) {
-    const [a, b] = out.split(".");
-    out = a + "." + (b || "").slice(0, 2);
-  }
-
-  return out;
+  return output;
 }
 
 function sanitize6dp(raw) {
-  const s = String(raw ?? "");
-  let out = s.replace(/[^\d.]/g, "");
+  const value = String(raw ?? "");
+  let output = value.replace(/[^\d.]/g, "");
 
-  const firstDot = out.indexOf(".");
-
-  if (firstDot !== -1) {
-    out =
-      out.slice(0, firstDot + 1) + out.slice(firstDot + 1).replace(/\./g, "");
-  }
+  const firstDot = output.indexOf(".");
 
   if (firstDot !== -1) {
-    const [a, b] = out.split(".");
-    out = a + "." + (b || "").slice(0, 6);
+    output =
+      output.slice(0, firstDot + 1) +
+      output.slice(firstDot + 1).replace(/\./g, "");
+
+    const [whole, decimal] = output.split(".");
+    output = `${whole}.${(decimal || "").slice(0, 6)}`;
   }
 
-  return out;
+  return output;
 }
 
 function getFormValue(formData, key) {
-  for (const [k, value] of formData.entries()) {
-    if (k === key || k.endsWith(`_${key}`)) {
+  for (const [formKey, value] of formData.entries()) {
+    if (formKey === key || formKey.endsWith(`_${key}`)) {
       return value;
     }
   }
@@ -119,42 +140,94 @@ function getFormValue(formData, key) {
   return null;
 }
 
+function getAllFormValues(formData, key) {
+  const values = [];
+
+  for (const [formKey, value] of formData.entries()) {
+    if (formKey === key || formKey.endsWith(`_${key}`)) {
+      values.push(value);
+    }
+  }
+
+  return values;
+}
+
+function parseJsonFormValue(formData, key, fallback = []) {
+  try {
+    const raw = getFormValue(formData, key);
+
+    if (!raw) {
+      return fallback;
+    }
+
+    const parsed = JSON.parse(String(raw));
+    return parsed;
+  } catch {
+    return fallback;
+  }
+}
+
+function validateStatusTransition(currentStatus, submittedStatus) {
+  if (!submittedStatus) {
+    return {
+      valid: true,
+      status: currentStatus,
+    };
+  }
+
+  const allowedNextStatuses = STATUS_TRANSITIONS[currentStatus] || [];
+  const isKeepingCurrentStatus = submittedStatus === currentStatus;
+  const isAllowedTransition = allowedNextStatuses.includes(submittedStatus);
+
+  return {
+    valid: isKeepingCurrentStatus || isAllowedTransition,
+    status: submittedStatus,
+  };
+}
+
 export default async function EditJournalPage({ params, searchParams }) {
   const { id } = await params;
-  const sp = await searchParams;
-  const errorType = sp?.error || "";
+  const resolvedSearchParams = await searchParams;
+  const errorType = resolvedSearchParams?.error || "";
 
   const supabase = await createClient();
 
-  const { data: authData } = await supabase.auth.getUser();
-  const user = authData?.user;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  if (!user) {
+    redirect("/login");
+  }
 
   const { data: journal, error } = await supabase
     .from("journals")
     .select(
-      `*,
-  symbols:symbol_id (
-    id,
-    symbol_name,
-    category
-  )
-`,
+      `
+        *,
+        symbols:symbol_id (
+          id,
+          symbol_name,
+          category
+        )
+      `,
     )
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
 
-  if (error || !journal) notFound();
+  if (error || !journal) {
+    notFound();
+  }
 
   const canEdit = canEditJournal(journal);
-  const canFullEdit = FULL_EDIT_STATUSES.includes(journal.status);
+  const canFullEdit = FULL_EDIT_STATUSES.includes(normalize(journal.status));
 
   if (!canEdit) {
     return (
       <div className="space-y-4 p-6">
         <h1 className="text-xl font-semibold">Edit Journal</h1>
+
         <p className="text-sm text-muted-foreground">
           This journal can no longer be edited.
         </p>
@@ -184,81 +257,73 @@ export default async function EditJournalPage({ params, searchParams }) {
 
     const supabase = await createClient();
 
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!user) redirect("/login");
+    if (!user) {
+      redirect("/login");
+    }
 
     const { data: existing, error: existingError } = await supabase
       .from("journals")
       .select(
         `
-      id,
-      purpose,
-      status,
-      quantity,
-      entry_price,
-      stop_loss,
-      take_profit,
-take_profit_qty,
-modified_sl_price,
-modified_tp_price,
-modified_tp_qty,
-sl_tp_adjustment_reason
-    `,
+          id,
+          purpose,
+          status,
+          quantity,
+          entry_price,
+          stop_loss,
+          take_profit,
+          take_profit_qty,
+          modified_sl_price,
+          modified_tp_price,
+          modified_tp_qty,
+          sl_tp_adjustment_reason
+        `,
       )
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
 
-    if (existingError || !existing) notFound();
+    if (existingError || !existing) {
+      notFound();
+    }
 
     if (!canEditJournal(existing)) {
       redirect("/app/radars");
     }
 
-    const submittedStatus = String(getFormValue(formData, "status") || "")
-      .trim()
-      .toUpperCase();
+    const currentStatus = normalize(existing.status);
 
-    const allowedStatusUpdates = {
-      "ENTRY PLANNED": [
-        "ENTRY PLACED",
-        "ENTRY TRIGGERED",
-        "ENTRY CANCELLED",
-        "ENTRY MISSED",
-      ],
-      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY CANCELLED", "ENTRY MISSED"],
-      "ENTRY TRIGGERED": [
-        "TRADE SL HIT",
-        "TRADE CLOSE WITH PROFIT",
-        "TRADE EXIT IN MID",
-      ],
-    };
+    const submittedStatus = normalize(getFormValue(formData, "status"));
 
-    const currentStatus = String(existing.status || "")
-      .trim()
-      .toUpperCase();
+    const transition = validateStatusTransition(currentStatus, submittedStatus);
 
-    if (
-      submittedStatus &&
-      allowedStatusUpdates[currentStatus] &&
-      !allowedStatusUpdates[currentStatus].includes(submittedStatus)
-    ) {
+    if (!transition.valid) {
       return {
         ok: false,
-        message: "Invalid status update.",
+        message: `Invalid status update from ${currentStatus} to ${submittedStatus}.`,
       };
     }
 
-    const statusRaw = submittedStatus || existing.status;
+    const statusRaw = transition.status || currentStatus;
+
+    const allowedStatuses =
+      STATUS_OPTIONS_BY_PURPOSE[existing.purpose] ||
+      STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"];
+
+    if (!allowedStatuses.includes(statusRaw)) {
+      redirect(
+        `/app/radars/${id}/edit?error=${encodeURIComponent("Invalid status.")}`,
+      );
+    }
 
     const journalStartAtRaw = String(
       getFormValue(formData, "journal_start_at") || "",
     ).trim();
-    const sl_tp_adjustment_reason =
-      String(getFormValue(formData, "sl_tp_adjustment_reason") || "").trim() ||
-      null;
+
     const journalEndAtRaw = String(
       getFormValue(formData, "journal_end_at") || "",
     ).trim();
@@ -270,45 +335,6 @@ sl_tp_adjustment_reason
     const journal_end_at = journalEndAtRaw
       ? new Date(journalEndAtRaw).toISOString()
       : null;
-
-    const exit_reason =
-      String(getFormValue(formData, "exit_reason") || "").trim() || null;
-
-    const exit_checkpoint =
-      String(getFormValue(formData, "exit_checkpoint") || "")
-        .trim()
-        .toUpperCase() || null;
-
-    const exitPriceRaw = sanitize6dp(
-      getFormValue(formData, "exit_price") || "",
-    );
-    const exit_price = exitPriceRaw ? Number(exitPriceRaw) : null;
-
-    const modifiedSlRaw = sanitize6dp(
-      getFormValue(formData, "modified_sl_price") || "",
-    );
-
-    const modified_sl_price = modifiedSlRaw ? Number(modifiedSlRaw) : null;
-
-    const modified_tp_price = formData
-      .getAll("modified_tp_price")
-      .map((x) => sanitize6dp(x))
-      .filter(Boolean)
-      .map(Number);
-
-    const modified_tp_qty = formData
-      .getAll("modified_tp_qty")
-      .map((x) => sanitize2dp(x))
-      .filter(Boolean)
-      .map(Number);
-
-    const allowedStatuses =
-      STATUS_OPTIONS_BY_PURPOSE[existing.purpose] ||
-      STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"];
-
-    if (!allowedStatuses.includes(statusRaw)) {
-      redirect(`/app/radars/${id}/edit?error=status`);
-    }
 
     if (!journal_start_at) {
       redirect(
@@ -325,13 +351,87 @@ sl_tp_adjustment_reason
         )}`,
       );
     }
-    const hasModifiedSL = getFormValue(formData, "modified_sl_price") !== null;
 
-    const hasModifiedTP = formData.getAll("modified_tp_price").length > 0;
+    const exit_reason =
+      String(getFormValue(formData, "exit_reason") || "").trim() || null;
 
-    if ((hasModifiedSL || hasModifiedTP) && !sl_tp_adjustment_reason) {
+    const exit_checkpoint =
+      normalize(getFormValue(formData, "exit_checkpoint")) || null;
+
+    const exitPriceRaw = sanitize6dp(
+      getFormValue(formData, "exit_price") || "",
+    );
+
+    const exit_price = exitPriceRaw !== "" ? Number(exitPriceRaw) : null;
+
+    const modifiedSlFormValue = getFormValue(formData, "modified_sl_price");
+
+    const modifiedSlRaw = sanitize6dp(modifiedSlFormValue || "");
+
+    const submittedModifiedSlPrice =
+      modifiedSlRaw !== "" ? Number(modifiedSlRaw) : null;
+
+    const modifiedTpPriceValues = getAllFormValues(
+      formData,
+      "modified_tp_price",
+    );
+
+    const modifiedTpQtyValues = getAllFormValues(formData, "modified_tp_qty");
+
+    const submittedModifiedTpPrice = modifiedTpPriceValues
+      .map((value) => sanitize6dp(value))
+      .filter((value) => value !== "")
+      .map(Number);
+
+    const submittedModifiedTpQty = modifiedTpQtyValues
+      .map((value) => sanitize2dp(value))
+      .filter((value) => value !== "")
+      .map(Number);
+
+    const hasSubmittedModifiedSl =
+      modifiedSlFormValue !== null && modifiedSlRaw !== "";
+
+    const hasSubmittedModifiedTp =
+      submittedModifiedTpPrice.length > 0 || submittedModifiedTpQty.length > 0;
+
+    const sl_tp_adjustment_reason =
+      String(getFormValue(formData, "sl_tp_adjustment_reason") || "").trim() ||
+      null;
+
+    if (
+      (hasSubmittedModifiedSl || hasSubmittedModifiedTp) &&
+      !sl_tp_adjustment_reason
+    ) {
       redirect(`/app/radars/${id}/edit?error=adjustment_reason_required`);
     }
+
+    if (
+      hasSubmittedModifiedTp &&
+      submittedModifiedTpPrice.length !== submittedModifiedTpQty.length
+    ) {
+      redirect(`/app/radars/${id}/edit?error=modified_tp_qty_mismatch`);
+    }
+
+    const resolvedModifiedSlPrice = hasSubmittedModifiedSl
+      ? submittedModifiedSlPrice
+      : existing.modified_sl_price != null
+        ? Number(existing.modified_sl_price)
+        : null;
+
+    const resolvedModifiedTpPrice =
+      submittedModifiedTpPrice.length > 0
+        ? submittedModifiedTpPrice
+        : Array.isArray(existing.modified_tp_price)
+          ? existing.modified_tp_price.map(Number)
+          : [];
+
+    const resolvedModifiedTpQty =
+      submittedModifiedTpQty.length > 0
+        ? submittedModifiedTpQty
+        : Array.isArray(existing.modified_tp_qty)
+          ? existing.modified_tp_qty.map(Number)
+          : [];
+
     const needsExitReason = [
       "ENTRY CANCELLED",
       "ENTRY MISSED",
@@ -344,23 +444,25 @@ sl_tp_adjustment_reason
       redirect(`/app/radars/${id}/edit?error=exit_reason_required`);
     }
 
-    if (
-      ["TRADE CLOSE WITH PROFIT", "TRADE SL HIT"].includes(statusRaw) &&
-      !exit_checkpoint
-    ) {
+    const needsExitCheckpoint = [
+      "TRADE CLOSE WITH PROFIT",
+      "TRADE SL HIT",
+    ].includes(statusRaw);
+
+    if (needsExitCheckpoint && !exit_checkpoint) {
       redirect(`/app/radars/${id}/edit?error=exit_checkpoint_required`);
     }
 
-    if (exit_checkpoint === "MODIFIED_SL" && modified_sl_price === null) {
+    if (exit_checkpoint === "MODIFIED_SL" && resolvedModifiedSlPrice === null) {
       redirect(`/app/radars/${id}/edit?error=modified_sl_required`);
     }
 
     if (exit_checkpoint === "MODIFIED_TP") {
-      if (!modified_tp_price.length || !modified_tp_qty.length) {
+      if (!resolvedModifiedTpPrice.length || !resolvedModifiedTpQty.length) {
         redirect(`/app/radars/${id}/edit?error=modified_tp_required`);
       }
 
-      if (modified_tp_price.length !== modified_tp_qty.length) {
+      if (resolvedModifiedTpPrice.length !== resolvedModifiedTpQty.length) {
         redirect(`/app/radars/${id}/edit?error=modified_tp_qty_mismatch`);
       }
     }
@@ -373,14 +475,19 @@ sl_tp_adjustment_reason
 
     if (statusRaw === "TRADE CLOSE WITH PROFIT") {
       if (exit_checkpoint === "ACTUAL_TP") {
-        finalExitPrice = Array.isArray(existing.take_profit)
-          ? Number(existing.take_profit[0])
-          : null;
+        finalExitPrice =
+          Array.isArray(existing.take_profit) && existing.take_profit.length > 0
+            ? Number(existing.take_profit[0])
+            : null;
       }
 
       if (exit_checkpoint === "MODIFIED_TP") {
         finalExitPrice =
-          modified_tp_price[0] ?? Number(existing.take_profit?.[0] || null);
+          resolvedModifiedTpPrice[0] ??
+          (Array.isArray(existing.take_profit) &&
+          existing.take_profit.length > 0
+            ? Number(existing.take_profit[0])
+            : null);
       }
 
       if (exit_checkpoint === "TP_BREAKEVEN") {
@@ -394,7 +501,7 @@ sl_tp_adjustment_reason
       }
 
       if (exit_checkpoint === "MODIFIED_SL") {
-        finalExitPrice = modified_sl_price;
+        finalExitPrice = resolvedModifiedSlPrice;
       }
 
       if (exit_checkpoint === "SL_BREAKEVEN") {
@@ -402,31 +509,50 @@ sl_tp_adjustment_reason
       }
     }
 
+    const isActiveStatus = ACTIVE_STATUSES.includes(statusRaw);
+
+    const storedJournalEndAt = isActiveStatus ? null : journal_end_at;
+
+    const storedExitReason = isActiveStatus ? null : exit_reason;
+
+    const storedExitPrice = isActiveStatus ? null : finalExitPrice;
+
+    const storedExitCheckpoint = isActiveStatus ? null : exit_checkpoint;
+
+    const nextModifiedSlPrice = hasSubmittedModifiedSl
+      ? submittedModifiedSlPrice
+      : existing.modified_sl_price;
+
+    const nextModifiedTpPrice =
+      submittedModifiedTpPrice.length > 0
+        ? submittedModifiedTpPrice
+        : existing.modified_tp_price;
+
+    const nextModifiedTpQty =
+      submittedModifiedTpQty.length > 0
+        ? submittedModifiedTpQty
+        : existing.modified_tp_qty;
+
+    const nextAdjustmentReason =
+      getFormValue(formData, "sl_tp_adjustment_reason") !== null
+        ? sl_tp_adjustment_reason
+        : existing.sl_tp_adjustment_reason;
+
     const { error: updateError } = await supabase
       .from("journals")
       .update({
         status: statusRaw,
         journal_start_at,
-        journal_end_at: needsEndDate(statusRaw) ? journal_end_at : null,
-        exit_reason,
-        exit_price: finalExitPrice,
-        exit_checkpoint,
-        modified_sl_price:
-          getFormValue(formData, "modified_sl_price") !== null
-            ? modified_sl_price
-            : existing.modified_sl_price,
+        journal_end_at: storedJournalEndAt,
 
-        modified_tp_price: formData.getAll("modified_tp_price").length
-          ? modified_tp_price
-          : existing.modified_tp_price,
+        exit_reason: storedExitReason,
+        exit_price: storedExitPrice,
+        exit_checkpoint: storedExitCheckpoint,
 
-        modified_tp_qty: formData.getAll("modified_tp_qty").length
-          ? modified_tp_qty
-          : existing.modified_tp_qty,
-        sl_tp_adjustment_reason:
-          getFormValue(formData, "sl_tp_adjustment_reason") !== null
-            ? sl_tp_adjustment_reason
-            : existing.sl_tp_adjustment_reason,
+        modified_sl_price: nextModifiedSlPrice,
+        modified_tp_price: nextModifiedTpPrice,
+        modified_tp_qty: nextModifiedTpQty,
+        sl_tp_adjustment_reason: nextAdjustmentReason,
       })
       .eq("id", id)
       .eq("user_id", user.id);
@@ -441,83 +567,78 @@ sl_tp_adjustment_reason
 
     redirect("/app/radars");
   }
+
   async function updateFullJournal(prevState, formData) {
     "use server";
 
     const supabase = await createClient();
 
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    if (!user) redirect("/login");
+    if (!user) {
+      redirect("/login");
+    }
 
     const { data: existing, error: existingError } = await supabase
       .from("journals")
-      .select("id, status")
+      .select("id, purpose, status")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
 
-    if (existingError || !existing) notFound();
+    if (existingError || !existing) {
+      notFound();
+    }
 
-    if (!FULL_EDIT_STATUSES.includes(existing.status)) {
+    const currentStatus = normalize(existing.status);
+
+    if (!FULL_EDIT_STATUSES.includes(currentStatus)) {
       redirect("/app/radars");
     }
 
-    const tpItems = JSON.parse(
-      getFormValue(formData, "take_profit_json") || "[]",
-    );
-    const existingSetupImages = JSON.parse(
-      getFormValue(formData, "existing_setup_images") || "[]",
-    );
-    const existingReferenceImages = JSON.parse(
-      getFormValue(formData, "existing_reference_images") || "[]",
-    );
-    const htf = JSON.parse(getFormValue(formData, "htf_json") || "[]");
-    const entry_tf = JSON.parse(
-      getFormValue(formData, "entry_tf_json") || "[]",
-    );
+    const submittedStatus = normalize(getFormValue(formData, "status"));
 
-    const submittedStatus = String(getFormValue(formData, "status") || "")
-      .trim()
-      .toUpperCase();
+    const transition = validateStatusTransition(currentStatus, submittedStatus);
 
-    const allowedStatusUpdates = {
-      "ENTRY PLANNED": [
-        "ENTRY PLACED",
-        "ENTRY TRIGGERED",
-        "ENTRY CANCELLED",
-        "ENTRY MISSED",
-      ],
-      "ENTRY PLACED": ["ENTRY TRIGGERED", "ENTRY CANCELLED", "ENTRY MISSED"],
-      "ENTRY TRIGGERED": [
-        "TRADE SL HIT",
-        "TRADE CLOSE WITH PROFIT",
-        "TRADE EXIT IN MID",
-      ],
-    };
-
-    const currentStatus = String(existing.status || "")
-      .trim()
-      .toUpperCase();
-
-    console.log("STATUS DEBUG:", {
-      currentStatus,
-      submittedStatus,
-    });
-
-    if (
-      submittedStatus &&
-      allowedStatusUpdates[currentStatus] &&
-      !allowedStatusUpdates[currentStatus].includes(submittedStatus)
-    ) {
+    if (!transition.valid) {
       return {
         ok: false,
-        message: "Invalid status update.",
+        message: `Invalid status update from ${currentStatus} to ${submittedStatus}.`,
       };
     }
 
-    const statusRaw = submittedStatus || existing.status;
+    const statusRaw = transition.status || currentStatus;
+
+    const allowedStatuses =
+      STATUS_OPTIONS_BY_PURPOSE[existing.purpose] ||
+      STATUS_OPTIONS_BY_PURPOSE["TRADE OBSERVATION"];
+
+    if (!allowedStatuses.includes(statusRaw)) {
+      return {
+        ok: false,
+        message: "Invalid status.",
+      };
+    }
+
+    const tpItems = parseJsonFormValue(formData, "take_profit_json", []);
+
+    const existingSetupImages = parseJsonFormValue(
+      formData,
+      "existing_setup_images",
+      [],
+    );
+
+    const existingReferenceImages = parseJsonFormValue(
+      formData,
+      "existing_reference_images",
+      [],
+    );
+
+    const htf = parseJsonFormValue(formData, "htf_json", []);
+
+    const entry_tf = parseJsonFormValue(formData, "entry_tf_json", []);
 
     const journalStartAtRaw = String(
       getFormValue(formData, "journal_start_at") || "",
@@ -527,37 +648,88 @@ sl_tp_adjustment_reason
       getFormValue(formData, "journal_end_at") || "",
     ).trim();
 
+    const journal_start_at = journalStartAtRaw
+      ? new Date(journalStartAtRaw).toISOString()
+      : null;
+
+    const journal_end_at =
+      needsEndDate(statusRaw) && journalEndAtRaw
+        ? new Date(journalEndAtRaw).toISOString()
+        : null;
+
+    if (!journal_start_at) {
+      return {
+        ok: false,
+        message: "Journal start date is required.",
+      };
+    }
+
+    if (needsEndDate(statusRaw) && !journal_end_at) {
+      return {
+        ok: false,
+        message: "Journal end date is required for this status.",
+      };
+    }
+
+    const isActiveStatus = ACTIVE_STATUSES.includes(statusRaw);
+
     const payload = {
       purpose: String(getFormValue(formData, "purpose") || "").trim(),
+
       trading_account_id: getFormValue(formData, "trading_account_id") || null,
+
       symbol_id: getFormValue(formData, "symbol_id") || null,
+
       status: statusRaw,
-      direction: String(getFormValue(formData, "direction") || "")
-        .trim()
-        .toUpperCase(),
+
+      direction: normalize(getFormValue(formData, "direction")),
+
       quantity: getFormValue(formData, "quantity") || null,
+
       entry_price: getFormValue(formData, "entry_price") || null,
+
       stop_loss: getFormValue(formData, "stop_loss") || null,
-      take_profit: tpItems.map((x) => x.price).filter(Boolean),
-      take_profit_qty: tpItems.map((x) => x.qty).filter(Boolean),
+
+      take_profit: Array.isArray(tpItems)
+        ? tpItems.map((item) => item.price).filter(Boolean)
+        : [],
+
+      take_profit_qty: Array.isArray(tpItems)
+        ? tpItems.map((item) => item.qty).filter(Boolean)
+        : [],
+
       risk_mode: String(getFormValue(formData, "risk_mode") || "").trim(),
+
       risk_per_trade: getFormValue(formData, "risk_per_trade") || null,
+
       entry_reason:
         String(getFormValue(formData, "entry_reason") || "").trim() || null,
-      exit_reason:
-        String(getFormValue(formData, "exit_reason") || "").trim() || null,
-      exit_price: getFormValue(formData, "exit_price") || null,
-      journal_start_at: journalStartAtRaw
-        ? new Date(journalStartAtRaw).toISOString()
-        : null,
-      journal_end_at:
-        needsEndDate(statusRaw) && journalEndAtRaw
-          ? new Date(journalEndAtRaw).toISOString()
-          : null,
-      htf,
-      entry_tf,
-      setup_images: existingSetupImages,
-      reference_images: existingReferenceImages,
+
+      exit_reason: isActiveStatus
+        ? null
+        : String(getFormValue(formData, "exit_reason") || "").trim() || null,
+
+      exit_price: isActiveStatus
+        ? null
+        : getFormValue(formData, "exit_price") || null,
+
+      exit_checkpoint: isActiveStatus
+        ? null
+        : normalize(getFormValue(formData, "exit_checkpoint")) || null,
+
+      journal_start_at,
+      journal_end_at: isActiveStatus ? null : journal_end_at,
+
+      htf: Array.isArray(htf) ? htf : [],
+      entry_tf: Array.isArray(entry_tf) ? entry_tf : [],
+
+      setup_images: Array.isArray(existingSetupImages)
+        ? existingSetupImages
+        : [],
+
+      reference_images: Array.isArray(existingReferenceImages)
+        ? existingReferenceImages
+        : [],
     };
 
     const { error: updateError } = await supabase
@@ -577,8 +749,8 @@ sl_tp_adjustment_reason
       ok: true,
       message: "Opportunity updated successfully.",
       journalId: id,
-      existingSetupImages,
-      existingReferenceImages,
+      existingSetupImages: payload.setup_images,
+      existingReferenceImages: payload.reference_images,
     };
   }
 
