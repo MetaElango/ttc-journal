@@ -64,22 +64,22 @@ function shortText(value, max = 120) {
   return `${text.slice(0, max)}...`;
 }
 
-function getSharedTime(value) {
-  if (!value) return "Shared recently";
+function getSharedTime(value, text) {
+  if (!value) return `${text} recently`;
 
   const diffMs = Date.now() - new Date(value).getTime();
   const mins = Math.max(0, Math.floor(diffMs / 60000));
 
-  if (mins < 1) return "Shared just now";
-  if (mins < 60) return `Shared ${mins} min${mins === 1 ? "" : "s"} ago`;
+  if (mins < 1) return `${text} just now`;
+  if (mins < 60) return `${text} ${mins} min${mins === 1 ? "" : "s"} ago`;
 
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `Shared ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  if (hours < 24) return `${text} ${hours} hour${hours === 1 ? "" : "s"} ago`;
 
   const days = Math.floor(hours / 24);
-  if (days < 30) return `Shared ${days} day${days === 1 ? "" : "s"} ago`;
+  if (days < 30) return `${text} ${days} day${days === 1 ? "" : "s"} ago`;
 
-  return `Shared ${new Date(value).toLocaleDateString()}`;
+  return `${text} ${new Date(value).toLocaleDateString()}`;
 }
 
 function getWeightedTakeProfit(journal) {
@@ -630,11 +630,19 @@ function SocialJournalCard({
                 <UserRound className="h-3.5 w-3.5" />
                 {getAuthorName(journal)}
               </span>
-
               <span className="inline-flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
-                {getSharedTime(journal.shared_at)}
+                {getSharedTime(journal.shared_at, "Shared")}
               </span>
+              {journal.shared_at &&
+                journal.updated_at &&
+                new Date(journal.shared_at).getTime() !==
+                  new Date(journal.updated_at).getTime() && (
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      {getSharedTime(journal.updated_at, "Updated")}
+                    </span>,
+                  )}
             </div>
 
             {incorporated ? (
@@ -841,62 +849,73 @@ export default function SocialClient({ journals, title, description }) {
   }, [journals]);
 
   const filteredJournals = useMemo(() => {
-    return journals.filter((journal) => {
-      const strategy = getStrategy(journal);
+    return journals
+      .filter((journal) => {
+        const strategy = getStrategy(journal);
 
-      const purposeMatch =
-        purposeFilter === "ALL" || journal.purpose === purposeFilter;
+        const purposeMatch =
+          purposeFilter === "ALL" || journal.purpose === purposeFilter;
 
-      const statusValue = journal.status || "No status";
-      const statusMatch =
-        statusFilter === "ALL" || statusValue === statusFilter;
+        const statusValue = journal.status || "No status";
+        const statusMatch =
+          statusFilter === "ALL" || statusValue === statusFilter;
 
-      const symbolMatch =
-        symbolFilter === "ALL" || journal.symbols?.symbol_name === symbolFilter;
+        const symbolMatch =
+          symbolFilter === "ALL" ||
+          journal.symbols?.symbol_name === symbolFilter;
 
-      const copyMatch =
-        copyFilter === "ALL" ||
-        (copyFilter === "INCORPORATED" && journal.copyStatus?.incorporated) ||
-        (copyFilter === "NOT_INCORPORATED" &&
-          !journal.copyStatus?.incorporated) ||
-        (copyFilter === "AUTHOR_UPDATED" &&
-          journal.copyStatus?.incorporated &&
-          journal.copyStatus?.authorUpdatedAfterCopy);
+        const copyMatch =
+          copyFilter === "ALL" ||
+          (copyFilter === "INCORPORATED" && journal.copyStatus?.incorporated) ||
+          (copyFilter === "NOT_INCORPORATED" &&
+            !journal.copyStatus?.incorporated) ||
+          (copyFilter === "AUTHOR_UPDATED" &&
+            journal.copyStatus?.incorporated &&
+            journal.copyStatus?.authorUpdatedAfterCopy);
 
-      const htfMatch =
-        htfFilter === "ALL" ||
-        asArray(journal.htf || strategy.htf).includes(htfFilter);
+        const htfMatch =
+          htfFilter === "ALL" ||
+          asArray(journal.htf || strategy.htf).includes(htfFilter);
 
-      const entryTfMatch =
-        entryTfFilter === "ALL" ||
-        asArray(journal.entry_tf || strategy.entry_tf).includes(entryTfFilter);
+        const entryTfMatch =
+          entryTfFilter === "ALL" ||
+          asArray(journal.entry_tf || strategy.entry_tf).includes(
+            entryTfFilter,
+          );
 
-      const tradingStyleMatch =
-        tradingStyleFilter === "ALL" ||
-        strategy.trading_style === tradingStyleFilter;
+        const tradingStyleMatch =
+          tradingStyleFilter === "ALL" ||
+          strategy.trading_style === tradingStyleFilter;
 
-      const setupTypeMatch =
-        setupTypeFilter === "ALL" || strategy.setup_type === setupTypeFilter;
+        const setupTypeMatch =
+          setupTypeFilter === "ALL" || strategy.setup_type === setupTypeFilter;
 
-      const approachMatch =
-        approachFilter === "ALL" || strategy.strategy_type === approachFilter;
+        const approachMatch =
+          approachFilter === "ALL" || strategy.strategy_type === approachFilter;
 
-      const userMatch =
-        userFilter === "ALL" || getAuthorName(journal) === userFilter;
+        const userMatch =
+          userFilter === "ALL" || getAuthorName(journal) === userFilter;
 
-      return (
-        purposeMatch &&
-        statusMatch &&
-        symbolMatch &&
-        copyMatch &&
-        htfMatch &&
-        entryTfMatch &&
-        tradingStyleMatch &&
-        setupTypeMatch &&
-        approachMatch &&
-        userMatch
-      );
-    });
+        return (
+          purposeMatch &&
+          statusMatch &&
+          symbolMatch &&
+          copyMatch &&
+          htfMatch &&
+          entryTfMatch &&
+          tradingStyleMatch &&
+          setupTypeMatch &&
+          approachMatch &&
+          userMatch
+        );
+      })
+      .sort((a, b) => {
+        const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+
+        const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+
+        return bTime - aTime;
+      });
   }, [
     journals,
     purposeFilter,

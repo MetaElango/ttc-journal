@@ -128,8 +128,8 @@ export default async function SocialPage() {
     query = query.not("user_id", "in", `(${adminIds.join(",")})`);
   }
 
-  const { data: journals, error } = await query.order("shared_at", {
-    ascending: false,
+  const { data: journals, error } = await query.order("updated_at", {
+    descending: true,
   });
 
   const visibleJournals = (journals || []).filter(

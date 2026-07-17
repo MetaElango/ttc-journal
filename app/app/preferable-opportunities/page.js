@@ -95,7 +95,7 @@ export default async function PreferableOpportunitiesPage() {
     .eq("profiles.type", "user")
     .not("mentor_pick_priority", "is", null)
     .order("mentor_pick_priority", { ascending: true })
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { descending: true });
 
   if (error) {
     console.error(error);

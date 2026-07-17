@@ -90,6 +90,7 @@ function CustomTooltip({ active, payload }) {
 }
 
 export default function PerformanceOverview({ journals }) {
+  console.log("PerformanceOverview journals", journals);
   let runningR = 0;
 
   const data = journals

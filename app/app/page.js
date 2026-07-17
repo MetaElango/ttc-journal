@@ -691,7 +691,8 @@ export default async function AppPage() {
       j.status !== "ENTRY CLOSED" &&
       j.status !== "TRADE EXIT IN MID" &&
       j.status !== "TRADE SL HIT" &&
-      j.status !== "TRADE CLOSE WITH PROFIT",
+      j.status !== "TRADE CLOSE WITH PROFIT" &&
+      j.status !== "ENTRY MISSED",
   );
 
   const topSuggestions = (topSuggestionsRes.data || []).filter(
@@ -700,7 +701,8 @@ export default async function AppPage() {
       j.status !== "ENTRY CLOSED" &&
       j.status !== "TRADE EXIT IN MID" &&
       j.status !== "TRADE SL HIT" &&
-      j.status !== "TRADE CLOSE WITH PROFIT",
+      j.status !== "TRADE CLOSE WITH PROFIT" &&
+      j.status !== "ENTRY MISSED",
   );
 
   const topComments = (topCommentsRes.data || []).filter(
@@ -709,7 +711,8 @@ export default async function AppPage() {
       j.status !== "ENTRY CLOSED" &&
       j.status !== "TRADE EXIT IN MID" &&
       j.status !== "TRADE SL HIT" &&
-      j.status !== "TRADE CLOSE WITH PROFIT",
+      j.status !== "TRADE CLOSE WITH PROFIT" &&
+      j.status !== "ENTRY MISSED",
   );
 
   const communityFocus = topComments

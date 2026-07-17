@@ -61,7 +61,7 @@ export default async function HariPickPage() {
     )
     .eq("is_shared", true)
     .eq("profiles.type", "admin")
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { descending: true });
 
   if (error) {
     console.error(error);
