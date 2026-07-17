@@ -404,15 +404,6 @@ const SESSION_RECORDINGS = [
     duration: "45 mins",
     embedUrl: "https://zoom.us/clips/embed/18viVO20RK-pTEdg-mlApQ",
   },
-
-  // Add more recordings like this:
-  // {
-  //   title: "Live Market Review",
-  //   host: "With Mentors",
-  //   date: "14 July 2026",
-  //   duration: "38 mins",
-  //   embedUrl: "https://zoom.us/clips/embed/YOUR_OTHER_VIDEO_ID",
-  // },
 ];
 
 function UpcomingSessions() {

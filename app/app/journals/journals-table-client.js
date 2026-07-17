@@ -1293,7 +1293,7 @@ export default function JournalsTableClient({ journals, activeTab }) {
                   </span>
                 </th>
 
-                <th className="px-5 py-4 font-bold">Lot Size</th>
+                <th className="px-5 py-4 font-bold">Account</th>
                 <th className="px-5 py-4 font-bold">Initial Risk</th>
 
                 {activeTab === "closed" ? (
@@ -1362,7 +1362,11 @@ export default function JournalsTableClient({ journals, activeTab }) {
                     <td className="px-5 py-4 font-semibold">
                       {journal.quantity ?? "—"}
                     </td>
-
+                    <td className="px-5 py-4">
+                      <div className="max-w-[160px] truncate font-semibold text-slate-700">
+                        {journal.trading_accounts?.account_name || "—"}
+                      </div>
+                    </td>
                     <td className="px-5 py-4 font-semibold">
                       {formatRisk(journal)}
                     </td>
