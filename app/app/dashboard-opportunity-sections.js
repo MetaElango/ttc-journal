@@ -195,21 +195,14 @@ function HariPick({ hariPicks, onOpenJournal, loadingId }) {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
+              <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                {" "}
                 <div>
                   <p className="text-slate-400">Timeframe</p>
                   <p className="mt-1 font-semibold text-slate-700">
                     {getTimeframe(pick)}
                   </p>
                 </div>
-
-                <div>
-                  <p className="text-slate-400">Confidence</p>
-                  <p className="mt-1 font-semibold text-slate-700">
-                    {getConfidence(pick)}%
-                  </p>
-                </div>
-
                 <div>
                   <p className="text-slate-400">RR</p>
                   <p className="mt-1 font-semibold text-blue-600">
@@ -233,7 +226,7 @@ function OpportunityRow({ journal, onOpenJournal, loadingId }) {
   const isShort = isShortDirection(journal);
 
   return (
-    <div className="grid grid-cols-[1fr_44px_48px_74px_40px] items-center gap-3 rounded-[14px] px-1 py-3">
+    <div className="grid grid-cols-[1fr_44px_74px_40px] items-center gap-3 rounded-[14px] px-1 py-3">
       <div className="flex min-w-0 items-center gap-3">
         <div className="rounded-[10px] border border-blue-100 bg-blue-50 p-2">
           <TrendingUp className="h-4 w-4 text-blue-600" />
@@ -248,13 +241,8 @@ function OpportunityRow({ journal, onOpenJournal, loadingId }) {
           </p>
         </div>
       </div>
-
       <p className="text-xs font-semibold text-slate-700">
         {getTimeframe(journal)}
-      </p>
-
-      <p className="text-xs font-semibold text-slate-700">
-        {getConfidence(journal)}%
       </p>
 
       <span
@@ -266,7 +254,6 @@ function OpportunityRow({ journal, onOpenJournal, loadingId }) {
       >
         {isShort ? "SHORT" : "LONG"}
       </span>
-
       <EyeButton
         loading={loadingId === journal.id}
         onClick={() => onOpenJournal(journal)}
