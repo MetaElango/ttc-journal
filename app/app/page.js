@@ -418,7 +418,7 @@ const SESSION_RECORDINGS = [
 function UpcomingSessions() {
   return (
     <Panel className="p-5">
-      <PanelHeader icon={Radio} title="Session Recordings" />
+      <PanelHeader icon={Radio} title="Recordings" />
 
       {SESSION_RECORDINGS.length === 0 ? (
         <div className="rounded-[18px] border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
