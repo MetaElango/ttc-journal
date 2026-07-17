@@ -396,40 +396,69 @@ function PreferableOpportunities({ topSuggestions }) {
   );
 }
 
+const SESSION_RECORDINGS = [
+  {
+    title: "Weekly Outlook (Week 28)",
+    host: "With Hari",
+    date: "15 July 2026",
+    duration: "45 mins",
+    embedUrl: "https://zoom.us/clips/embed/18viVO20RK-pTEdg-mlApQ",
+  },
+
+  // Add more recordings like this:
+  // {
+  //   title: "Live Market Review",
+  //   host: "With Mentors",
+  //   date: "14 July 2026",
+  //   duration: "38 mins",
+  //   embedUrl: "https://zoom.us/clips/embed/YOUR_OTHER_VIDEO_ID",
+  // },
+];
+
 function UpcomingSessions() {
   return (
     <Panel className="p-5">
-      <PanelHeader icon={Radio} title="Upcoming Live Sessions" href="#" />
+      <PanelHeader icon={Radio} title="Session Recordings" />
 
-      <div className="space-y-3">
-        {[
-          ["Weekly Outlook", "With Hari", "Today", "11:00 PM"],
-          ["Live Market Review", "With Mentors", "Tomorrow", "08:30 PM"],
-        ].map((item) => (
-          <div
-            key={item[0]}
-            className="flex items-center justify-between rounded-[16px] p-2"
-          >
-            <div className="flex items-center gap-3">
-              <div className="rounded-[10px] border border-blue-100 bg-blue-50 p-2">
-                <CalendarDays className="h-4 w-4 text-blue-600" />
+      {SESSION_RECORDINGS.length === 0 ? (
+        <div className="rounded-[18px] border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+          No session recordings available yet.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {SESSION_RECORDINGS.map((session) => (
+            <a
+              key={session.embedUrl}
+              href={session.embedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between rounded-[16px] p-2 transition hover:bg-blue-50"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="rounded-[10px] border border-blue-100 bg-blue-50 p-2">
+                  <Radio className="h-4 w-4 text-blue-600" />
+                </div>
+
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950">
+                    {session.title}
+                  </p>
+
+                  <p className="text-xs text-slate-500">{session.host}</p>
+                </div>
               </div>
 
-              <div>
-                <p className="text-sm font-semibold text-slate-950">
-                  {item[0]}
+              <div className="shrink-0 text-right">
+                <p className="text-xs text-slate-500">{session.date}</p>
+
+                <p className="text-sm font-semibold text-blue-600">
+                  {session.duration}
                 </p>
-                <p className="text-xs text-slate-500">{item[1]}</p>
               </div>
-            </div>
-
-            <div className="text-right">
-              <p className="text-xs text-slate-500">{item[2]}</p>
-              <p className="text-sm font-semibold text-blue-600">{item[3]}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+            </a>
+          ))}
+        </div>
+      )}
     </Panel>
   );
 }
