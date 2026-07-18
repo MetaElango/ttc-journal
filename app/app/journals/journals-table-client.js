@@ -1292,6 +1292,7 @@ export default function JournalsTableClient({ journals, activeTab }) {
                     Strategy
                   </span>
                 </th>
+                <th className="px-5 py-4 font-bold">Lot size</th>
 
                 <th className="px-5 py-4 font-bold">Account</th>
                 <th className="px-5 py-4 font-bold">Initial Risk</th>
