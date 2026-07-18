@@ -149,6 +149,38 @@ function EyeButton({ onClick, loading, className = "" }) {
     </button>
   );
 }
+function getStatusStyle(status) {
+  switch (status) {
+    case "ENTRY PLANNED":
+      return "bg-slate-100 text-slate-700";
+
+    case "ENTRY PLACED":
+      return "bg-blue-100 text-blue-700";
+
+    case "ENTRY TRIGGERED":
+    case "RUNNING TRADE":
+      return "bg-amber-100 text-amber-700";
+
+    case "TRADE CLOSE WITH PROFIT":
+      return "bg-emerald-100 text-emerald-700";
+
+    case "TRADE SL HIT":
+      return "bg-red-100 text-red-700";
+
+    case "TRADE EXIT IN MID":
+    case "ENTRY CLOSED":
+      return "bg-purple-100 text-purple-700";
+
+    case "ENTRY MISSED":
+      return "bg-orange-100 text-orange-700";
+
+    case "ENTRY CANCELLED":
+      return "bg-gray-100 text-gray-700";
+
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+}
 function HariPick({ hariPicks, onOpenJournal, loadingId }) {
   return (
     <Panel className="p-5">
@@ -185,6 +217,14 @@ function HariPick({ hariPicks, onOpenJournal, loadingId }) {
                     }`}
                   >
                     {isShortDirection(pick) ? "SHORT" : "LONG"}
+                  </span>
+
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
+                      pick.status,
+                    )}`}
+                  >
+                    {pick.status}
                   </span>
 
                   <EyeButton
