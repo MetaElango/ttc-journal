@@ -657,7 +657,7 @@ export default async function AppPage() {
       .eq("is_shared", true)
       .eq("profiles.type", "admin")
       .order("updated_at", { ascending: false })
-      .limit(4),
+      .limit(10),
 
     supabase
       .from("journals")
@@ -679,7 +679,7 @@ export default async function AppPage() {
       .order("updated_at", {
         ascending: false,
       })
-      .limit(6),
+      .limit(10),
 
     supabase
       .from("journals")
@@ -705,15 +705,17 @@ export default async function AppPage() {
     (j) => !j.trading_accounts?.is_hidden,
   );
 
-  const hariPicks = (hariPicksRes.data || []).filter(
-    (j) =>
-      !j.trading_accounts?.is_hidden &&
-      j.status !== "ENTRY CLOSED" &&
-      j.status !== "TRADE EXIT IN MID" &&
-      j.status !== "TRADE SL HIT" &&
-      j.status !== "TRADE CLOSE WITH PROFIT" &&
-      j.status !== "ENTRY MISSED",
-  );
+  const hariPicks = (hariPicksRes.data || [])
+    .filter(
+      (j) =>
+        !j.trading_accounts?.is_hidden &&
+        j.status !== "ENTRY CLOSED" &&
+        j.status !== "TRADE EXIT IN MID" &&
+        j.status !== "TRADE SL HIT" &&
+        j.status !== "TRADE CLOSE WITH PROFIT" &&
+        j.status !== "ENTRY MISSED",
+    )
+    .slice(0, 3);
 
   const topSuggestions = (topSuggestionsRes.data || []).filter(
     (j) =>
