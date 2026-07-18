@@ -760,8 +760,30 @@ function SocialJournalCard({
     </article>
   );
 }
-
+const JOURNAL_TABS = [
+  {
+    key: "ACTIVE",
+    label: "Planned & Active",
+    statuses: ["ENTRY PLANNED", "ENTRY PLACED", "ENTRY TRIGGERED"],
+  },
+  {
+    key: "CLOSED",
+    label: "Closed",
+    statuses: [
+      "TRADE CLOSE WITH PROFIT",
+      "TRADE SL HIT",
+      "TRADE EXIT IN MID",
+      "ENTRY CLOSED",
+    ],
+  },
+  {
+    key: "MISSED_CANCELLED",
+    label: "Missed & Cancelled",
+    statuses: ["ENTRY MISSED", "ENTRY CANCELLED"],
+  },
+];
 export default function SocialClient({ journals, title, description }) {
+  const [activeJournalTab, setActiveJournalTab] = useState("ACTIVE");
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [confirmJournal, setConfirmJournal] = useState(null);
 
@@ -791,7 +813,13 @@ export default function SocialClient({ journals, title, description }) {
 
     return { total, incorporated, totalIncorporations };
   }, [journals]);
+function handleTabChange(tabKey) {
 
+  setActiveJournalTab(tabKey);
+
+  setStatusFilter("ALL");
+
+}
   const filterOptions = useMemo(() => {
     const purposes = Array.from(
       new Set(journals.map((j) => j.purpose).filter(Boolean)),
@@ -847,11 +875,27 @@ export default function SocialClient({ journals, title, description }) {
       users,
     };
   }, [journals]);
+const availableStatuses = useMemo(() => {
+  const selectedTab = JOURNAL_TABS.find(
+    (tab) => tab.key === activeJournalTab,
+  );
 
+  if (!selectedTab) return filterOptions.statuses;
+
+  return filterOptions.statuses.filter((status) =>
+    selectedTab.statuses.includes(norm(status)),
+  );
+}, [activeJournalTab, filterOptions.statuses]);
   const filteredJournals = useMemo(() => {
     return journals
       .filter((journal) => {
         const strategy = getStrategy(journal);
+        const selectedTab = JOURNAL_TABS.find(
+  (tab) => tab.key === activeJournalTab,
+);
+
+const tabMatch =
+  !selectedTab || selectedTab.statuses.includes(norm(journal.status));
 
         const purposeMatch =
           purposeFilter === "ALL" || journal.purpose === purposeFilter;
@@ -897,6 +941,7 @@ export default function SocialClient({ journals, title, description }) {
           userFilter === "ALL" || getAuthorName(journal) === userFilter;
 
         return (
+          tabMatch &&
           purposeMatch &&
           statusMatch &&
           symbolMatch &&
@@ -918,6 +963,7 @@ export default function SocialClient({ journals, title, description }) {
       });
   }, [
     journals,
+    activeJournalTab,
     purposeFilter,
     statusFilter,
     symbolFilter,
@@ -1143,7 +1189,7 @@ export default function SocialClient({ journals, title, description }) {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="ALL">All statuses</option>
-              {filterOptions.statuses.map((x) => (
+              {availableStatuses.map((x) => (
                 <option key={x} value={x}>
                   {x}
                 </option>
@@ -1151,6 +1197,45 @@ export default function SocialClient({ journals, title, description }) {
             </FilterSelect>
           </div>
         </section>
+
+        <section className="rounded-3xl border bg-card p-2 shadow-sm">
+  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    {JOURNAL_TABS.map((tab) => {
+      const isActive = activeJournalTab === tab.key;
+
+      const count = journals.filter((journal) =>
+        tab.statuses.includes(norm(journal.status)),
+      ).length;
+
+      return (
+        <button
+          key={tab.key}
+          type="button"
+          onClick={() => handleTabChange(tab.key)}
+          className={[
+            "flex min-h-12 items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition",
+            isActive
+              ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+              : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700",
+          ].join(" ")}
+        >
+          <span>{tab.label}</span>
+
+          <span
+            className={[
+              "rounded-full px-2.5 py-1 text-xs font-bold",
+              isActive
+                ? "bg-white/20 text-white"
+                : "bg-slate-100 text-slate-600",
+            ].join(" ")}
+          >
+            {count}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+</section>
 
         {journals.length === 0 ? (
           <div className="rounded-3xl border border-dashed bg-card p-12 text-center">
