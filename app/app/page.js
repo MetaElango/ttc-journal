@@ -398,6 +398,13 @@ function PreferableOpportunities({ topSuggestions }) {
 
 const SESSION_RECORDINGS = [
   {
+    title: "Weekly Outlook (Week 29)",
+    host: "With Hari",
+    date: "19 July 2026",
+    duration: "1 hr 13 mins",
+    embedUrl: "https://zoom.us/clips/embed/adZSTUkPTSigCvWaLSIPew",
+  },
+  {
     title: "Weekly Outlook (Week 28)",
     host: "With Hari",
     date: "15 July 2026",
