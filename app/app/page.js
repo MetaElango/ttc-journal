@@ -407,7 +407,7 @@ const SESSION_RECORDINGS = [
   {
     title: "Weekly Outlook (Week 28)",
     host: "With Hari",
-    date: "15 July 2026",
+    date: "12 July 2026",
     duration: "45 mins",
     embedUrl: "https://zoom.us/clips/embed/18viVO20RK-pTEdg-mlApQ",
   },
