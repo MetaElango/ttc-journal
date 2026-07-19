@@ -325,11 +325,36 @@ export default async function NewJournalPage({ searchParams }) {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
-  const { data: symbols } = await supabase
+  const { data: symbols, error: symbolsError } = await supabase
     .from("symbols")
-    .select("id, category, symbol_name")
+    .select(
+      `
+    id,
+    category,
+    symbol_name,
+    full_name,
+    asset_class,
+    contract_size,
+    tick_size,
+    decimal_places,
+    min_lot,
+    lot_step,
+    leverage,
+    margin_percent,
+    price_multiplier,
+    base_currency,
+    quote_currency,
+    profit_currency,
+    is_active
+  `,
+    )
+    .eq("is_active", true)
     .order("category", { ascending: true })
     .order("symbol_name", { ascending: true });
+
+  if (symbolsError) {
+    console.error("Failed to load symbols:", symbolsError);
+  }
 
   async function createJournal(prevState, formData) {
     "use server";
