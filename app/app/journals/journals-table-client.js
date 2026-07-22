@@ -1239,6 +1239,20 @@ export default function JournalsTableClient({ journals, activeTab }) {
     }
   }, [page, totalPages]);
 
+  const expectancyR = useMemo(() => {
+    const closedTrades = items
+      .map((journal) => getActualRRNumber(journal))
+      .filter((value) => value !== null && Number.isFinite(value));
+
+    if (!closedTrades.length) {
+      return null;
+    }
+
+    const totalR = closedTrades.reduce((sum, value) => sum + value, 0);
+
+    return totalR / closedTrades.length;
+  }, [items]);
+
   function handleSaved(journalId, updated) {
     setItems((previous) =>
       previous.map((item) =>
@@ -1314,6 +1328,7 @@ export default function JournalsTableClient({ journals, activeTab }) {
 
                 <th className="px-5 py-4 font-bold">Market</th>
                 <th className="px-5 py-4 font-bold">Action</th>
+                <th className="px-5 py-4 font-bold">Open time</th>
                 <th className="px-5 py-4 font-bold">Entry</th>
                 <th className="px-5 py-4 font-bold">Stop loss</th>
                 <th className="px-5 py-4 font-bold">Take profit</th>
@@ -1413,7 +1428,9 @@ export default function JournalsTableClient({ journals, activeTab }) {
                         {isBuy ? "Buy" : "Sell"}
                       </span>
                     </td>
-
+                    <td className="px-5 py-4 font-medium">
+                      <ClientDate value={journal.journal_start_at} />
+                    </td>
                     <td className="px-5 py-4 font-semibold">
                       {formatPrice(journal.entry_price, decimalPlaces)}
                     </td>
@@ -1559,6 +1576,7 @@ export default function JournalsTableClient({ journals, activeTab }) {
       <JournalDetailsModal
         journal={selectedJournal}
         onClose={() => setSelectedJournal(null)}
+        expectancyR={expectancyR}
         afterContent={
           selectedJournal ? (
             <AftermathDetails journal={selectedJournal} />

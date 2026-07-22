@@ -12,28 +12,87 @@ import {
 
 import CommentsSection from "../circle/comments-section";
 
-function norm(v) {
-  return String(v || "")
+const CLOSED_TRADE_STATUSES = [
+  "TRADE CLOSE WITH PROFIT",
+  "TRADE EXIT IN MID",
+  "TRADE SL HIT",
+];
+
+function norm(value) {
+  return String(value || "")
     .trim()
     .toUpperCase();
 }
 
-function getStatusTone(status) {
-  const s = norm(status);
+function toNumber(value, fallback = null) {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
 
-  if (["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"].includes(s)) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function formatUsd(value) {
+  const parsed = toNumber(value);
+
+  if (parsed === null) {
+    return "—";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(parsed);
+}
+
+function formatR(value) {
+  const parsed = toNumber(value);
+
+  if (parsed === null) {
+    return "—";
+  }
+
+  return `${parsed > 0 ? "+" : ""}${parsed.toFixed(2)}R`;
+}
+
+function formatRiskReward(value) {
+  const parsed = toNumber(value);
+
+  if (parsed === null) {
+    return "—";
+  }
+
+  return `1:${parsed.toFixed(2)}`;
+}
+
+function getStatusTone(status) {
+  const normalizedStatus = norm(status);
+
+  if (
+    ["ENTRY PLACED", "ENTRY TRIGGERED", "RUNNING TRADE"].includes(
+      normalizedStatus,
+    )
+  ) {
     return "border-blue-500/25 bg-blue-500/10 text-blue-700";
   }
 
-  if (["TRADE CLOSE WITH PROFIT"].includes(s)) {
+  if (normalizedStatus === "TRADE CLOSE WITH PROFIT") {
     return "border-emerald-500/25 bg-emerald-500/10 text-emerald-700";
   }
 
-  if (["TRADE SL HIT"].includes(s)) {
+  if (normalizedStatus === "TRADE SL HIT") {
     return "border-red-500/25 bg-red-500/10 text-red-700";
   }
 
-  if (["ENTRY CANCELLED", "ENTRY MISSED"].includes(s)) {
+  if (normalizedStatus === "TRADE EXIT IN MID") {
+    return "border-violet-500/25 bg-violet-500/10 text-violet-700";
+  }
+
+  if (["ENTRY CANCELLED", "ENTRY MISSED"].includes(normalizedStatus)) {
     return "border-amber-500/25 bg-amber-500/10 text-amber-700";
   }
 
@@ -51,6 +110,9 @@ function Pill({ children, className = "" }) {
 }
 
 function InfoBlock({ label, value, className = "" }) {
+  const displayValue =
+    value !== null && value !== undefined && value !== "" ? value : "—";
+
   return (
     <div
       className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 ${className}`}
@@ -58,9 +120,52 @@ function InfoBlock({ label, value, className = "" }) {
       <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
         {label}
       </div>
+
       <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-        {value || "—"}
+        {displayValue}
       </div>
+    </div>
+  );
+}
+
+function PerformanceCard({
+  label,
+  value,
+  numericValue = null,
+  helper = "",
+  neutral = false,
+}) {
+  const parsedValue = toNumber(numericValue);
+
+  let containerTone = "border-slate-200 bg-slate-50";
+  let valueTone = "text-slate-950";
+  let helperTone = "text-slate-500";
+
+  if (!neutral && parsedValue !== null) {
+    if (parsedValue > 0) {
+      containerTone = "border-emerald-500/20 bg-emerald-500/5";
+      valueTone = "text-emerald-700";
+      helperTone = "text-emerald-600";
+    } else if (parsedValue < 0) {
+      containerTone = "border-red-500/20 bg-red-500/5";
+      valueTone = "text-red-700";
+      helperTone = "text-red-600";
+    }
+  }
+
+  return (
+    <div className={`min-w-0 rounded-2xl border p-4 ${containerTone}`}>
+      <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
+
+      <div className={`mt-2 truncate text-xl font-black ${valueTone}`}>
+        {value}
+      </div>
+
+      {helper ? (
+        <div className={`mt-2 text-xs font-bold ${helperTone}`}>{helper}</div>
+      ) : null}
     </div>
   );
 }
@@ -71,7 +176,8 @@ function ReasonBox({ label, value }) {
       <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
         {label}
       </div>
-      <div className="min-h-[120px] resize-y overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-wrap">
+
+      <div className="min-h-[120px] resize-y overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7 text-slate-700">
         {value || "—"}
       </div>
     </div>
@@ -96,7 +202,9 @@ function NoteBlock({ title, value }) {
 }
 
 function ImageCarousel({ images, index, onClose, onPrev, onNext }) {
-  if (!images?.length) return null;
+  if (!images?.length) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 p-4">
@@ -145,13 +253,20 @@ export default function JournalDetailsModal({
   journal,
   onClose,
   afterContent,
+  expectancyR = null,
 }) {
-  const [carousel, setCarousel] = useState({ images: [], index: 0 });
+  const [carousel, setCarousel] = useState({
+    images: [],
+    index: 0,
+  });
+
   const [activeIndex, setActiveIndex] = useState(0);
-  const [commentCount, setCommentCount] = useState(0);
+  const [, setCommentCount] = useState(0);
 
   const allImages = useMemo(() => {
-    if (!journal) return [];
+    if (!journal) {
+      return [];
+    }
 
     return [
       ...(journal.setupImageUrls || []),
@@ -161,10 +276,15 @@ export default function JournalDetailsModal({
 
   useEffect(() => {
     setActiveIndex(0);
-    setCarousel({ images: [], index: 0 });
+    setCarousel({
+      images: [],
+      index: 0,
+    });
   }, [journal?.id]);
 
-  if (!journal) return null;
+  if (!journal) {
+    return null;
+  }
 
   const strategy = journal.strategy_snapshot || {};
   const activeImages = allImages;
@@ -173,22 +293,75 @@ export default function JournalDetailsModal({
     ? `${journal.symbols.symbol_name} — ${journal.symbols.category}`
     : "—";
 
+  const directionLabel = norm(journal.direction) === "SELL" ? "SHORT" : "LONG";
+
+  const isClosedTrade = CLOSED_TRADE_STATUSES.includes(norm(journal.status));
+
+  const profitLossUsd =
+    toNumber(journal.profit_loss_usd) ??
+    toNumber(journal.calculated_profit_loss_usd) ??
+    toNumber(journal.calculation?.profit_loss_usd);
+
+  const realizedR =
+    toNumber(journal.calculated_r_multiple) ??
+    toNumber(journal.calculation?.r_multiple);
+
+  const plannedRiskReward =
+    toNumber(journal.calculated_planned_rr) ??
+    toNumber(journal.calculation?.planned_risk_reward);
+
+  /*
+   * Expectancy normally belongs to a collection of trades.
+   * Pass expectancyR from the filtered closed-trade table when available.
+   */
+  const displayedExpectancy =
+    toNumber(expectancyR) ??
+    toNumber(journal.expectancy_r) ??
+    toNumber(journal.calculated_expectancy_r);
+
+  const profitLossHelper =
+    profitLossUsd === null
+      ? "Calculation unavailable"
+      : profitLossUsd > 0
+        ? "Realized profit"
+        : profitLossUsd < 0
+          ? "Realized loss"
+          : "Breakeven";
+
+  const rMultipleHelper =
+    realizedR === null
+      ? "Calculation unavailable"
+      : realizedR > 0
+        ? "Positive R result"
+        : realizedR < 0
+          ? "Negative R result"
+          : "Breakeven result";
+
   function prevImage() {
-    if (!activeImages.length) return;
+    if (!activeImages.length) {
+      return;
+    }
+
     setActiveIndex((current) =>
       current === 0 ? activeImages.length - 1 : current - 1,
     );
   }
 
   function nextImage() {
-    if (!activeImages.length) return;
+    if (!activeImages.length) {
+      return;
+    }
+
     setActiveIndex((current) =>
       current === activeImages.length - 1 ? 0 : current + 1,
     );
   }
 
   function closeCarousel() {
-    setCarousel({ images: [], index: 0 });
+    setCarousel({
+      images: [],
+      index: 0,
+    });
   }
 
   function carouselPrev() {
@@ -206,8 +379,6 @@ export default function JournalDetailsModal({
         current.index === current.images.length - 1 ? 0 : current.index + 1,
     }));
   }
-
-  const directionLabel = norm(journal.direction) === "SELL" ? "SHORT" : "LONG";
 
   return (
     <>
@@ -276,6 +447,7 @@ export default function JournalDetailsModal({
                   <div className="flex h-[640px] items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-white">
                     <div className="text-center">
                       <ImageIcon className="mx-auto h-10 w-10 text-slate-400" />
+
                       <p className="mt-3 text-sm text-slate-500">
                         No setup images uploaded
                       </p>
@@ -286,24 +458,26 @@ export default function JournalDetailsModal({
 
               {allImages.length ? (
                 <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
-                  {allImages.map((img, idx) => (
+                  {allImages.map((image, index) => (
                     <button
-                      key={`${img}-${idx}`}
+                      key={`${image}-${index}`}
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        setActiveIndex(index);
+
                         setCarousel({
                           images: allImages,
-                          index: idx,
-                        })
-                      }
+                          index,
+                        });
+                      }}
                       className={`overflow-hidden rounded-2xl border transition ${
-                        activeIndex === idx
+                        activeIndex === index
                           ? "border-sky-500 ring-2 ring-sky-500/20"
                           : "border-slate-200"
                       }`}
                     >
                       <img
-                        src={img}
+                        src={image}
                         alt=""
                         className="h-20 w-28 object-cover"
                       />
@@ -340,13 +514,13 @@ export default function JournalDetailsModal({
 
             <div className="space-y-4 overflow-y-auto bg-white p-5">
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
                     <div className="text-xs font-bold uppercase text-slate-500">
                       Symbol
                     </div>
 
-                    <div className="mt-2 text-2xl font-bold text-slate-950">
+                    <div className="mt-2 truncate text-2xl font-bold text-slate-950">
                       {journal.symbols?.symbol_name || "—"}
                     </div>
 
@@ -362,6 +536,7 @@ export default function JournalDetailsModal({
                       ) : (
                         <TrendingUp className="h-3.5 w-3.5" />
                       )}
+
                       {directionLabel}
                     </div>
                   </div>
@@ -371,6 +546,55 @@ export default function JournalDetailsModal({
                   </Pill>
                 </div>
               </div>
+
+              {isClosedTrade ? (
+                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="mb-4">
+                    <div className="text-sm font-bold text-slate-950">
+                      Trade Performance
+                    </div>
+
+                    <div className="mt-1 text-xs font-medium text-slate-500">
+                      Realized result and original trade plan
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <PerformanceCard
+                      label="Profit & Loss"
+                      value={formatUsd(profitLossUsd)}
+                      numericValue={profitLossUsd}
+                      helper={profitLossHelper}
+                    />
+
+                    <PerformanceCard
+                      label="R Multiple"
+                      value={formatR(realizedR)}
+                      numericValue={realizedR}
+                      helper={rMultipleHelper}
+                    />
+
+                    <PerformanceCard
+                      label="Risk to Reward"
+                      value={formatRiskReward(plannedRiskReward)}
+                      numericValue={plannedRiskReward}
+                      helper="Original planned RR"
+                      neutral
+                    />
+
+                    <PerformanceCard
+                      label="Expectancy"
+                      value={formatR(displayedExpectancy)}
+                      numericValue={displayedExpectancy}
+                      helper={
+                        displayedExpectancy !== null
+                          ? "Filtered trades average R"
+                          : "Expectancy not provided"
+                      }
+                    />
+                  </div>
+                </div>
+              ) : null}
 
               <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-4 text-sm font-bold text-slate-950">
@@ -382,8 +606,9 @@ export default function JournalDetailsModal({
                     <div className="text-xs font-bold uppercase text-blue-600">
                       Entry Price
                     </div>
+
                     <div className="mt-2 text-2xl font-bold text-slate-950">
-                      {journal.entry_price || "—"}
+                      {journal.entry_price ?? "—"}
                     </div>
                   </div>
 
@@ -391,8 +616,9 @@ export default function JournalDetailsModal({
                     <div className="text-xs font-bold uppercase text-orange-600">
                       Stop Loss
                     </div>
+
                     <div className="mt-2 text-2xl font-bold text-slate-950">
-                      {journal.stop_loss || "—"}
+                      {journal.stop_loss ?? "—"}
                     </div>
                   </div>
                 </div>
@@ -405,18 +631,24 @@ export default function JournalDetailsModal({
                   <div className="mt-3 space-y-2">
                     {Array.isArray(journal.take_profit) &&
                     journal.take_profit.length ? (
-                      journal.take_profit.map((tp, i) => (
+                      journal.take_profit.map((takeProfit, index) => (
                         <div
-                          key={i}
-                          className="flex items-center justify-between rounded-xl bg-white/80 px-3 py-2 text-sm"
+                          key={`${takeProfit}-${index}`}
+                          className="flex items-center justify-between gap-3 rounded-xl bg-white/80 px-3 py-2 text-sm"
                         >
-                          <span className="font-semibold text-slate-600">
-                            TP {i + 1}
+                          <span className="shrink-0 font-semibold text-slate-600">
+                            TP {index + 1}
                           </span>
-                          <span className="font-bold text-slate-950">
-                            {tp}{" "}
+
+                          <span className="min-w-0 text-right font-bold text-slate-950">
+                            {takeProfit}{" "}
                             <span className="text-xs font-medium text-slate-500">
-                              ({journal.take_profit_qty?.[i] || "—"} lots)
+                              (
+                              {journal.take_profit_qty?.[index] !== null &&
+                              journal.take_profit_qty?.[index] !== undefined
+                                ? journal.take_profit_qty[index]
+                                : "—"}{" "}
+                              lots)
                             </span>
                           </span>
                         </div>
@@ -430,15 +662,22 @@ export default function JournalDetailsModal({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <InfoBlock label="Quantity" value={journal.quantity} />
+
                 <InfoBlock
                   label="Risk"
                   value={
-                    journal.risk_per_trade
-                      ? `${journal.risk_per_trade} ${journal.risk_mode || ""}`
+                    journal.risk_per_trade !== null &&
+                    journal.risk_per_trade !== undefined &&
+                    journal.risk_per_trade !== ""
+                      ? `${journal.risk_per_trade} ${
+                          journal.risk_mode || ""
+                        }`.trim()
                       : "—"
                   }
                 />
+
                 <InfoBlock label="Symbol" value={symbol} />
+
                 <InfoBlock
                   label="Account"
                   value={journal.trading_accounts?.account_name || "—"}
@@ -455,11 +694,12 @@ export default function JournalDetailsModal({
                     label="Entry Reason"
                     value={journal.entry_reason}
                   />
+
                   <ReasonBox label="Exit Reason" value={journal.exit_reason} />
                 </div>
               </div>
 
-              {(journal.owner_note || journal.admin_note) && (
+              {journal.owner_note || journal.admin_note ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="mb-4 text-sm font-bold text-slate-950">
                     Notes
@@ -467,10 +707,11 @@ export default function JournalDetailsModal({
 
                   <div className="space-y-3">
                     <NoteBlock title="Trader Note" value={journal.owner_note} />
+
                     <NoteBlock title="Admin Note" value={journal.admin_note} />
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {afterContent}
 
