@@ -174,6 +174,18 @@ function getLotSize(journal) {
   return toNumber(journal.lot_size) ?? toNumber(journal.quantity);
 }
 
+function getTradingAccount(journal) {
+  return journal.trading_accounts || null;
+}
+
+function getAccountId(journal) {
+  return journal.trading_account_id || journal.trading_accounts?.id || null;
+}
+
+function getAccountInitialBalance(journal) {
+  return toNumber(journal.trading_accounts?.account_size);
+}
+
 function getEffectiveContractSize(journal) {
   return (
     toNumber(journal.effective_contract_size) ??
@@ -769,6 +781,52 @@ export default function JournalIntelligencePanel({
       0,
     );
 
+    /*
+     * The journals prop already contains the client-side filtered journals.
+     *
+     * Therefore:
+     * - Initial Balance includes only accounts represented by filtered trades.
+     * - Current Balance uses only the filtered closed-trade P&L.
+     * - Each account's account_size is added only once.
+     */
+    const uniqueAccounts = new Map();
+
+    performanceJournals.forEach((journal) => {
+      const accountId = getAccountId(journal);
+      const initialBalance = getAccountInitialBalance(journal);
+
+      if (!accountId || initialBalance === null) {
+        return;
+      }
+
+      if (!uniqueAccounts.has(accountId)) {
+        uniqueAccounts.set(accountId, {
+          initialBalance,
+          profitLossUsd: 0,
+        });
+      }
+
+      const account = uniqueAccounts.get(accountId);
+
+      account.profitLossUsd += calculateProfitLossUsd(journal);
+    });
+
+    const accountValues = Array.from(uniqueAccounts.values());
+
+    const accountInitialBalance = accountValues.reduce(
+      (sum, account) => sum + account.initialBalance,
+      0,
+    );
+
+    const accountProfitLossUsd = accountValues.reduce(
+      (sum, account) => sum + account.profitLossUsd,
+      0,
+    );
+
+    const accountCurrentBalance = accountInitialBalance + accountProfitLossUsd;
+
+    const accountCount = accountValues.length;
+
     const winningTrades = calculatedTrades.filter((trade) => trade.r > 0);
 
     const losingTrades = calculatedTrades.filter((trade) => trade.r < 0);
@@ -905,6 +963,10 @@ export default function JournalIntelligencePanel({
       totalTrades,
       totalR,
       totalProfitLossUsd,
+      accountInitialBalance,
+      accountCurrentBalance,
+      accountProfitLossUsd,
+      accountCount,
       winRate,
       avgWinR,
       avgLossR,
@@ -1022,7 +1084,38 @@ export default function JournalIntelligencePanel({
           value={analytics.totalTrades}
           helper="Filtered"
         />
+        <MetricCard
+          label="Initial Balance"
+          value={
+            analytics.accountCount > 0
+              ? formatUsd(analytics.accountInitialBalance)
+              : "—"
+          }
+          helper={
+            analytics.accountCount === 1
+              ? "Filtered account"
+              : analytics.accountCount > 1
+                ? `${analytics.accountCount} accounts combined`
+                : "No account available"
+          }
+        />
 
+        <MetricCard
+          label="Current Balance"
+          value={
+            analytics.accountCount > 0
+              ? formatUsd(analytics.accountCurrentBalance)
+              : "—"
+          }
+          positive={analytics.accountProfitLossUsd >= 0}
+          helper={
+            analytics.accountProfitLossUsd >= 0
+              ? `${formatUsd(analytics.accountProfitLossUsd)} filtered profit`
+              : `${formatUsd(
+                  Math.abs(analytics.accountProfitLossUsd),
+                )} filtered loss`
+          }
+        />
         <MetricCard
           label="Net P&L"
           value={formatUsd(analytics.totalProfitLossUsd)}
