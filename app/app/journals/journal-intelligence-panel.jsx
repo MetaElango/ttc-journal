@@ -1101,7 +1101,7 @@ export default function JournalIntelligencePanel({
         />
 
         <MetricCard
-          label="Current Balance"
+          label="Equity Balance"
           value={
             analytics.accountCount > 0
               ? formatUsd(analytics.accountCurrentBalance)
